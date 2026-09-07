@@ -70,6 +70,10 @@ struct PermissionsSettingsView: View {
     private static let knownAuthorizedBrowserBundleIDsStorageKey = "voxt.permissions.knownAuthorizedBrowserBundleIDs"
 
     @State private var states: [SettingsPermissionKind: PermissionState] = [:]
+    // Resolve permission requirements only when the inputs change. Loading
+    // feature settings performs prompt/resource normalization and must not be
+    // part of the SwiftUI body evaluation path.
+    @State private var requiredPermissionKinds: [SettingsPermissionKind] = []
     @State private var monitoringKinds: Set<SettingsPermissionKind> = []
     @State private var monitorTasks: [SettingsPermissionKind: Task<Void, Never>] = [:]
 
@@ -95,29 +99,13 @@ struct PermissionsSettingsView: View {
         TranscriptionEngine(rawValue: transcriptionEngineRaw) ?? .mlxAudio
     }
 
-    private var featureSettings: FeatureSettings {
-        FeatureSettingsStore.load(defaults: .standard)
-    }
-
-    private var permissionRequirementContext: SettingsPermissionRequirementContext {
-        SettingsPermissionRequirementResolver.requirementContext(
-            selectedEngine: transcriptionEngine,
-            muteSystemAudioWhileRecording: muteSystemAudioWhileRecording,
-            featureSettings: featureSettings
-        )
-    }
-
-    private var permissionKinds: [SettingsPermissionKind] {
-        SettingsPermissionRequirementResolver.requiredPermissions(context: permissionRequirementContext)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             PermissionsSettingsSection(
                 title: "",
                 description: ""
             ) {
-                ForEach(permissionKinds) { kind in
+                ForEach(requiredPermissionKinds) { kind in
                     permissionRow(kind)
                 }
             }
@@ -174,7 +162,7 @@ struct PermissionsSettingsView: View {
         }
         .onAppear {
             _ = AccessibilityPermissionManager.request(prompt: false)
-            refreshStates()
+            refreshPermissionRequirementsAndStates()
             let targets = loadBrowserTargets()
             refreshBrowserAutomationStates(targets: targets)
         }
@@ -189,13 +177,13 @@ struct PermissionsSettingsView: View {
         }
         .animation(.easeInOut(duration: 0.16), value: permissionToastMessage)
         .onChange(of: muteSystemAudioWhileRecording) { _, _ in
-            refreshStates()
+            refreshPermissionRequirementsAndStates()
         }
         .onChange(of: transcriptionEngineRaw) { _, _ in
-            refreshStates()
+            refreshPermissionRequirementsAndStates()
         }
         .onChange(of: featureSettingsRaw) { _, _ in
-            refreshStates()
+            refreshPermissionRequirementsAndStates()
         }
         .onDisappear {
             stopAllMonitoring()
@@ -299,11 +287,34 @@ struct PermissionsSettingsView: View {
             .foregroundStyle(state.tint)
     }
 
-    private func refreshStates() {
+    private func refreshPermissionRequirementsAndStates() {
+        let settings = FeatureSettingsStore.load(defaults: .standard)
+        let context = SettingsPermissionRequirementResolver.requirementContext(
+            selectedEngine: transcriptionEngine,
+            muteSystemAudioWhileRecording: muteSystemAudioWhileRecording,
+            featureSettings: settings
+        )
+        let latestKinds = SettingsPermissionRequirementResolver.requiredPermissions(context: context)
+        if latestKinds != requiredPermissionKinds {
+            requiredPermissionKinds = latestKinds
+        }
+
         var snapshot: [SettingsPermissionKind: PermissionState] = [:]
-        for kind in permissionKinds {
+        for kind in latestKinds {
             snapshot[kind] = currentState(for: kind)
         }
+        guard snapshot != states else { return }
+        states = snapshot
+        notifyPermissionStatusChanged()
+        VoxtLog.settings("Permission status: \(permissionSnapshotText(snapshot))")
+    }
+
+    private func refreshStates() {
+        var snapshot: [SettingsPermissionKind: PermissionState] = [:]
+        for kind in requiredPermissionKinds {
+            snapshot[kind] = currentState(for: kind)
+        }
+        guard snapshot != states else { return }
         states = snapshot
         notifyPermissionStatusChanged()
         VoxtLog.settings("Permission status: \(permissionSnapshotText(snapshot))")
@@ -576,7 +587,7 @@ struct PermissionsSettingsView: View {
                           !browserAutomationTestsInFlight.contains(target.bundleID) else {
                         return
                     }
-                    browserAutomationStates[target.bundleID] = state
+                    setBrowserAutomationState(state, for: target)
                 }
            }
         }
@@ -654,13 +665,13 @@ struct PermissionsSettingsView: View {
                 browserAutomationRequestTasks.removeValue(forKey: target.bundleID)
                 browserAutomationRequestsInFlight.remove(target.bundleID)
                 if let integrityError = result.integrityError {
-                    browserAutomationStates[target.bundleID] = .disabled
+                    setBrowserAutomationState(.disabled, for: target)
                     showPermissionToast(integrityError, duration: 5.0)
                     return
                 }
 
                 guard let scriptProbe = result.scriptProbe else { return }
-                browserAutomationStates[target.bundleID] = result.enabled ? .enabled : .disabled
+                setBrowserAutomationState(result.enabled ? .enabled : .disabled, for: target)
                 if result.enabled {
                     setKnownAuthorizedBrowser(target.bundleID, isAuthorized: true)
                     if result.permissionGranted && scriptProbe.appNotRunning {
@@ -783,21 +794,21 @@ struct PermissionsSettingsView: View {
                 browserAutomationTestTasks.removeValue(forKey: target.bundleID)
                 browserAutomationTestsInFlight.remove(target.bundleID)
                 if let integrityError = result.integrityError {
-                    browserAutomationStates[target.bundleID] = .disabled
+                    setBrowserAutomationState(.disabled, for: target)
                     showPermissionToast(integrityError, duration: 5.0)
                     return
                 }
 
                 guard let scriptProbe = result.scriptProbe else { return }
                 if scriptProbe.success {
-                    browserAutomationStates[target.bundleID] = .enabled
+                    setBrowserAutomationState(.enabled, for: target)
                     setKnownAuthorizedBrowser(target.bundleID, isAuthorized: true)
                     showPermissionToast(AppLocalization.localizedString("Browser URL read test succeeded."))
                     return
                 }
 
                 if scriptProbe.permissionDenied {
-                    browserAutomationStates[target.bundleID] = .disabled
+                    setBrowserAutomationState(.disabled, for: target)
                     setKnownAuthorizedBrowser(target.bundleID, isAuthorized: false)
                     showPermissionToast(AppLocalization.localizedString("Browser URL read test failed: permission denied."))
                 } else if scriptProbe.appNotRunning {
@@ -951,12 +962,17 @@ struct PermissionsSettingsView: View {
     }
 
     private func permissionSnapshotText(_ snapshot: [SettingsPermissionKind: PermissionState]) -> String {
-        permissionKinds
+        requiredPermissionKinds
             .map { kind in
                 let state = snapshot[kind] ?? .disabled
                 return "\(kind.logKey)=\(state == .enabled ? "on" : "off")"
             }
             .joined(separator: ", ")
+    }
+
+    private func setBrowserAutomationState(_ state: PermissionState, for target: BrowserAutomationTarget) {
+        guard browserAutomationStates[target.bundleID] != state else { return }
+        browserAutomationStates[target.bundleID] = state
     }
 }
 

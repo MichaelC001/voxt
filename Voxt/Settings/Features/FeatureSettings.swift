@@ -641,6 +641,32 @@ struct FeatureSettings: Codable, Hashable, Sendable {
     var meeting: MeetingFeatureSettings
     var availability: FeatureAvailabilitySettings
 
+    // SwiftUI may recreate a View value many times while it is rendering.
+    // This value is intentionally cheap and side-effect free; persisted
+    // settings must be loaded from an explicit lifecycle callback instead of
+    // from a @State property initializer.
+    static let placeholder = FeatureSettings(
+        transcription: TranscriptionFeatureSettings(
+            asrSelectionID: .dictation,
+            llmEnabled: false,
+            llmSelectionID: .localLLM(CustomLLMModelManager.defaultModelRepo),
+            prompt: ""
+        ),
+        translation: TranslationFeatureSettings(
+            asrSelectionID: .dictation,
+            modelSelectionID: .localLLM(CustomLLMModelManager.defaultModelRepo),
+            targetLanguageRawValue: TranslationTargetLanguage.english.rawValue,
+            prompt: ""
+        ),
+        rewrite: RewriteFeatureSettings(
+            asrSelectionID: .dictation,
+            llmSelectionID: .localLLM(CustomLLMModelManager.defaultModelRepo),
+            prompt: "",
+            appEnhancementEnabled: true
+        ),
+        availability: .allEnabled
+    )
+
     init(
         transcription: TranscriptionFeatureSettings,
         translation: TranslationFeatureSettings,

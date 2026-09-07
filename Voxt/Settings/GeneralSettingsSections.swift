@@ -350,11 +350,8 @@ private struct ClampedIntegerTextField: View {
 
                     let parsed = Int(digits) ?? range.lowerBound
                     let clamped = min(max(parsed, range.lowerBound), range.upperBound)
-                    value = clamped
-
-                    let clampedText = String(clamped)
-                    if text != clampedText {
-                        text = clampedText
+                    if value != clamped {
+                        value = clamped
                     }
                 }
                 .onSubmit {

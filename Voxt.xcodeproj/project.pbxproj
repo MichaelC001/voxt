@@ -1014,7 +1014,7 @@
 			repositoryURL = "https://github.com/mattt/llama.swift.git";
 			requirement = {
 				kind = exactVersion;
-				version = 2.10069.0;
+				version = 2.10549.0;
 			};
 		};
 		C1D2E3F4A5060708090A0B03 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
@@ -1030,7 +1030,7 @@
 			repositoryURL = "https://github.com/jaywcjlove/PermissionFlow.git";
 			requirement = {
 				kind = exactVersion;
-				version = 2.6.0;
+				version = 2.11.2;
 			};
 		};
 		F1A2B3C4D5E6F708090A0B0E /* XCRemoteSwiftPackageReference "FaviconFinder" */ = {
@@ -1046,7 +1046,7 @@
 			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
 			requirement = {
 				kind = exactVersion;
-				version = 0.15.5;
+				version = 0.15.6;
 			};
 		};
 		FA11DBA2FA11DBA2FA11DBA2 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {

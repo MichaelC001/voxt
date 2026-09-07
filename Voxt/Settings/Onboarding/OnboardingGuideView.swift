@@ -53,7 +53,7 @@ struct OnboardingGuideView: View {
     @State private var showsMoreRemoteLLMProviders = false
     @State private var modelStorageDisplayPath = ""
     @State private var modelStorageSelectionError: String?
-    @State private var featureSettings = FeatureSettingsStore.load(defaults: .standard)
+    @State private var featureSettings = FeatureSettings.placeholder
     @State private var isMicrophoneDialogPresented = false
     @State private var isUserMainLanguageDialogPresented = false
     @State private var isModelStorageDialogPresented = false

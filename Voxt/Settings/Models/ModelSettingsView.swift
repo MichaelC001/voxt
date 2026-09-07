@@ -51,7 +51,7 @@ struct ModelSettingsView: View {
 
     @State var catalogTab: ModelCatalogTab = .asr
     @State var selectedTags = Set<String>()
-    @State var cachedFeatureSettings = FeatureSettingsStore.load()
+    @State var cachedFeatureSettings = FeatureSettings.placeholder
     @State var cachedRemoteASRConfigurations = [String: RemoteProviderConfiguration]()
     @State var cachedRemoteLLMConfigurations = [String: RemoteProviderConfiguration]()
     @State private var modelStorageDisplayPath = ""

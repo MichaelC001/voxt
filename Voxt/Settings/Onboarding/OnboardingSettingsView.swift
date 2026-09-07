@@ -62,7 +62,7 @@ struct OnboardingSettingsView: View {
     @State var rewriteTestPrompt = OnboardingRewriteTest.defaultPrompt
     @State var rewriteTestSourceText = OnboardingRewriteTest.defaultSourceText
     @State var appEnhancementDemoPlayer: AVPlayer?
-    @State var featureSettings = FeatureSettingsStore.load(defaults: .standard)
+    @State var featureSettings = FeatureSettings.placeholder
     @State private var permissionRefreshRevision = 0
     @State var permissionMonitoringKinds: Set<OnboardingContextualPermission> = []
     @State private var permissionMonitorTasks: [OnboardingContextualPermission: Task<Void, Never>] = [:]

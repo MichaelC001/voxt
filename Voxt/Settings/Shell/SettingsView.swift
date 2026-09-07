@@ -431,10 +431,6 @@ struct SettingsView: View {
         AppInterfaceLanguage(rawValue: interfaceLanguageRaw) ?? .system
     }
 
-    private var featureSettings: FeatureSettings {
-        FeatureSettingsStore.load(defaults: .standard)
-    }
-
     private var currentTranscriptionHotkeyDisplayString: String {
         _ = hotkeyInputType
         _ = hotkeyKeyCode
@@ -695,7 +691,9 @@ struct SettingsView: View {
             featureSettings: featureSettings
         )
 
-        hasMissingPermissions = SettingsPermissionRequirementResolver.hasMissingPermissions(context: context)
+        let hasMissingPermissions = SettingsPermissionRequirementResolver.hasMissingPermissions(context: context)
+        guard self.hasMissingPermissions != hasMissingPermissions else { return }
+        self.hasMissingPermissions = hasMissingPermissions
     }
 
     private func refreshModelConfigurationBadge() {

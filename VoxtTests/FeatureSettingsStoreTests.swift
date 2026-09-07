@@ -52,6 +52,43 @@ final class FeatureSettingsStoreTests: XCTestCase {
         }
     }
 
+    func testLoadNormalizationDoesNotBroadcastFeatureSettingsChange() throws {
+        try withEphemeralDefaults { defaults in
+            let notificationExpectation = expectation(
+                forNotification: .voxtFeatureSettingsDidChange,
+                object: nil
+            )
+            notificationExpectation.isInverted = true
+
+            _ = FeatureSettingsStore.load(defaults: defaults)
+
+            wait(for: [notificationExpectation], timeout: 0.1)
+        }
+    }
+
+    func testLoadNormalizationIsIdempotent() throws {
+        try withEphemeralDefaults { defaults in
+            let first = FeatureSettingsStore.load(defaults: defaults)
+            let second = FeatureSettingsStore.load(defaults: defaults)
+
+            if first.transcription != second.transcription {
+                XCTFail("transcription changed between loads")
+            }
+            if first.translation != second.translation {
+                XCTFail("translation changed between loads")
+            }
+            if first.rewrite != second.rewrite {
+                XCTFail("rewrite changed between loads")
+            }
+            if first.meeting != second.meeting {
+                XCTFail("meeting changed between loads")
+            }
+            if first.availability != second.availability {
+                XCTFail("availability changed between loads")
+            }
+        }
+    }
+
     func testRemovedModelSelectionsMigrateToSupportedDefaults() {
         let legacySherpaSelection = FeatureModelSelectionID(rawValue: "sherpa:funasr-nano-int8")
         XCTAssertEqual(

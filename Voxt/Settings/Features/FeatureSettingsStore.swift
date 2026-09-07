@@ -22,31 +22,52 @@ enum FeatureSettingsStore {
            let decoded = try? JSONDecoder().decode(FeatureSettings.self, from: data) {
             let sanitized = sanitize(decoded, defaults: defaults)
             if sanitized != decoded {
-                save(sanitized, defaults: defaults)
+                // Loading and normalizing settings is a read operation. Do
+                // not broadcast a change here: observers commonly call load
+                // in response to this notification, which would otherwise
+                // create a notification -> load -> save -> notification loop.
+                _ = persist(sanitized, defaults: defaults, notify: false)
             }
             return sanitized
         }
         let derived = deriveFromLegacy(defaults: defaults)
-        save(derived, defaults: defaults)
-        return derived
+        let normalized = sanitize(derived, defaults: defaults, fallback: derived)
+        _ = persist(normalized, defaults: defaults, notify: false)
+        return normalized
     }
 
-    static func save(_ settings: FeatureSettings, defaults: UserDefaults = .standard) {
+    static func save(
+        _ settings: FeatureSettings,
+        defaults: UserDefaults = .standard,
+        notify: Bool = true
+    ) {
         removeObsoleteLatencyProfileKeys(defaults: defaults)
         enforceAlwaysOnLegacyFlags(defaults: defaults)
         let sanitized = sanitize(settings, defaults: defaults)
-        let storageReady = storageRepresentation(for: sanitized)
+        _ = persist(sanitized, defaults: defaults, notify: notify)
+    }
+
+    private static func persist(
+        _ settings: FeatureSettings,
+        defaults: UserDefaults,
+        notify: Bool
+    ) -> Bool {
+        var didChange = false
+        let storageReady = storageRepresentation(for: settings)
         if let data = try? JSONEncoder().encode(storageReady),
            let raw = String(data: data, encoding: .utf8) {
-            defaults.set(raw, forKey: AppPreferenceKey.featureSettings)
+            didChange = setIfChanged(raw, forKey: AppPreferenceKey.featureSettings, defaults: defaults) || didChange
         }
         // Keep feature-specific keys that runtime flows still read in sync.
         // VAD mode is global and is not read from or written to meeting settings.
-        syncLegacyTranscription(storageReady.transcription, defaults: defaults)
-        syncLegacyTranslation(storageReady.translation, defaults: defaults)
-        syncLegacyRewrite(storageReady.rewrite, defaults: defaults)
-        syncLegacyMeeting(storageReady.meeting, defaults: defaults)
-        NotificationCenter.default.post(name: .voxtFeatureSettingsDidChange, object: nil)
+        didChange = syncLegacyTranscription(storageReady.transcription, defaults: defaults) || didChange
+        didChange = syncLegacyTranslation(storageReady.translation, defaults: defaults) || didChange
+        didChange = syncLegacyRewrite(storageReady.rewrite, defaults: defaults) || didChange
+        didChange = syncLegacyMeeting(storageReady.meeting, defaults: defaults) || didChange
+        if notify, didChange {
+            NotificationCenter.default.post(name: .voxtFeatureSettingsDidChange, object: nil)
+        }
+        return didChange
     }
 
     static func update(defaults: UserDefaults = .standard, _ mutate: (inout FeatureSettings) -> Void) {
@@ -95,7 +116,7 @@ enum FeatureSettingsStore {
     }
 
     private static func enforceAlwaysOnLegacyFlags(defaults: UserDefaults) {
-        defaults.set(true, forKey: AppPreferenceKey.translateSelectedTextOnTranslationHotkey)
+        _ = setIfChanged(true, forKey: AppPreferenceKey.translateSelectedTextOnTranslationHotkey, defaults: defaults)
     }
 
     nonisolated static func availability(defaults: UserDefaults = .standard) -> FeatureAvailabilitySettings {
@@ -253,105 +274,139 @@ enum FeatureSettingsStore {
         let availability: FeatureAvailabilitySettings
     }
 
-    private static func syncLegacyASRSelection(_ selectionID: FeatureModelSelectionID, defaults: UserDefaults) {
+    @discardableResult
+    private static func syncLegacyASRSelection(_ selectionID: FeatureModelSelectionID, defaults: UserDefaults) -> Bool {
+        var didChange = false
         switch selectionID.asrSelection {
         case .dictation:
-            defaults.set(TranscriptionEngine.dictation.rawValue, forKey: AppPreferenceKey.transcriptionEngine)
+            didChange = setIfChanged(TranscriptionEngine.dictation.rawValue, forKey: AppPreferenceKey.transcriptionEngine, defaults: defaults) || didChange
         case .mlx(let repo):
-            defaults.set(TranscriptionEngine.mlxAudio.rawValue, forKey: AppPreferenceKey.transcriptionEngine)
-            defaults.set(MLXModelManager.canonicalModelRepo(repo), forKey: AppPreferenceKey.mlxModelRepo)
+            didChange = setIfChanged(TranscriptionEngine.mlxAudio.rawValue, forKey: AppPreferenceKey.transcriptionEngine, defaults: defaults) || didChange
+            didChange = setIfChanged(MLXModelManager.canonicalModelRepo(repo), forKey: AppPreferenceKey.mlxModelRepo, defaults: defaults) || didChange
         case .remote(let provider):
-            defaults.set(TranscriptionEngine.remote.rawValue, forKey: AppPreferenceKey.transcriptionEngine)
-            defaults.set(provider.rawValue, forKey: AppPreferenceKey.remoteASRSelectedProvider)
+            didChange = setIfChanged(TranscriptionEngine.remote.rawValue, forKey: AppPreferenceKey.transcriptionEngine, defaults: defaults) || didChange
+            didChange = setIfChanged(provider.rawValue, forKey: AppPreferenceKey.remoteASRSelectedProvider, defaults: defaults) || didChange
         case .none:
-            defaults.set(TranscriptionEngine.mlxAudio.rawValue, forKey: AppPreferenceKey.transcriptionEngine)
+            didChange = setIfChanged(TranscriptionEngine.mlxAudio.rawValue, forKey: AppPreferenceKey.transcriptionEngine, defaults: defaults) || didChange
         }
+        return didChange
     }
 
-    private static func syncLegacyTranscription(_ settings: TranscriptionFeatureSettings, defaults: UserDefaults) {
-        defaults.set(
+    @discardableResult
+    private static func syncLegacyTranscription(_ settings: TranscriptionFeatureSettings, defaults: UserDefaults) -> Bool {
+        var didChange = setIfChanged(
             AppPromptDefaults.canonicalStoredText(settings.prompt, kind: .enhancement),
-            forKey: AppPreferenceKey.enhancementSystemPrompt
+            forKey: AppPreferenceKey.enhancementSystemPrompt,
+            defaults: defaults
         )
         guard settings.llmEnabled else {
-            defaults.set(EnhancementMode.off.rawValue, forKey: AppPreferenceKey.enhancementMode)
-            return
+            didChange = setIfChanged(EnhancementMode.off.rawValue, forKey: AppPreferenceKey.enhancementMode, defaults: defaults) || didChange
+            return didChange
         }
 
         switch settings.llmSelectionID.textSelection {
         case .appleIntelligence:
-            defaults.set(EnhancementMode.appleIntelligence.rawValue, forKey: AppPreferenceKey.enhancementMode)
+            didChange = setIfChanged(EnhancementMode.appleIntelligence.rawValue, forKey: AppPreferenceKey.enhancementMode, defaults: defaults) || didChange
         case .localLLM(let repo):
-            defaults.set(EnhancementMode.customLLM.rawValue, forKey: AppPreferenceKey.enhancementMode)
-            defaults.set(repo, forKey: AppPreferenceKey.customLLMModelRepo)
+            didChange = setIfChanged(EnhancementMode.customLLM.rawValue, forKey: AppPreferenceKey.enhancementMode, defaults: defaults) || didChange
+            didChange = setIfChanged(repo, forKey: AppPreferenceKey.customLLMModelRepo, defaults: defaults) || didChange
         case .remoteLLM(let provider):
-            defaults.set(EnhancementMode.remoteLLM.rawValue, forKey: AppPreferenceKey.enhancementMode)
-            defaults.set(provider.rawValue, forKey: AppPreferenceKey.remoteLLMSelectedProvider)
+            didChange = setIfChanged(EnhancementMode.remoteLLM.rawValue, forKey: AppPreferenceKey.enhancementMode, defaults: defaults) || didChange
+            didChange = setIfChanged(provider.rawValue, forKey: AppPreferenceKey.remoteLLMSelectedProvider, defaults: defaults) || didChange
         case .none:
-            defaults.set(EnhancementMode.off.rawValue, forKey: AppPreferenceKey.enhancementMode)
+            didChange = setIfChanged(EnhancementMode.off.rawValue, forKey: AppPreferenceKey.enhancementMode, defaults: defaults) || didChange
         }
+        return didChange
     }
 
-    private static func syncLegacyTranslation(_ settings: TranslationFeatureSettings, defaults: UserDefaults) {
-        defaults.set(
+    @discardableResult
+    private static func syncLegacyTranslation(_ settings: TranslationFeatureSettings, defaults: UserDefaults) -> Bool {
+        var didChange = setIfChanged(
             AppPromptDefaults.canonicalStoredText(settings.prompt, kind: .translation),
-            forKey: AppPreferenceKey.translationSystemPrompt
+            forKey: AppPreferenceKey.translationSystemPrompt,
+            defaults: defaults
         )
-        defaults.set(settings.targetLanguage.rawValue, forKey: AppPreferenceKey.translationTargetLanguage)
-        defaults.set(true, forKey: AppPreferenceKey.translateSelectedTextOnTranslationHotkey)
-        defaults.set(settings.showResultWindow, forKey: AppPreferenceKey.showSelectedTextTranslationResultWindow)
+        didChange = setIfChanged(settings.targetLanguage.rawValue, forKey: AppPreferenceKey.translationTargetLanguage, defaults: defaults) || didChange
+        didChange = setIfChanged(true, forKey: AppPreferenceKey.translateSelectedTextOnTranslationHotkey, defaults: defaults) || didChange
+        didChange = setIfChanged(settings.showResultWindow, forKey: AppPreferenceKey.showSelectedTextTranslationResultWindow, defaults: defaults) || didChange
 
         switch settings.modelSelectionID.translationSelection {
         case .localLLM(let repo):
-            defaults.set(TranslationModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.translationModelProvider)
-            defaults.set(TranslationModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.translationFallbackModelProvider)
-            defaults.set(repo, forKey: AppPreferenceKey.translationCustomLLMModelRepo)
+            didChange = setIfChanged(TranslationModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.translationModelProvider, defaults: defaults) || didChange
+            didChange = setIfChanged(TranslationModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.translationFallbackModelProvider, defaults: defaults) || didChange
+            didChange = setIfChanged(repo, forKey: AppPreferenceKey.translationCustomLLMModelRepo, defaults: defaults) || didChange
         case .localGGUF(let modelID):
-            defaults.set(TranslationModelProvider.localGGUF.rawValue, forKey: AppPreferenceKey.translationModelProvider)
-            defaults.set(TranslationModelProvider.localGGUF.rawValue, forKey: AppPreferenceKey.translationFallbackModelProvider)
-            defaults.set(modelID.rawValue, forKey: AppPreferenceKey.translationGGUFModelID)
+            didChange = setIfChanged(TranslationModelProvider.localGGUF.rawValue, forKey: AppPreferenceKey.translationModelProvider, defaults: defaults) || didChange
+            didChange = setIfChanged(TranslationModelProvider.localGGUF.rawValue, forKey: AppPreferenceKey.translationFallbackModelProvider, defaults: defaults) || didChange
+            didChange = setIfChanged(modelID.rawValue, forKey: AppPreferenceKey.translationGGUFModelID, defaults: defaults) || didChange
         case .remoteLLM(let provider):
-            defaults.set(TranslationModelProvider.remoteLLM.rawValue, forKey: AppPreferenceKey.translationModelProvider)
-            defaults.set(TranslationModelProvider.remoteLLM.rawValue, forKey: AppPreferenceKey.translationFallbackModelProvider)
-            defaults.set(provider.rawValue, forKey: AppPreferenceKey.translationRemoteLLMProvider)
+            didChange = setIfChanged(TranslationModelProvider.remoteLLM.rawValue, forKey: AppPreferenceKey.translationModelProvider, defaults: defaults) || didChange
+            didChange = setIfChanged(TranslationModelProvider.remoteLLM.rawValue, forKey: AppPreferenceKey.translationFallbackModelProvider, defaults: defaults) || didChange
+            didChange = setIfChanged(provider.rawValue, forKey: AppPreferenceKey.translationRemoteLLMProvider, defaults: defaults) || didChange
         case .none:
-            defaults.set(TranslationModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.translationModelProvider)
+            didChange = setIfChanged(TranslationModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.translationModelProvider, defaults: defaults) || didChange
         }
+        return didChange
     }
 
-    private static func syncLegacyRewrite(_ settings: RewriteFeatureSettings, defaults: UserDefaults) {
-        defaults.set(
+    @discardableResult
+    private static func syncLegacyRewrite(_ settings: RewriteFeatureSettings, defaults: UserDefaults) -> Bool {
+        var didChange = setIfChanged(
             AppPromptDefaults.canonicalStoredText(settings.prompt, kind: .rewrite),
-            forKey: AppPreferenceKey.rewriteSystemPrompt
+            forKey: AppPreferenceKey.rewriteSystemPrompt,
+            defaults: defaults
         )
-        defaults.set(settings.appEnhancementEnabled, forKey: AppPreferenceKey.appEnhancementEnabled)
+        didChange = setIfChanged(settings.appEnhancementEnabled, forKey: AppPreferenceKey.appEnhancementEnabled, defaults: defaults) || didChange
 
         switch settings.llmSelectionID.textSelection {
         case .appleIntelligence:
-            defaults.set(RewriteModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.rewriteModelProvider)
+            didChange = setIfChanged(RewriteModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.rewriteModelProvider, defaults: defaults) || didChange
         case .localLLM(let repo):
-            defaults.set(RewriteModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.rewriteModelProvider)
-            defaults.set(repo, forKey: AppPreferenceKey.rewriteCustomLLMModelRepo)
+            didChange = setIfChanged(RewriteModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.rewriteModelProvider, defaults: defaults) || didChange
+            didChange = setIfChanged(repo, forKey: AppPreferenceKey.rewriteCustomLLMModelRepo, defaults: defaults) || didChange
         case .remoteLLM(let provider):
-            defaults.set(RewriteModelProvider.remoteLLM.rawValue, forKey: AppPreferenceKey.rewriteModelProvider)
-            defaults.set(provider.rawValue, forKey: AppPreferenceKey.rewriteRemoteLLMProvider)
+            didChange = setIfChanged(RewriteModelProvider.remoteLLM.rawValue, forKey: AppPreferenceKey.rewriteModelProvider, defaults: defaults) || didChange
+            didChange = setIfChanged(provider.rawValue, forKey: AppPreferenceKey.rewriteRemoteLLMProvider, defaults: defaults) || didChange
         case .none:
-            defaults.set(RewriteModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.rewriteModelProvider)
+            didChange = setIfChanged(RewriteModelProvider.customLLM.rawValue, forKey: AppPreferenceKey.rewriteModelProvider, defaults: defaults) || didChange
         }
+        return didChange
     }
 
-    private static func syncLegacyMeeting(_ settings: MeetingFeatureSettings, defaults: UserDefaults) {
-        defaults.set(settings.chunkingMode.rawValue, forKey: AppPreferenceKey.meetingChunkingMode)
-        defaults.set(settings.sileroVADSensitivity.rawValue, forKey: AppPreferenceKey.meetingSileroVADSensitivity)
-        defaults.set(settings.speakerDiarizationModel.rawValue, forKey: AppPreferenceKey.meetingSpeakerDiarizationModel)
-        defaults.set(
+    @discardableResult
+    private static func syncLegacyMeeting(_ settings: MeetingFeatureSettings, defaults: UserDefaults) -> Bool {
+        var didChange = setIfChanged(settings.chunkingMode.rawValue, forKey: AppPreferenceKey.meetingChunkingMode, defaults: defaults)
+        didChange = setIfChanged(settings.sileroVADSensitivity.rawValue, forKey: AppPreferenceKey.meetingSileroVADSensitivity, defaults: defaults) || didChange
+        didChange = setIfChanged(settings.speakerDiarizationModel.rawValue, forKey: AppPreferenceKey.meetingSpeakerDiarizationModel, defaults: defaults) || didChange
+        didChange = setIfChanged(
             settings.finalTranscriptOptimizationEnabled,
-            forKey: AppPreferenceKey.meetingFinalTranscriptOptimizationEnabled
-        )
+            forKey: AppPreferenceKey.meetingFinalTranscriptOptimizationEnabled,
+            defaults: defaults
+        ) || didChange
+        return didChange
     }
 
-    private static func sanitize(_ settings: FeatureSettings, defaults: UserDefaults) -> FeatureSettings {
-        let fallback = deriveFromLegacy(defaults: defaults)
+    @discardableResult
+    private static func setIfChanged(_ value: Any, forKey key: String, defaults: UserDefaults) -> Bool {
+        guard let existing = defaults.object(forKey: key) else {
+            defaults.set(value, forKey: key)
+            return true
+        }
+        if let existingObject = existing as? NSObject,
+           let newObject = value as? NSObject,
+           existingObject.isEqual(newObject) {
+            return false
+        }
+        defaults.set(value, forKey: key)
+        return true
+    }
+
+    private static func sanitize(
+        _ settings: FeatureSettings,
+        defaults: UserDefaults,
+        fallback: FeatureSettings? = nil
+    ) -> FeatureSettings {
+        let fallback = fallback ?? deriveFromLegacy(defaults: defaults)
         let promptLanguage = AppPromptDefaults.interfaceLanguage(from: defaults)
         let resolvedTranscriptionPrompt = AppPromptDefaults.resolvedStoredText(
             sanitizedPrompt(settings.transcription.prompt),

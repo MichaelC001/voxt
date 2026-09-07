@@ -28,6 +28,11 @@ struct RemindersListDescriptor: Identifiable, Hashable, Sendable {
 }
 
 enum RemindersPermissionManager {
+    // EventKit keeps an XPC connection to calaccessd for each event store.
+    // Reuse one store for the lifetime of the app instead of creating one
+    // every time permissions or reminder lists are queried.
+    static let sharedEventStore = EKEventStore()
+
     static func authorizationState() -> RemindersAuthorizationState {
         switch EKEventStore.authorizationStatus(for: .reminder) {
         case .fullAccess, .authorized:
@@ -48,7 +53,7 @@ enum RemindersPermissionManager {
     }
 
     static func requestAccess(completion: @escaping (Bool) -> Void) {
-        let eventStore = EKEventStore()
+        let eventStore = sharedEventStore
         if #available(macOS 14.0, *) {
             eventStore.requestFullAccessToReminders { granted, _ in
                 completion(granted)
@@ -60,7 +65,7 @@ enum RemindersPermissionManager {
         }
     }
 
-    static func writableLists(eventStore: EKEventStore = EKEventStore()) -> [RemindersListDescriptor] {
+    static func writableLists(eventStore: EKEventStore = sharedEventStore) -> [RemindersListDescriptor] {
         eventStore.calendars(for: .reminder)
             .filter(\.allowsContentModifications)
             .map {

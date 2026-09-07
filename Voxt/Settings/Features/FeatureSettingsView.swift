@@ -22,7 +22,7 @@ struct FeatureSettingsView: View {
     @AppStorage(AppPreferenceKey.interfaceLanguage) var interfaceLanguageRaw = AppInterfaceLanguage.system.rawValue
     @AppStorage(AppPreferenceKey.appBranchGroups) var appBranchGroupsData = Data()
 
-    @State var featureSettings = FeatureSettingsStore.load()
+    @State var featureSettings = FeatureSettings.placeholder
     @State var selectorSheet: FeatureModelSelectorSheet?
     @State var remindersListDescriptors: [RemindersListDescriptor] = []
     @State var isRemindersListSheetPresented = false

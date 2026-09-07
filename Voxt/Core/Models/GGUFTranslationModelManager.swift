@@ -709,7 +709,7 @@ actor GGUFTranslationRuntime {
         try Task.checkCancellation()
         let prefillElapsedMs = millisecondsSince(prefillStartedAt)
 
-        let sampler = try createSampler()
+        let sampler = try createSampler(vocab: vocab)
         defer { llama_sampler_free(sampler) }
 
         var generated = ""
@@ -931,7 +931,7 @@ actor GGUFTranslationRuntime {
         return Array(tokens.prefix(Int(tokenCount)))
     }
 
-    private func createSampler() throws -> UnsafeMutablePointer<llama_sampler> {
+    private func createSampler(vocab: OpaquePointer?) throws -> UnsafeMutablePointer<llama_sampler> {
         let params = llama_sampler_chain_default_params()
         guard let sampler = llama_sampler_chain_init(params) else {
             throw NSError(
@@ -940,7 +940,8 @@ actor GGUFTranslationRuntime {
                 userInfo: [NSLocalizedDescriptionKey: "Failed to initialize llama.cpp sampler."]
             )
         }
-        llama_sampler_chain_add(sampler, llama_sampler_init_penalties(64, 1.05, 0, 0))
+        let vocabularySize = Int32(llama_vocab_n_tokens(vocab))
+        llama_sampler_chain_add(sampler, llama_sampler_init_penalties(vocabularySize, 64, 1.05, 0, 0))
         llama_sampler_chain_add(sampler, llama_sampler_init_top_k(10))
         llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.9, 1))
         llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.2))

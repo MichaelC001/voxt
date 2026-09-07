@@ -46,9 +46,11 @@ protocol VoxtRemindersSyncBackend {
 }
 
 final class EventKitVoxtRemindersSyncBackend: VoxtRemindersSyncBackend {
+    static let shared = EventKitVoxtRemindersSyncBackend()
+
     private let eventStore: EKEventStore
 
-    init(eventStore: EKEventStore = EKEventStore()) {
+    init(eventStore: EKEventStore = RemindersPermissionManager.sharedEventStore) {
         self.eventStore = eventStore
     }
 
@@ -132,7 +134,14 @@ final class VoxtRemindersSyncCoordinator {
         self.noteStore = noteStore
         self.settingsProvider = settingsProvider
         self.exportStore = exportStore ?? VoxtNoteRemindersExportStore()
-        self.backendFactory = backendFactory ?? { EventKitVoxtRemindersSyncBackend() }
+        if let backendFactory {
+            self.backendFactory = backendFactory
+        } else {
+            // Resolve the shared backend only when the first reconciliation
+            // runs. This keeps EKEventStore initialization off the main
+            // actor during app startup while still reusing one store.
+            self.backendFactory = { EventKitVoxtRemindersSyncBackend.shared }
+        }
         self.notificationCenter = notificationCenter
         self.latestNotesSnapshot = noteStore.items
 
