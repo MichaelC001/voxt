@@ -531,7 +531,11 @@ enum MLXTranscriptionPlanning {
         catalogPolicy: MLXASRKVCachePolicy?
     ) -> MLXASRKVCachePolicy? {
         if family == .qwen3ASR {
-            return .finalQwen
+            // Final must use the same conservative Qwen KV policy as live decoding.
+            // The automatic-language path is especially sensitive to early prompt
+            // quantization; overriding the catalog policy here can make Final lose
+            // earlier multilingual content even when live decoding accumulated it.
+            return catalogPolicy ?? .conservativeQwen
         }
         return catalogPolicy
     }

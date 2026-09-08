@@ -7,33 +7,25 @@ enum FeatureSettingsStore {
     static func migrateIfNeeded(defaults: UserDefaults = .standard) {
         removeObsoleteLatencyProfileKeys(defaults: defaults)
         enforceAlwaysOnLegacyFlags(defaults: defaults)
-        guard loadRaw(defaults: defaults) == nil else {
-            _ = load(defaults: defaults)
+        guard loadRaw(defaults: defaults) != nil else {
+            save(deriveFromLegacy(defaults: defaults), defaults: defaults, notify: false)
             return
         }
-        save(deriveFromLegacy(defaults: defaults), defaults: defaults)
+
+        // Migration is the one explicit place where a normalized snapshot is
+        // written. Keeping this out of load() prevents a SwiftUI @AppStorage
+        // observer from turning a read into a write -> view update loop.
+        save(load(defaults: defaults), defaults: defaults, notify: false)
     }
 
     static func load(defaults: UserDefaults = .standard) -> FeatureSettings {
-        removeObsoleteLatencyProfileKeys(defaults: defaults)
-        enforceAlwaysOnLegacyFlags(defaults: defaults)
         if let raw = loadRaw(defaults: defaults),
            let data = raw.data(using: .utf8),
            let decoded = try? JSONDecoder().decode(FeatureSettings.self, from: data) {
-            let sanitized = sanitize(decoded, defaults: defaults)
-            if sanitized != decoded {
-                // Loading and normalizing settings is a read operation. Do
-                // not broadcast a change here: observers commonly call load
-                // in response to this notification, which would otherwise
-                // create a notification -> load -> save -> notification loop.
-                _ = persist(sanitized, defaults: defaults, notify: false)
-            }
-            return sanitized
+            return sanitize(decoded, defaults: defaults)
         }
         let derived = deriveFromLegacy(defaults: defaults)
-        let normalized = sanitize(derived, defaults: defaults, fallback: derived)
-        _ = persist(normalized, defaults: defaults, notify: false)
-        return normalized
+        return sanitize(derived, defaults: defaults, fallback: derived)
     }
 
     static func save(
