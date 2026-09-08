@@ -35,12 +35,13 @@ final class FeatureSettingsStoreTests: XCTestCase {
         }
     }
 
-    func testLoadRemovesObsoleteLatencyProfileKeysAndDerivesSettings() throws {
+    func testMigrateIfNeededRemovesObsoleteLatencyProfileKeysAndDerivesSettings() throws {
         try withEphemeralDefaults { defaults in
             defaults.set("quality", forKey: "enhancementLatencyProfile")
             defaults.set(EnhancementMode.customLLM.rawValue, forKey: AppPreferenceKey.enhancementMode)
             defaults.set("mlx-community/Qwen3.5-2B-4bit", forKey: AppPreferenceKey.customLLMModelRepo)
 
+            FeatureSettingsStore.migrateIfNeeded(defaults: defaults)
             let settings = FeatureSettingsStore.load(defaults: defaults)
 
             XCTAssertNil(defaults.object(forKey: "enhancementLatencyProfile"))
@@ -63,6 +64,22 @@ final class FeatureSettingsStoreTests: XCTestCase {
             _ = FeatureSettingsStore.load(defaults: defaults)
 
             wait(for: [notificationExpectation], timeout: 0.1)
+        }
+    }
+
+    func testLoadDoesNotMutateStoredFeatureSettingsPayload() throws {
+        try withEphemeralDefaults { defaults in
+            let original = try XCTUnwrap(
+                String(
+                    data: JSONEncoder().encode(FeatureSettingsStore.deriveFromLegacy(defaults: defaults)),
+                    encoding: .utf8
+                )
+            )
+            defaults.set(original, forKey: AppPreferenceKey.featureSettings)
+
+            _ = FeatureSettingsStore.load(defaults: defaults)
+
+            XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.featureSettings), original)
         }
     }
 
@@ -115,6 +132,7 @@ final class FeatureSettingsStoreTests: XCTestCase {
             let data = try JSONEncoder().encode(settings)
             defaults.set(try XCTUnwrap(String(data: data, encoding: .utf8)), forKey: AppPreferenceKey.featureSettings)
 
+            FeatureSettingsStore.migrateIfNeeded(defaults: defaults)
             let loaded = FeatureSettingsStore.load(defaults: defaults)
             let storedRaw = try XCTUnwrap(defaults.string(forKey: AppPreferenceKey.featureSettings))
             let stored = try JSONDecoder().decode(FeatureSettings.self, from: XCTUnwrap(storedRaw.data(using: .utf8)))

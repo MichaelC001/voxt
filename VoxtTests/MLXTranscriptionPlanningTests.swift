@@ -367,15 +367,22 @@ final class MLXTranscriptionPlanningTests: XCTestCase {
         XCTAssertEqual(MLXTranscriptionPlanning.postStopFinalChunkDuration(presetChunkDuration: 1200), 1200)
     }
 
-    func testPostStopFinalKVCachePolicyUsesFinalQwenForQwenFamily() {
+    func testPostStopFinalKVCachePolicyKeepsConservativeQwenForQwenFamily() {
         XCTAssertEqual(
             MLXTranscriptionPlanning.postStopFinalKVCachePolicy(
                 family: .qwen3ASR,
                 catalogPolicy: .conservativeQwen
             ),
-            .finalQwen
+            .conservativeQwen
         )
-        XCTAssertEqual(MLXASRKVCachePolicy.finalQwen.quantizedStart, 64)
+        XCTAssertEqual(MLXASRKVCachePolicy.conservativeQwen.quantizedStart, 256)
+        XCTAssertEqual(
+            MLXTranscriptionPlanning.postStopFinalKVCachePolicy(
+                family: .qwen3ASR,
+                catalogPolicy: nil
+            ),
+            .conservativeQwen
+        )
         XCTAssertNil(
             MLXTranscriptionPlanning.postStopFinalKVCachePolicy(
                 family: .mossTranscribeDiarize,

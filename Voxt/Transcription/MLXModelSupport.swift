@@ -93,14 +93,6 @@ nonisolated struct MLXASRKVCachePolicy: Equatable, Sendable {
         groupSize: 64,
         quantizedStart: 256
     )
-
-    /// Slightly earlier KV quantization for offline Final passes where prompt/prefill
-    /// dominates short-to-medium dictation more than long live sessions.
-    nonisolated static let finalQwen = Self(
-        bits: 8,
-        groupSize: 64,
-        quantizedStart: 64
-    )
 }
 
 nonisolated struct MLXASRPurpose: OptionSet, Sendable {
