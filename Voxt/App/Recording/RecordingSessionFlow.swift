@@ -229,6 +229,13 @@ extension AppDelegate {
             interactionSoundPlayer.playStart()
         }
 
+        if outputMode != .rewrite, transcriptionCaptureMode == .standard {
+            OnboardingSessionEvent.started(
+                id: activeRecordingSessionID,
+                kind: outputMode == .translation ? .voiceTranslation : .transcription,
+                windowNumber: NSApp.isActive ? NSApp.keyWindow?.windowNumber : nil
+            ).post()
+        }
         startRecordingCapture(using: recordingEngine)
     }
 
@@ -239,6 +246,7 @@ extension AppDelegate {
             return
         }
         let stoppingSessionID = activeRecordingSessionID
+        OnboardingSessionEvent.processing(id: stoppingSessionID).post()
         VoxtLog.asr("Recording stop requested.")
 
         hotkeyManager.setCommonStopKeyEnabled(false)

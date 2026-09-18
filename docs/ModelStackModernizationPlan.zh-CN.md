@@ -211,7 +211,7 @@ LM `#620` 是首个生成 token 处的 cache 管理变更，不直接等于 ASR 
 - **删除** `FluidAudio` 包引用、product、`#if canImport(FluidAudio)` 全部分支。
 - **保留** `llama.swift`，不升级除非 Hy-MT2 加载失败。
 - Sparkle `2.10.0` / GRDB `7.11.1` / swift-log `1.15.1` 已在 `95ade09` 更新并固定；FaviconFinder `5.1.5`、PermissionFlow `2.11.2`、llama.swift `2.10549.0` 保留。Voxt API 兼容仍需完整构建确认。
-- 工作区 `Package.resolved` 已解除 gitignore，但尚未生成。接续要求真实解析后入库，而不只是打印 pin；CI 和发布均严格使用同一锁文件。无 lockfile 的 bootstrap 只用于初始化，不是每次发布重新解析。
+- 工作区 `Package.resolved` 已解除 gitignore；重新盘点确认它原本已受版本控制，内容仍是旧依赖图。必须真实重新解析、审查并更新，而不只是修改工程 pin；CI 和发布严格使用同一锁文件。PR 首轮已因旧锁与新 revision 不匹配失败，不能再写成“尚无锁文件”。
 
 ### 4.4 体积相关的依赖事实
 
@@ -569,7 +569,7 @@ VAD 热路径去掉 `MainActorSync.run`：
 - 听写 overlay、快捷键、权限、历史列表的产品结构
 - 远程模型配置 sheet
 - 词典、提示词、增强策略
-- Onboarding 步数；只替换说话人分离那一行的文案
+- 初版模型栈任务不重做引导；后续经明确要求纳入六步引导精简，见 `docs/OnboardingGuide.zh-CN.md`。它作为单独审查范围，不改变听写 / 翻译 / 会议的核心业务链路。
 - 不为“高级用户恢复隐藏模型”增加入口
 
 ### 8.5 代码简洁性从删除中来
@@ -650,7 +650,7 @@ VAD 热路径去掉 `MainActorSync.run`：
 6. 纯历史 merge 且 tree hash 与已通过版本相同才可跳过重复 CI；代码、依赖或 workflow 变更不能援引旧绿色结果。
 7. 对所有退役 runtime 设防回归门禁；保留必要旧数据迁移测试，不为追求“零旧字符串”删除迁移安全性。
 
-**Plan 完成定义**：A–D 的实施及对应测试完成，E 的 app 构建、质量、性能与包体证据齐备。允许 tag 晚于集成，但不允许把缺失的验证标成完成。当前另一路 onboarding / 录音引导工作不纳入本轮修改或提交。
+**Plan 完成定义**：A–D 的实施及对应测试完成，E 的 app 构建、质量、性能与包体证据齐备。允许 tag 晚于集成，但不允许把缺失的验证标成完成。后续要求已将 onboarding / 录音引导也纳入本分支：单独记录六步导航、配置草稿及真实体验状态的实现与验收，不把引导源码合入等同于 AppKit 交互已验证。
 
 ## 10. 迁移矩阵
 

@@ -250,6 +250,7 @@ extension AppDelegate {
             outputText: context.outputText,
             outputMode: sessionOutputMode
         )
+        OnboardingSessionEvent.delivered(id: sessionID, text: context.outputText, succeeded: didInject).post()
         finalizeCommittedOutputPostDelivery(
             deliveredContext: context,
             outputMode: sessionOutputMode,
@@ -515,6 +516,7 @@ extension AppDelegate {
         _ context: SessionFinalizeContext,
         completion: ((Bool, Bool, OutputDestinationContext?) -> Void)? = nil
     ) {
+        let sessionID = activeRecordingSessionID
         let delivery = resolvedOutputDelivery(for: context)
         let deliveryLabel: String
         switch delivery {
@@ -547,6 +549,7 @@ extension AppDelegate {
                 if didInject, let autoKeyPressHotkey {
                     self.pressAutoKeyAfterTextInjection(autoKeyPressHotkey)
                 }
+                OnboardingSessionEvent.delivered(id: sessionID, text: context.outputText, succeeded: didInject).post()
                 completion?(
                     didInject,
                     didInject && autoKeyPressHotkey != nil,
@@ -565,6 +568,7 @@ extension AppDelegate {
         case .selectedTextTranslationResultWindow:
             presentSelectedTextTranslationAnswerOverlay(content: context.outputText)
             sessionFinalOutputDeliveredAt = Date()
+            OnboardingSessionEvent.delivered(id: sessionID, text: context.outputText, succeeded: true).post()
             completion?(false, false, nil)
         }
     }

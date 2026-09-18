@@ -417,14 +417,14 @@ struct SettingsView: View {
     }
 
     private var onboardingContent: some View {
-        OnboardingSettingsView(
-            currentStep: onboardingStepBinding,
-            mlxModelManager: mlxModelManager,
-            customLLMManager: customLLMManager,
-            appUpdateManager: appUpdateManager,
-            onExit: exitOnboarding,
-            onFinish: finishOnboarding
-        )
+        // Keep legacy navigation routes on the same read-only-on-open, six-step guide.
+        Color.clear.onAppear {
+            guard case .onboarding(let step) = displayMode else { return }
+            displayMode = .normal
+            AppDelegate.shared?.openOnboardingWindow(
+                step: OnboardingGuideStep.restored(from: step.rawValue)
+            )
+        }
     }
 
     private var interfaceLanguage: AppInterfaceLanguage {
@@ -458,20 +458,6 @@ struct SettingsView: View {
         guard !visible.contains(selectedFeatureTab) else { return }
         navigationRequest = nil
         selectedFeatureTab = .features
-    }
-
-    private var onboardingStepBinding: Binding<OnboardingStep> {
-        Binding(
-            get: {
-                if case .onboarding(let step) = displayMode {
-                    return step
-                }
-                return .language
-            },
-            set: { newStep in
-                displayMode = .onboarding(step: newStep)
-            }
-        )
     }
 
     private var updateBadgeState: UpdateBadgeState {
@@ -720,25 +706,6 @@ struct SettingsView: View {
 
     private func refreshMicrophoneBadge() {
         hasNoAvailableMicrophones = AudioInputDeviceManager.availableInputDevices().isEmpty
-    }
-
-    private func enterOnboarding(step: OnboardingStep) {
-        OnboardingPreferenceManager.saveLastStep(step)
-        displayMode = .onboarding(step: step)
-    }
-
-    private func exitOnboarding() {
-        OnboardingPreferenceManager.markCompleted()
-        navigationRequest = nil
-        selectedTab = .report
-        displayMode = .normal
-    }
-
-    private func finishOnboarding() {
-        OnboardingPreferenceManager.markCompleted()
-        navigationRequest = nil
-        selectedTab = .report
-        displayMode = .normal
     }
 
     private var currentTitle: LocalizedStringKey {

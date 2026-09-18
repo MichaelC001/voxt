@@ -1,26 +1,18 @@
 // OnboardingGuideTypes.swift
-// Provides Onboarding Guide Types for onboarding settings.
+// The six-step, task-based setup guide. Raw values remain stable for saved progress.
 
-import SwiftUI
+import Foundation
 
 enum OnboardingGuidePhase: String, CaseIterable, Identifiable {
-    case basics
-    case workflows
-    case advanced
-    case finish
+    case basics, workflows, finish
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .basics:
-            return AppLocalization.localizedString("Basics")
-        case .workflows:
-            return AppLocalization.localizedString("Workflows")
-        case .advanced:
-            return AppLocalization.localizedString("Advanced")
-        case .finish:
-            return AppLocalization.localizedString("Finish")
+        case .basics: return AppLocalization.localizedString("Basics")
+        case .workflows: return AppLocalization.localizedString("Workflows")
+        case .finish: return AppLocalization.localizedString("Finish")
         }
     }
 }
@@ -29,54 +21,28 @@ enum OnboardingGuideStep: String, CaseIterable, Identifiable {
     case permissions
     case models
     case transcriptionShortcut
-    case transcriptionEnhancement
     case translationShortcut
     case translationSelection
-    case rewriteShortcut
-    case rewriteSelection
-    case appEnhancement
-    case meeting
     case finish
 
     var id: String { rawValue }
 
     var phase: OnboardingGuidePhase {
         switch self {
-        case .permissions, .models:
-            return .basics
-        case .transcriptionShortcut, .transcriptionEnhancement, .translationShortcut, .translationSelection, .rewriteShortcut, .rewriteSelection:
-            return .workflows
-        case .appEnhancement, .meeting:
-            return .advanced
-        case .finish:
-            return .finish
+        case .permissions, .models: return .basics
+        case .transcriptionShortcut, .translationShortcut, .translationSelection: return .workflows
+        case .finish: return .finish
         }
     }
 
     var title: String {
         switch self {
-        case .permissions:
-            return AppLocalization.localizedString("Get Permissions")
-        case .models:
-            return AppLocalization.localizedString("Choose Models")
-        case .transcriptionShortcut:
-            return AppLocalization.localizedString("Transcription Shortcut")
-        case .transcriptionEnhancement:
-            return AppLocalization.localizedString("Transcription Enhancement")
-        case .translationShortcut:
-            return AppLocalization.localizedString("Translation Shortcut")
-        case .translationSelection:
-            return AppLocalization.localizedString("Translate Selected Text")
-        case .rewriteShortcut:
-            return AppLocalization.localizedString("Rewrite Shortcut")
-        case .rewriteSelection:
-            return AppLocalization.localizedString("Rewrite Selected Text")
-        case .appEnhancement:
-            return AppLocalization.localizedString("App Enhancement")
-        case .meeting:
-            return AppLocalization.localizedString("Meeting")
-        case .finish:
-            return AppLocalization.localizedString("Ready")
+        case .permissions: return AppLocalization.localizedString("Get Permissions")
+        case .models: return AppLocalization.localizedString("Choose Models")
+        case .transcriptionShortcut: return AppLocalization.localizedString("Try Voice Input")
+        case .translationShortcut: return AppLocalization.localizedString("Try Voice Translation")
+        case .translationSelection: return AppLocalization.localizedString("Translate Selected Text")
+        case .finish: return AppLocalization.localizedString("Explore More")
         }
     }
 
@@ -85,60 +51,50 @@ enum OnboardingGuideStep: String, CaseIterable, Identifiable {
         case .permissions:
             return AppLocalization.localizedString("Allow Voxt to hear you, read shortcuts, and insert text into active apps.")
         case .models:
-            return AppLocalization.localizedString("Pick local models or configure remote providers before testing voice workflows.")
+            return AppLocalization.localizedString("One speech model is enough to start. Translation is optional.")
         case .transcriptionShortcut:
-            return AppLocalization.localizedString("Press the transcription shortcut in a focused input to confirm the overlay opens.")
-        case .transcriptionEnhancement:
-            return AppLocalization.localizedString("Try enhanced transcription output in a focused input.")
+            return AppLocalization.localizedString("Read the sample aloud and watch your words appear. Your own words work too.")
         case .translationShortcut:
-            return AppLocalization.localizedString("Choose a target language and test the translation shortcut.")
+            return AppLocalization.localizedString("Say it in your language. Let Voxt type it in another.")
         case .translationSelection:
-            return AppLocalization.localizedString("Select text in the test area before continuing.")
-        case .rewriteShortcut:
-            return AppLocalization.localizedString("Use voice rewrite mode to answer or transform text.")
-        case .rewriteSelection:
-            return AppLocalization.localizedString("Select source text and ask Voxt to rewrite it.")
-        case .appEnhancement:
-            return AppLocalization.localizedString("Test temporary app-aware instructions while Voxt is focused.")
-        case .meeting:
-            return AppLocalization.localizedString("Check the meeting shortcut and confirm the audio, summary, and speaker separation setup.")
+            return AppLocalization.localizedString("Select the sample, then use the same translation shortcut.")
         case .finish:
-            return AppLocalization.localizedString("Review the active shortcuts and start using Voxt.")
+            return AppLocalization.localizedString("You know the basics. Discover these features whenever you need them.")
         }
     }
 
-    var stepNumber: Int {
-        (Self.allCases.firstIndex(of: self) ?? 0) + 1
-    }
+    var stepNumber: Int { (Self.allCases.firstIndex(of: self) ?? 0) + 1 }
 
-    var previous: OnboardingGuideStep? {
+    var previous: Self? {
         guard let index = Self.allCases.firstIndex(of: self), index > 0 else { return nil }
         return Self.allCases[index - 1]
     }
 
-    var next: OnboardingGuideStep? {
+    var next: Self? {
         guard let index = Self.allCases.firstIndex(of: self), index + 1 < Self.allCases.count else { return nil }
         return Self.allCases[index + 1]
     }
 
+    var isPractice: Bool { phase == .workflows }
+
     var sidebarIconKind: SettingsSidebarIconKind {
         switch self {
-        case .permissions:
-            return .permissions
-        case .models:
-            return .model
-        case .transcriptionShortcut, .transcriptionEnhancement:
-            return .transcription
-        case .translationShortcut, .translationSelection:
-            return .translation
-        case .rewriteShortcut, .rewriteSelection:
-            return .rewrite
-        case .appEnhancement:
-            return .appEnhancement
-        case .meeting:
-            return .meeting
-        case .finish:
-            return .home
+        case .permissions: return .permissions
+        case .models: return .model
+        case .transcriptionShortcut: return .transcription
+        case .translationShortcut, .translationSelection: return .translation
+        case .finish: return .home
+        }
+    }
+
+    static func restored(from rawValue: String) -> Self? {
+        switch rawValue {
+        case "microphone", "language": return .permissions
+        case "model": return .models
+        case "transcriptionEnhancement", "transcription": return .transcriptionShortcut
+        case "translation": return .translationShortcut
+        case "rewriteShortcut", "rewriteSelection", "rewrite", "appEnhancement", "meeting": return .finish
+        default: return Self(rawValue: rawValue)
         }
     }
 }

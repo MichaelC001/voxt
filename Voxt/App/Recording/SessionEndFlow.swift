@@ -150,6 +150,7 @@ extension AppDelegate {
             "Session end pipeline started. sessionID=\(sessionID.uuidString), trigger=\(trigger), displayMode=\(overlayState.displayMode), overlayVisible=\(overlayWindow.isVisible)",
             verbose: true
         )
+        OnboardingSessionEvent.ended(id: sessionID, message: overlayState.statusMessage).post()
         let stages: [any SessionEndStage] = [
             HideOverlayStage(),
             RestoreSystemAudioStage(),

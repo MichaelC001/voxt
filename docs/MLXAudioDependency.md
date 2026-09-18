@@ -12,7 +12,7 @@ Updated: 2026-09-18. Distinguish **the app's current dependency**, **the publish
 - MLX runtime: fork exact `0.31.6`
 - Tokenizer / hub: fork exact `swift-transformers 1.3.4` / `swift-huggingface 0.10.2`
 
-This replaces `.12` / runtime `0.31.4` / LM `d242429`. App compilation and the actual app lockfile still require macOS validation; the new source pins alone are not a release certification.
+This replaces `.12` / runtime `0.31.4` / LM `d242429` in the project requirements. The tracked app `Package.resolved` still contains the OLD graph; earlier notes claiming the file was absent were incorrect. [PR CI 35322684144](https://github.com/hehehai/voxt/actions/runs/35322684144) failed strict dependency resolution on that mismatch, before app compilation or tests. Regenerate and review the app lockfile on macOS; new source pins alone are not a release certification.
 
 The new fork preserves `.12`'s structured `TranscriptionEvent.ended(STTOutput)`, language provenance, Qwen KV/language controls, incremental Nemotron streaming, and streaming/VAD failure propagation.
 

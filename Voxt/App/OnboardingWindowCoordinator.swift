@@ -9,6 +9,7 @@ private struct OnboardingGuideWindowRoot: View {
 
     @ObservedObject var mlxModelManager: MLXModelManager
     @ObservedObject var customLLMManager: CustomLLMModelManager
+    @ObservedObject var overlayState: OverlayState
 
     let onClose: () -> Void
     let onFinish: () -> Void
@@ -17,12 +18,14 @@ private struct OnboardingGuideWindowRoot: View {
         initialStep: OnboardingGuideStep,
         mlxModelManager: MLXModelManager,
         customLLMManager: CustomLLMModelManager,
+        overlayState: OverlayState,
         onClose: @escaping () -> Void,
         onFinish: @escaping () -> Void
     ) {
         _currentStep = State(initialValue: initialStep)
         self.mlxModelManager = mlxModelManager
         self.customLLMManager = customLLMManager
+        self.overlayState = overlayState
         self.onClose = onClose
         self.onFinish = onFinish
     }
@@ -32,6 +35,7 @@ private struct OnboardingGuideWindowRoot: View {
             currentStep: $currentStep,
             mlxModelManager: mlxModelManager,
             customLLMManager: customLLMManager,
+            overlayState: overlayState,
             onClose: onClose,
             onFinish: onFinish
         )
@@ -52,8 +56,6 @@ extension AppDelegate {
         let initialStep = requestedStep
             ?? OnboardingPreferenceManager.savedLastGuideStep()
             ?? .permissions
-        OnboardingPreferenceManager.saveLastGuideStep(initialStep)
-
         if let window = onboardingWindowController?.window {
             if !window.isVisible {
                 window.center()
@@ -62,6 +64,7 @@ extension AppDelegate {
             return
         }
 
+        OnboardingPreferenceManager.saveLastGuideStep(initialStep)
         let window = OnboardingHostWindow(
             contentRect: NSRect(origin: .zero, size: onboardingWindowContentSize),
             styleMask: [.borderless, .fullSizeContentView],
@@ -89,6 +92,7 @@ extension AppDelegate {
             initialStep: initialStep,
             mlxModelManager: mlxModelManager,
             customLLMManager: customLLMManager,
+            overlayState: overlayState,
             onClose: { [weak self, weak window] in
                 window?.close()
                 self?.onboardingWindowController = nil

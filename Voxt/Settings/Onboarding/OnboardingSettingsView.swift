@@ -256,8 +256,7 @@ struct OnboardingSettingsView: View {
         let appeared = AnyView(localized.onAppear {
                 refreshInputDevices()
                 refreshModelStorageDisplayPath()
-                syncOnboardingModelManagers()
-                syncOnboardingFeatureSelections()
+                featureSettings = FeatureSettingsStore.load(defaults: .standard)
                 prepareDemoPlayerIfNeeded(for: currentStep)
             })
         let muteObserved = AnyView(appeared.onChange(of: muteSystemAudioWhileRecording) { _, newValue in

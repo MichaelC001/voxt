@@ -43,7 +43,7 @@
 - 删除一次性 `mlx-next.patch`、隔离候选生成器及其专用测试，避免维护两套实现。
 - 新增 `tools/configure_xcode.sh`，测试与发布 workflow 共用一致 Xcode / SDK / compiler PATH，并采用 fork 已验证的 MetalToolchain 安装步骤；共享开发机不自动 sudo 切工具链。
 
-**待验证**：Swift 类型检查、真实 OptiQ/VLM 权重、tokenizer / model reasoning 和 EOS 行为；工作区 `Package.resolved` 仍必须在 Mac 真实解析后生成，未伪造。
+**待验证**：Swift 类型检查、真实 OptiQ/VLM 权重、tokenizer / model reasoning 和 EOS 行为。纠正早先盘点：仓库已有受版本控制的旧 `Package.resolved`（Audio `.12` / MLX `0.31.4` / LM `d242429`），并非没有锁文件。必须针对新工程引用在 Mac 重新解析、审查并更新，不能手写或复制 fork 的锁文件。
 
 ## 4. B：安装校验与文件操作
 
@@ -128,10 +128,24 @@ VOXT_RUN_MODEL_TESTS=1 VOXT_MODEL_STORAGE_ROOT="/absolute/path/to/existing/model
 | 隔离运行边界 | 会话接口和 macOS thermal state 在临时 harness 中使用测试替身，MLX 后端与 UI 未参与；不能据此宣称整个应用编译通过 |
 | `git diff --check` | 通过 |
 | 本地完整验收脚本 | 在入口明确拒绝：`Xcode validation requires macOS.` |
-| Voxt 实际 lockfile、Debug / Release / XCTest | **待 Mac 执行** |
+| Voxt 新依赖 lockfile、Debug / Release / XCTest | **待更新旧锁并在 Mac 执行；PR 首轮 CI 已在依赖解析阶段失败，未进入 app 编译 / 测试** |
 | ASR / LLM / VLM 质量、长会议、取消、内存压力回放 | **待 Mac 执行** |
 | Instruments、峰值内存和 App / zip / DMG 对比 | **未测量** |
 
 因此当前不能标记“整个 plan 验收完成”。先在 Mac 收集完整批次的构建 / 测试日志，集中修复同类问题后再统一提交并跑一轮 CI；不以多次 Actions 单点试错。纯 Foundation 隔离编译和静态审计不能代替完整 macOS / MLX 的类型检查和回放。
 
-另一路 onboarding / 录音练习的工作区改动未被覆盖。为了 async 卸载，仅调整了 `OnboardingSettingsSteps.swift` 中原有卸载回调的 await；没有修改用户正在开发的引导行为。
+## 9. 后续纳入：六步交互引导
+
+按后续要求，原本独立保留的 onboarding / 录音练习改动现在也纳入同一分支与 PR #150：
+
+- 引导收敛为权限、模型、语音输入、语音翻译、选中翻译、探索更多六步；三个练习可跳过，老用户不被强制重新引导。
+- `OnboardingModelDraft` 在明确确认时合并到最新配置，浏览或关闭未确认页不重写用户的混合模型路由。
+- `OnboardingPracticeState` 使用真实业务事件，并校验步骤、来源窗口和 session ID；失败、取消、重试和迟到回调隔离。
+- 复用实际快捷键、音频反馈、文本注入和翻译结果窗口；新增中英日文案及 `OnboardingGuideTests`。
+- 具体流程、测试与人工验收见 [六步交互引导](OnboardingGuide.zh-CN.md)。AppKit 交互、权限、焦点和真实输入验证仍待 Mac 执行。
+
+### PR 依赖解析阻断
+
+[PR 首轮 CI 35322684144](https://github.com/hehehai/voxt/actions/runs/35322684144) 因旧 lockfile 与新 revision 不匹配失败：`an out-of-date resolved file was detected`，退出码 74。这不是 XCTest 断言失败；app 编译和测试尚未开始。
+
+本次引导提交不修改这个已知依赖阻断，不伪造锁文件。为了避免重复消耗同一个必然失败的 Actions 运行，本次提交使用 `[skip ci]`，PR 保持 Draft / 待验证，不沿用旧绿色结果。更新并审查实际 lockfile 后，再统一运行完整 CI。
