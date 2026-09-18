@@ -159,9 +159,7 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
         if let model {
             return model
         }
-        let directory = await MainActor.run {
-            MeetingSortformerModelStorage.modelDirectory(requireValid: true)
-        }
+        let directory = await MeetingSortformerModelStorage.validatedModelDirectory()
         guard let directory else {
             throw MeetingVADModelError.modelNotDownloaded
         }

@@ -149,13 +149,13 @@ extension AppDelegate {
 
         if modelProvider == .customLLM {
             let translationRepo = translationCustomLLMRepo
-            guard customLLMManager.isModelDownloaded(repo: translationRepo) else {
+            guard customLLMManager.canAttemptInference(repo: translationRepo) else {
                 VoxtLog.translationWarning("Translation provider customLLM unavailable: model not downloaded. repo=\(translationRepo)")
                 throw TextTransformFailure.translationModelNotInstalled
             }
             VoxtLog.translation("Translation provider selected: customLLM")
         } else if modelProvider == .localGGUF {
-            guard ggufTranslationModelManager.isModelDownloaded(id: translationGGUFModelID) else {
+            guard ggufTranslationModelManager.canAttemptInference(id: translationGGUFModelID) else {
                 VoxtLog.translationWarning("Translation provider localGGUF unavailable: model not downloaded. modelID=\(translationGGUFModelID.rawValue)")
                 throw TextTransformFailure.translationModelNotInstalled
             }
@@ -275,7 +275,7 @@ extension AppDelegate {
         }
 
         if modelProvider == .customLLM {
-            guard customLLMManager.isModelDownloaded(repo: rewriteRepo) else {
+            guard customLLMManager.canAttemptInference(repo: rewriteRepo) else {
                 VoxtLog.translationWarning("Rewrite provider customLLM unavailable: model not downloaded. repo=\(rewriteRepo)")
                 throw TextTransformFailure.rewriteModelNotInstalled
             }
@@ -397,11 +397,11 @@ extension AppDelegate {
 
         if modelProvider == .customLLM {
             let translationRepo = translationCustomLLMRepo
-            guard customLLMManager.isModelDownloaded(repo: translationRepo) else {
+            guard customLLMManager.canAttemptInference(repo: translationRepo) else {
                 throw TextTransformFailure.translationModelNotInstalled
             }
         } else if modelProvider == .localGGUF {
-            guard ggufTranslationModelManager.isModelDownloaded(id: translationGGUFModelID) else {
+            guard ggufTranslationModelManager.canAttemptInference(id: translationGGUFModelID) else {
                 throw TextTransformFailure.translationModelNotInstalled
             }
         } else if modelProvider == .remoteLLM {

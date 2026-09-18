@@ -180,10 +180,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Configure consistent build and MLX JIT toolchain
+        run: source tools/configure_xcode.sh --select-system
+
+      - name: Install Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
       - name: Audit committed dependency graph
         run: |
-          xcodebuild -version
-          xcrun swift --version
           python3 tools/audit_model_stack.py --resolved Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
       - name: Resolve Xcode compilation cache key

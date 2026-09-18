@@ -93,7 +93,7 @@ extension AppDelegate {
             }
         }
 
-        return repos.filter { customLLMManager.isModelDownloaded(repo: $0) }
+        return repos.filter { customLLMManager.canAttemptInference(repo: $0) }
     }
 
     private struct RemoteWarmupContext {
@@ -162,7 +162,7 @@ extension AppDelegate {
 
     private func startCustomLLMWarmupIfNeeded(repo: String, reason: String) {
         let canonicalRepo = CustomLLMModelManager.canonicalModelRepo(repo)
-        guard customLLMManager.isModelDownloaded(repo: canonicalRepo) else { return }
+        guard customLLMManager.canAttemptInference(repo: canonicalRepo) else { return }
         guard llmWarmupTasksByRepo[canonicalRepo] == nil else { return }
         guard !customLLMManager.isModelLoaded(repo: canonicalRepo) else { return }
 

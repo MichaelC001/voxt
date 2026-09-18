@@ -40,6 +40,12 @@ final class GGUFTranslationModelManager: ObservableObject {
     @Published private(set) var activeDownloadModelID: GGUFTranslationModelID?
 
     private let runtime = GGUFTranslationRuntime()
+    private let installationCache = ModelInstallationCache()
+    private var deletingIDs: Set<GGUFTranslationModelID> = []
+    private var activeInferenceCount = 0
+    private var storageRoot: URL?
+    private var storageRevision = UUID()
+    private var downloadStorageRevision: UUID?
     private var currentModelID: GGUFTranslationModelID
     private var downloadTask: Task<Void, Never>?
     private var downloadProgressTask: Task<Void, Never>?
@@ -48,6 +54,10 @@ final class GGUFTranslationModelManager: ObservableObject {
 
     init(modelID: GGUFTranslationModelID) {
         self.currentModelID = modelID
+        installationCache.onChange = { [weak self] key, _ in
+            guard let self, let id = GGUFTranslationModelID(rawValue: key), self.activeDownloadModelID != id else { return }
+            self.stateByID[id] = self.resolvedStoredState(for: id)
+        }
         refreshStorageRoot()
     }
 
@@ -60,6 +70,17 @@ final class GGUFTranslationModelManager: ObservableObject {
     }
 
     func refreshStorageRoot() {
+        let root = ModelStorageDirectoryManager.resolvedWriteRootURL()
+        if storageRoot != root {
+            storageRoot = root
+            storageRevision = UUID()
+            downloadStopAction = downloadTask == nil ? nil : .pause
+            downloadTask?.cancel()
+            cancelDownloadProgressTask()
+            stateByID.removeAll()
+            pausedStatusMessageByID.removeAll()
+        }
+        installationCache.invalidateAll()
         for modelID in GGUFTranslationModelID.allCases {
             guard activeDownloadModelID != modelID else { continue }
             let resolvedState = resolvedStoredState(for: modelID)
@@ -108,16 +129,46 @@ final class GGUFTranslationModelManager: ObservableObject {
     }
 
     func isModelDownloaded(id: GGUFTranslationModelID) -> Bool {
-        FileManager.default.fileExists(atPath: modelFileURL(for: id).path)
+        requestInstallation(id)
+        return installationCache.peek(id.rawValue)?.isInstalled ?? false
+    }
+
+    func canAttemptInference(id: GGUFTranslationModelID) -> Bool {
+        isModelDownloaded(id: id) || isCheckingInstallation(id: id)
+    }
+
+    func isCheckingInstallation(id: GGUFTranslationModelID) -> Bool {
+        requestInstallation(id)
+        return installationCache.isChecking(id.rawValue)
+    }
+
+    @discardableResult
+    func refreshInstallation(id: GGUFTranslationModelID) async throws -> ModelInstallationSnapshot {
+        guard !isShuttingDownForApplicationTermination, !deletingIDs.contains(id) else { throw CancellationError() }
+        let request = installationRequest(id)
+        return try await installationCache.value(id.rawValue) { request.scan() }
+    }
+
+    private func installationRequest(_ id: GGUFTranslationModelID) -> ModelInstallationRequest {
+        let url = modelFileURL(for: id)
+        let part = partialFileURL(for: url)
+        return ModelInstallationRequest(directories: [url], partialDirectories: [part, part.appendingPathExtension("json")], validate: {
+            guard let handle = try? FileHandle(forReadingFrom: $0) else { return false }
+            defer { try? handle.close() }
+            return (try? handle.read(upToCount: 4)) == Data("GGUF".utf8)
+        })
+    }
+
+    private func requestInstallation(_ id: GGUFTranslationModelID) {
+        guard !isShuttingDownForApplicationTermination, !deletingIDs.contains(id), installationCache.needsRequest(id.rawValue) else { return }
+        let request = installationRequest(id)
+        installationCache.request(id.rawValue) { request.scan() }
     }
 
     func cachedModelSizeText(id: GGUFTranslationModelID) -> String? {
-        let url = modelFileURL(for: id)
-        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey]),
-              let fileSize = values.fileSize else {
-            return nil
-        }
-        return ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file)
+        requestInstallation(id)
+        guard let snapshot = installationCache.peek(id.rawValue), snapshot.allocatedBytes > 0 else { return nil }
+        return ByteCountFormatter.string(fromByteCount: snapshot.allocatedBytes, countStyle: .file)
     }
 
     func openModelDirectory(id: GGUFTranslationModelID) {
@@ -127,34 +178,56 @@ final class GGUFTranslationModelManager: ObservableObject {
     }
 
     @discardableResult
-    func deleteModel(id: GGUFTranslationModelID) -> Result<Void, Error> {
-        if activeDownloadModelID == id || hasResumableDownload(id: id) {
-            cancelDownload(id: id)
+    func deleteModel(id: GGUFTranslationModelID) async -> Result<Void, Error> {
+        guard activeInferenceCount == 0, !deletingIDs.contains(id) else {
+            return .failure(NSError(domain: "Voxt.GGUFTranslation", code: 1005,
+                userInfo: [NSLocalizedDescriptionKey: "The model is currently in use. Try again when generation finishes."]))
         }
-        pausedStatusMessageByID[id] = nil
+        deletingIDs.insert(id)
+        defer { deletingIDs.remove(id) }
+        let url = modelFileURL(for: id)
+        let partial = partialFileURL(for: url)
+        let pending = activeDownloadModelID == id ? downloadTask : nil
+        if pending != nil { cancelDownload(id: id) }
+        installationCache.invalidate(id.rawValue)
+        await pending?.value
         do {
-            try ResumableModelDownloadSupport.purgePartialArtifacts(for: modelFileURL(for: id))
-            let modelURL = modelFileURL(for: id)
-            if FileManager.default.fileExists(atPath: modelURL.path) {
-                try FileManager.default.removeItem(at: modelURL)
-            }
+            try await ModelDiskOperations.remove([url, partial, partial.appendingPathExtension("json")])
+            installationCache.invalidate(id.rawValue)
+            stateByID[id] = .notDownloaded
+            pausedStatusMessageByID[id] = nil
+            return .success(())
         } catch {
+            installationCache.invalidate(id.rawValue)
             stateByID[id] = .error("Couldn't uninstall model: \(error.localizedDescription)")
             return .failure(error)
         }
-        stateByID[id] = .notDownloaded
-        return .success(())
     }
 
     func downloadModel(id: GGUFTranslationModelID) {
-        guard !isShuttingDownForApplicationTermination else { return }
+        guard !isShuttingDownForApplicationTermination, !deletingIDs.contains(id) else { return }
         guard downloadTask == nil else { return }
         guard activeDownloadModelID == nil || activeDownloadModelID == id else { return }
+        if isCheckingInstallation(id: id) {
+            let request = installationRequest(id)
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    _ = try await self.installationCache.value(id.rawValue) { request.scan() }
+                    self.downloadModel(id: id)
+                } catch { return }
+            }
+            return
+        }
         guard !isModelDownloaded(id: id) else {
             stateByID[id] = .downloaded
             return
         }
+        installationCache.invalidate(id.rawValue)
 
+        let revision = storageRevision
+        downloadStorageRevision = revision
+        downloadStopAction = nil
         SystemNotificationSupport.requestAuthorizationIfNeeded()
         activeDownloadModelID = id
         pausedStatusMessageByID[id] = nil
@@ -187,20 +260,28 @@ final class GGUFTranslationModelManager: ObservableObject {
             defer {
                 cancelDownloadProgressTask()
                 downloadTask = nil
+                installationCache.invalidate(id.rawValue)
+                requestInstallation(id)
                 downloadStopAction = nil
+                downloadStorageRevision = nil
                 if activeDownloadModelID == id {
                     activeDownloadModelID = nil
                 }
             }
 
             do {
+                try Task.checkCancellation()
+                guard revision == storageRevision else { throw CancellationError() }
                 try await performDownload(id: id)
+                try Task.checkCancellation()
+                guard revision == storageRevision else { throw CancellationError() }
                 pausedStatusMessageByID[id] = nil
                 stateByID[id] = .downloaded
                 SystemNotificationSupport.postModelDownloadSucceeded(
                     modelName: displayTitle(for: id)
                 )
             } catch is CancellationError {
+                guard revision == storageRevision else { return }
                 cancelDownloadProgressTask()
                 switch downloadStopAction {
                 case .pause:
@@ -217,11 +298,13 @@ final class GGUFTranslationModelManager: ObservableObject {
                     }
                 case .cancel, .none:
                     pausedStatusMessageByID[id] = nil
-                    try? ResumableModelDownloadSupport.purgePartialArtifacts(for: modelFileURL(for: id))
-                    try? FileManager.default.removeItem(at: modelFileURL(for: id))
+                    let url = modelFileURL(for: id)
+                    await cleanupPartialDownload(at: url)
+                    guard revision == storageRevision else { return }
                     stateByID[id] = .notDownloaded
                 }
             } catch {
+                guard revision == storageRevision else { return }
                 cancelDownloadProgressTask()
                 if pauseDownloadIfNetworkIssue(error, id: id) {
                     return
@@ -249,9 +332,29 @@ final class GGUFTranslationModelManager: ObservableObject {
             return
         }
 
-        try? ResumableModelDownloadSupport.purgePartialArtifacts(for: modelFileURL(for: id))
-        try? FileManager.default.removeItem(at: modelFileURL(for: id))
+        let url = modelFileURL(for: id)
+        activeDownloadModelID = id
+        installationCache.invalidate(id.rawValue)
         stateByID[id] = .notDownloaded
+        downloadTask = Task { [weak self] in
+            guard let self else { return }
+            await cleanupPartialDownload(at: url)
+            downloadTask = nil
+            downloadStopAction = nil
+            activeDownloadModelID = nil
+            installationCache.invalidate(id.rawValue)
+            requestInstallation(id)
+        }
+    }
+
+    private func cleanupPartialDownload(at url: URL) async {
+        let part = partialFileURL(for: url)
+        let result = await Task.detached(priority: .utility) {
+            try await ModelDiskOperations.remove([url, part, part.appendingPathExtension("json")])
+        }.result
+        if case .failure(let error) = result {
+            VoxtLog.modelWarning("GGUF partial cleanup failed: \(error.localizedDescription)")
+        }
     }
 
     func pauseDownload(id: GGUFTranslationModelID) {
@@ -276,6 +379,7 @@ final class GGUFTranslationModelManager: ObservableObject {
     func shutdownForApplicationTermination() async {
         guard !isShuttingDownForApplicationTermination else { return }
         isShuttingDownForApplicationTermination = true
+        installationCache.invalidateAll()
         let task = downloadTask
         if let activeDownloadModelID, task != nil {
             downloadStopAction = .pause
@@ -298,12 +402,8 @@ final class GGUFTranslationModelManager: ObservableObject {
     }
 
     func hasResumableDownload(id: GGUFTranslationModelID) -> Bool {
-        guard !isModelDownloaded(id: id) else { return false }
-        let destinationURL = modelFileURL(for: id)
-        let partURL = partialFileURL(for: destinationURL)
-        let stateURL = partURL.appendingPathExtension("json")
-        return FileManager.default.fileExists(atPath: partURL.path)
-            || FileManager.default.fileExists(atPath: stateURL.path)
+        requestInstallation(id)
+        return installationCache.peek(id.rawValue)?.hasPartialDownload ?? false
     }
 
     func pausedStatusMessage(for id: GGUFTranslationModelID) -> String? {
@@ -407,7 +507,8 @@ final class GGUFTranslationModelManager: ObservableObject {
         completedFiles: Int,
         totalFiles: Int
     ) {
-        guard activeDownloadModelID == id, downloadStopAction == nil else { return }
+        guard activeDownloadModelID == id, downloadStopAction == nil,
+              downloadStorageRevision == storageRevision else { return }
         let nextState = ModelState.downloading(
             progress: progress,
             completed: completed,
@@ -523,9 +624,11 @@ final class GGUFTranslationModelManager: ObservableObject {
         modelID: GGUFTranslationModelID,
         onPartialText: (@Sendable (String) -> Void)? = nil
     ) async throws -> String {
-        guard !isShuttingDownForApplicationTermination else { throw CancellationError() }
-        let modelURL = modelFileURL(for: modelID)
-        guard FileManager.default.fileExists(atPath: modelURL.path) else {
+        guard !isShuttingDownForApplicationTermination, !deletingIDs.contains(modelID) else { throw CancellationError() }
+        activeInferenceCount += 1
+        defer { activeInferenceCount -= 1 }
+        let installed = try await refreshInstallation(id: modelID)
+        guard let modelURL = installed.directory else {
             throw NSError(
                 domain: "Voxt.GGUFTranslation",
                 code: 404,

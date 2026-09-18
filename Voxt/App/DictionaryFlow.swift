@@ -159,7 +159,7 @@ extension AppDelegate {
             customLLMManager.displayTitle(for: $0).localizedCaseInsensitiveCompare(customLLMManager.displayTitle(for: $1)) == .orderedAscending
         }
 
-        for repo in uniqueLocalRepos where customLLMManager.isModelDownloaded(repo: repo) {
+        for repo in uniqueLocalRepos where customLLMManager.canAttemptInference(repo: repo) {
             options.append(
                 DictionaryHistoryScanModelOption(
                     id: "local:\(repo)",
@@ -419,7 +419,7 @@ extension AppDelegate {
     }
 
     private func customLLMDictionaryHistoryScanModel() -> DictionaryHistoryScanModel? {
-        guard customLLMManager.isModelDownloaded(repo: customLLMManager.currentModelRepo) else {
+        guard customLLMManager.canAttemptInference(repo: customLLMManager.currentModelRepo) else {
             return nil
         }
         return .customLLM(repo: customLLMManager.currentModelRepo)
@@ -434,7 +434,7 @@ extension AppDelegate {
     private func dictionaryHistoryScanModel(for optionID: String) throws -> DictionaryHistoryScanModel {
         if optionID.hasPrefix("local:") {
             let repo = String(optionID.dropFirst("local:".count))
-            guard customLLMManager.isModelDownloaded(repo: repo) else {
+            guard customLLMManager.canAttemptInference(repo: repo) else {
                 throw NSError(
                     domain: "Voxt.DictionaryHistoryScan",
                     code: -5,

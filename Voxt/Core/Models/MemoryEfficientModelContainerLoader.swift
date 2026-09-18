@@ -39,6 +39,7 @@ private struct MemoryEfficientLLMInputProcessor: UserInputProcessor {
 }
 
 nonisolated enum MemoryEfficientModelContainerLoader {
+    @concurrent
     static func load(
         from directory: URL,
         using tokenizerLoader: any TokenizerLoader,
@@ -94,8 +95,7 @@ nonisolated enum MemoryEfficientModelContainerLoader {
         let modelConfiguration = resolvedModelConfiguration(
             configuration,
             baseConfig: baseConfig,
-            configData: configData,
-            includeConfigDataForToolFormat: true
+            model: model
         )
         let messageGenerator: any MessageGenerator = if let model = model as? any LLMModel {
             model.messageGenerator(tokenizer: tokenizer)
@@ -160,8 +160,7 @@ nonisolated enum MemoryEfficientModelContainerLoader {
         let modelConfiguration = resolvedModelConfiguration(
             configuration,
             baseConfig: baseConfig,
-            configData: configData,
-            includeConfigDataForToolFormat: false
+            model: model
         )
         return ModelContainer(
             context: ModelContext(
@@ -206,10 +205,9 @@ nonisolated enum MemoryEfficientModelContainerLoader {
     private static func resolvedModelConfiguration(
         _ configuration: ResolvedModelConfiguration,
         baseConfig: BaseConfiguration,
-        configData: Data,
-        includeConfigDataForToolFormat: Bool
+        model: any LanguageModel
     ) -> ModelConfiguration {
-        var eosTokenIDs = Set(baseConfig.eosTokenIds?.values ?? [])
+        var eosTokenIDs = baseConfig.effectiveEOSTokenIds
         var stopStrings = configuration.stopStrings
         let generationConfigURL = configuration.modelDirectory
             .appendingPathComponent("generation_config.json")
@@ -225,18 +223,17 @@ nonisolated enum MemoryEfficientModelContainerLoader {
             stopStrings.formUnion(generationConfig.stopStrings)
         }
 
-        let toolCallFormat = configuration.toolCallFormat
-            ?? ToolCallFormat.infer(
-                from: baseConfig.modelType,
-                configData: includeConfigDataForToolFormat ? configData : nil
-            )
+        // The current LM API declares conventions on each concrete model.
+        // Keep explicit configuration overrides ahead of architecture defaults.
+        let toolCallFormat = configuration.toolCallFormat ?? model.toolCallFormat
         return ModelConfiguration(
             directory: configuration.modelDirectory,
             defaultPrompt: configuration.defaultPrompt,
             extraEOSTokens: configuration.extraEOSTokens,
             stopStrings: stopStrings,
             eosTokenIds: eosTokenIDs,
-            toolCallFormat: toolCallFormat
+            toolCallFormat: toolCallFormat,
+            reasoningConfig: configuration.reasoningConfig ?? model.reasoningConfig
         )
     }
 
@@ -288,6 +285,9 @@ nonisolated enum MemoryEfficientModelContainerLoader {
             parameters: ModuleParameters.unflattened(weights),
             verify: [.all]
         )
+        // New LM models materialize derived inference-only state after weights
+        // are installed. Forward passes must not perform this mutation lazily.
+        try model.prepare()
         try withError {
             eval(model)
         }

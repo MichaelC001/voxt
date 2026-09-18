@@ -27,6 +27,19 @@ enum MeetingSortformerModelStorage {
         return nil
     }
 
+    static func readableDirectories() -> [URL] {
+        ModelStorageDirectoryManager.resolvedReadableRootURLs().compactMap {
+            MLXModelStorageSupport.cacheDirectory(for: repo, rootDirectory: $0)
+        }
+    }
+
+    static func validatedModelDirectory() async -> URL? {
+        let directories = readableDirectories()
+        return await Task.detached(priority: .utility) {
+            directories.first { isValidModelDirectory($0) }
+        }.value
+    }
+
     static func writeModelDirectory() -> URL? {
         MLXModelStorageSupport.cacheDirectory(
             for: repo,
@@ -46,16 +59,20 @@ enum MeetingSortformerModelStorage {
         _ directory: URL,
         fileManager: FileManager = .default
     ) -> Bool {
-        guard fileManager.fileExists(atPath: directory.appendingPathComponent("config.json").path) else {
-            return false
-        }
+        guard let config = try? Data(contentsOf: directory.appendingPathComponent("config.json")),
+              (try? JSONSerialization.jsonObject(with: config)) != nil,
+              ModelWeightFileValidation.hasCompleteIndex(in: directory) else { return false }
         guard let entries = try? fileManager.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: nil
         ) else {
             return false
         }
-        return entries.contains { $0.pathExtension == "safetensors" }
+        return entries.contains {
+            guard $0.pathExtension == "safetensors",
+                  let values = try? $0.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]) else { return false }
+            return values.isRegularFile == true && (values.fileSize ?? 0) > 0
+        }
     }
 
     static func clearHubCache(rootDirectory: URL = ModelStorageDirectoryManager.resolvedWriteRootURL()) {
@@ -259,9 +276,7 @@ actor MeetingRealtimeDiarizationStage {
         if let model {
             return model
         }
-        let directory = await MainActor.run {
-            MeetingSortformerModelStorage.modelDirectory(requireValid: true)
-        }
+        let directory = await MeetingSortformerModelStorage.validatedModelDirectory()
         guard let directory else {
             throw MeetingVADModelError.modelNotDownloaded
         }

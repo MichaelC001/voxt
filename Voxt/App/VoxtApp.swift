@@ -470,7 +470,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var customEnhancementModelAvailable: Bool {
-        customLLMManager.isModelDownloaded(repo: customLLMManager.currentModelRepo)
+        customLLMManager.canAttemptInference(repo: customLLMManager.currentModelRepo)
     }
 
     private var remoteEnhancementModelAvailable: Bool {

@@ -27,6 +27,8 @@ nonisolated struct DeepIdleMemoryReclamationState: Equatable, Sendable {
     let hasActiveLLMInference: Bool
     let isTranscriberRecording: Bool
     let isTranscriberFinalizing: Bool
+    var hasPendingASRLoad = false
+    var hasPendingLLMLoad = false
 
     var disposition: DeepIdleMemoryReclamationDisposition {
         if isApplicationTerminating {
@@ -43,6 +45,8 @@ nonisolated struct DeepIdleMemoryReclamationState: Equatable, Sendable {
             || hasActiveLLMInference
             || isTranscriberRecording
             || isTranscriberFinalizing
+            || hasPendingASRLoad
+            || hasPendingLLMLoad
         {
             return .retryAfterTransientWork
         }
@@ -66,6 +70,8 @@ nonisolated struct DeepIdleMemoryReclamationState: Equatable, Sendable {
         if hasActiveLLMInference { blockers.append("llm-active-inference") }
         if isTranscriberRecording { blockers.append("transcriber-recording") }
         if isTranscriberFinalizing { blockers.append("transcriber-finalizing") }
+        if hasPendingASRLoad { blockers.append("asr-loading") }
+        if hasPendingLLMLoad { blockers.append("llm-loading") }
         return blockers.isEmpty ? "none" : blockers.joined(separator: ",")
     }
 }
@@ -82,13 +88,21 @@ enum IdleMemoryReclamationSupport {
     static let transientRetryDelay: Duration = .seconds(5)
 
     @discardableResult
-    static func releaseAllocatorCaches() -> Int {
-        // MLX evaluation is asynchronous. Ensure completion handlers have released their
-        // graph and Metal resources before asking MLX and malloc to return idle pages.
-        Stream.gpu.synchronize()
-        Stream.cpu.synchronize()
-        Memory.clearCache()
-        return malloc_zone_pressure_relief(nil, 0)
+    nonisolated static func releaseAllocatorCaches() async -> Int {
+        // Reclaim only allocator-owned UNUSED buffers. Do not synchronize global
+        // streams: that can block UI and accidentally wait for a newly started
+        // session. MLX keeps in-flight allocations alive; later unload notifications
+        // can reclaim buffers that are not yet idle. No live model state is mutated.
+        let task = Task.detached(priority: .utility) {
+            guard !Task.isCancelled else { return 0 }
+            Memory.clearCache()
+            return malloc_zone_pressure_relief(nil, 0)
+        }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 }
 
@@ -169,7 +183,9 @@ extension AppDelegate {
             hasLoadedLLMModel: customLLMManager.hasLoadedInferenceModel,
             hasActiveLLMInference: customLLMManager.hasActiveInference,
             isTranscriberRecording: mlxTranscriber?.isRecording == true,
-            isTranscriberFinalizing: mlxTranscriber?.isFinalizingTranscription == true
+            isTranscriberFinalizing: mlxTranscriber?.isFinalizingTranscription == true,
+            hasPendingASRLoad: mlxModelManager.hasPendingModelLoad,
+            hasPendingLLMLoad: customLLMManager.hasPendingModelLoad
         )
     }
 
@@ -204,7 +220,7 @@ extension AppDelegate {
         if releasedTranscriber {
             mlxTranscriber = nil
         }
-        let reclaimedBytes = IdleMemoryReclamationSupport.releaseAllocatorCaches()
+        let reclaimedBytes = await IdleMemoryReclamationSupport.releaseAllocatorCaches()
         let memoryAfter = Memory.snapshot()
         VoxtLog.modelInfo(
             "Deep idle memory reclamation completed. id=\(reclamationID.uuidString), "

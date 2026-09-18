@@ -196,8 +196,8 @@ extension ModelSettingsView {
         }
     }
 
-    func deleteModel(_ repo: String) -> Result<Void, Error> {
-        let result = mlxModelManager.deleteModel(repo: repo)
+    func deleteModel(_ repo: String) async -> Result<Void, Error> {
+        let result = await mlxModelManager.deleteModel(repo: repo)
         if MLXModelManager.canonicalModelRepo(repo) == MLXModelManager.canonicalModelRepo(modelRepo) {
             mlxModelManager.checkExistingModel()
         }
@@ -239,8 +239,8 @@ extension ModelSettingsView {
         }
     }
 
-    func deleteCustomLLM(_ repo: String) -> Result<Void, Error> {
-        let result = customLLMManager.deleteModel(repo: repo)
+    func deleteCustomLLM(_ repo: String) async -> Result<Void, Error> {
+        let result = await customLLMManager.deleteModel(repo: repo)
         if repo == customLLMRepo {
             customLLMManager.checkExistingModel()
         }
@@ -269,11 +269,11 @@ extension ModelSettingsView {
             let result: Result<Void, Error>
             switch target {
             case .mlx(let repo):
-                result = deleteModel(repo)
+                result = await deleteModel(repo)
             case .customLLM(let repo):
-                result = deleteCustomLLM(repo)
+                result = await deleteCustomLLM(repo)
             case .ggufTranslation(let modelID):
-                result = deleteGGUFTranslationModel(modelID)
+                result = await deleteGGUFTranslationModel(modelID)
             }
             switch result {
             case .success:
@@ -360,8 +360,8 @@ extension ModelSettingsView {
         refreshCatalogSnapshot()
     }
 
-    func deleteGGUFTranslationModel(_ modelID: GGUFTranslationModelID) -> Result<Void, Error> {
-        let result = ggufTranslationModelManager.deleteModel(id: modelID)
+    func deleteGGUFTranslationModel(_ modelID: GGUFTranslationModelID) async -> Result<Void, Error> {
+        let result = await ggufTranslationModelManager.deleteModel(id: modelID)
         refreshCatalogSnapshot()
         return result
     }
@@ -504,7 +504,7 @@ extension ModelSettingsView {
         } else if case .loading = mlxModelManager.state {
             // Avoid resetting while model is being loaded.
         } else {
-            mlxModelManager.checkExistingModel()
+            mlxModelManager.checkExistingModel(refresh: true)
         }
 
         if !customLLMManager.activeDownloadRepos.isEmpty {
@@ -512,7 +512,7 @@ extension ModelSettingsView {
         } else if case .paused = customLLMManager.state {
             // Preserve paused state while download cancellation settles.
         } else {
-            customLLMManager.checkExistingModel()
+            customLLMManager.checkExistingModel(refresh: true)
         }
     }
 

@@ -8,10 +8,15 @@ command -v xcodebuild >/dev/null || { echo "Requires Xcode on macOS" >&2; exit 1
 xcodebuild -version
 xcrun swift --version
 OPTIONS=()
-if [[ -f "$LOCK" ]]; then
+UPDATE_LOCK=0
+if [[ "${1:-}" == --update-lock ]]; then
+  UPDATE_LOCK=1
+  shift
+fi
+if [[ -f "$LOCK" && "$UPDATE_LOCK" == 0 ]]; then
   OPTIONS+=(-onlyUsePackageVersionsFromResolvedFile)
 else
-  echo "Bootstrapping Package.resolved; review and commit the generated lockfile before release." >&2
+  echo "Resolving the current project requirements; review and commit Package.resolved before release." >&2
 fi
 xcodebuild -resolvePackageDependencies \
   -project Voxt.xcodeproj -scheme Voxt \

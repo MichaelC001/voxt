@@ -166,8 +166,21 @@ extension ModelSettingsView {
             }
     }
 
+    private var installationRefreshPublisher: AnyPublisher<Void, Never> {
+        Publishers.Merge(
+            mlxModelManager.$installationRevision.map { _ in () },
+            customLLMManager.$installationRevision.map { _ in () }
+        )
+        .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
+        .eraseToAnyPublisher()
+    }
+
     var contentWithLifecycle: some View {
         stateObservedContent
+            .onReceive(installationRefreshPublisher) { _ in
+                guard isActive, mainWindowState.isVisible else { return }
+                refreshCatalogSnapshot()
+            }
             .onReceive(modelStateRefreshTimer) { _ in
                 handleModelStateRefreshTick()
             }

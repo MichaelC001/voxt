@@ -26,14 +26,9 @@ final class MLXRealtimeReplayIntegrationTests: XCTestCase {
         return url
     }
 
-    private func resolvedModelRepoAndHubURL() throws -> (repo: String, hubURL: URL) {
+    private func resolvedModelRepoAndHubURL() async throws -> (repo: String, hubURL: URL) {
         let defaults = UserDefaults.standard
-        defaults.set("/Users/guanwei/x/models", forKey: AppPreferenceKey.modelStorageRootPath)
-        defaults.removeObject(forKey: AppPreferenceKey.modelStorageRootBookmark)
-        ModelStorageDirectoryManager.setAuthorizedRootURLForTesting(
-            URL(fileURLWithPath: "/Users/guanwei/x/models", isDirectory: true)
-        )
-        addTeardownBlock { ModelStorageDirectoryManager.resetForTesting() }
+        ModelTestGate.configureStorageRoot(for: self)
         let hubURL = defaults.bool(forKey: AppPreferenceKey.useHfMirror)
             ? MLXModelManager.mirrorHubBaseURL
             : MLXModelManager.defaultHubBaseURL
@@ -42,6 +37,7 @@ final class MLXRealtimeReplayIntegrationTests: XCTestCase {
             defaults.string(forKey: AppPreferenceKey.mlxModelRepo) ?? MLXModelManager.defaultModelRepo
         )
         let probeManager = MLXModelManager(modelRepo: preferredRepo, hubBaseURL: hubURL)
+        try await ModelTestGate.waitForASRInstallations(probeManager)
         if probeManager.isModelDownloaded(repo: preferredRepo),
            MLXModelManager.isMultilingualModelRepo(preferredRepo) {
             return (preferredRepo, hubURL)
@@ -59,8 +55,8 @@ final class MLXRealtimeReplayIntegrationTests: XCTestCase {
         return (fallbackRepo, hubURL)
     }
 
-    private func makeTranscriber() throws -> MLXTranscriber {
-        let resolved = try resolvedModelRepoAndHubURL()
+    private func makeTranscriber() async throws -> MLXTranscriber {
+        let resolved = try await resolvedModelRepoAndHubURL()
         return MLXTranscriber(
             modelManager: MLXModelManager(modelRepo: resolved.repo, hubBaseURL: resolved.hubURL)
         )
@@ -68,7 +64,7 @@ final class MLXRealtimeReplayIntegrationTests: XCTestCase {
 
     func testReplayOfficialShortFixtureProducesLiveAndFinalEvents() async throws {
         try requireModelTestsEnabled()
-        let transcriber = try makeTranscriber()
+        let transcriber = try await makeTranscriber()
         let diagnostics = try await transcriber.debugReplayRealtimeAudioFileWithTrace(
             fixtureURL(named: "qwen_audio_short_zh_chongqing.wav"),
             stepSeconds: 1.5
@@ -82,7 +78,7 @@ final class MLXRealtimeReplayIntegrationTests: XCTestCase {
     func testReplayOfficialLongFixtureKeepsPublishingIntoLaterPortion() async throws {
         try requireModelTestsEnabled()
         let clipURL = try fixtureURL(named: "qwen_audio_long_zh_composite.wav")
-        let transcriber = try makeTranscriber()
+        let transcriber = try await makeTranscriber()
 
         let clip = try DebugAudioClipIO.clip(for: clipURL)
         XCTAssertGreaterThanOrEqual(clip.durationSeconds, minimumLongFormDurationSeconds)
@@ -110,7 +106,7 @@ final class MLXRealtimeReplayIntegrationTests: XCTestCase {
     func testReplayOfficialLongFixturePublishesStopPreviewBeforeFinal() async throws {
         try requireModelTestsEnabled()
         let clipURL = try fixtureURL(named: "qwen_audio_long_en_composite.wav")
-        let transcriber = try makeTranscriber()
+        let transcriber = try await makeTranscriber()
 
         let diagnostics = try await transcriber.debugReplayRealtimeAudioFileWithTrace(
             clipURL,

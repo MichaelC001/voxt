@@ -1037,8 +1037,11 @@ final class MeetingDetailViewModel: ObservableObject {
         refreshTranscriptListCaches()
     }
 
+    private var transcriptListCache = MeetingTranscriptListCache()
+
     private func refreshTranscriptListCaches() {
-        speakerOrdinalByIdentityKey = MeetingTranscriptListSupport.speakerOrdinals(for: segments)
+        transcriptListCache.updateOrdinals(for: segments)
+        speakerOrdinalByIdentityKey = transcriptListCache.ordinals
         displayedSegments = MeetingTranscriptListSupport.displayedSegments(
             from: segments,
             searchQuery: searchQuery,
@@ -1046,9 +1049,9 @@ final class MeetingDetailViewModel: ObservableObject {
                 self?.timelineSpeakerTitle(for: segment) ?? segment.speaker.displayTitle
             }
         )
-        speakerGroups = MeetingTranscriptListSupport.speakerGroups(
-            from: displayedSegments,
-            titleForSegment: { [weak self] segment in
+        speakerGroups = transcriptListCache.groups(
+            for: displayedSegments,
+            title: { [weak self] segment in
                 self?.timelineSpeakerTitle(for: segment) ?? segment.speaker.displayTitle
             }
         )

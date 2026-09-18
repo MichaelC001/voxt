@@ -33,6 +33,8 @@ extension ModelSettingsView {
             state = .paused
         } else if catalogSnapshot.isDownloaded {
             state = .installed
+        } else if mlxModelManager.isCheckingInstallation(repo: canonicalRepo) {
+            state = .checking
         } else {
             state = .installable(isEnabled: true)
         }
@@ -78,6 +80,8 @@ extension ModelSettingsView {
             state = .paused
         } else if isInstalled {
             state = .installed
+        } else if customLLMManager.isCheckingInstallation(repo: canonicalRepo) {
+            state = .checking
         } else {
             state = .installable(isEnabled: true)
         }
@@ -138,7 +142,9 @@ extension ModelSettingsView {
             case .downloaded:
                 state = .installed
             case .notDownloaded, .error:
-                state = .installable(isEnabled: ggufTranslationModelManager.activeDownloadModelID == nil)
+                state = ggufTranslationModelManager.isCheckingInstallation(id: modelID)
+                    ? .checking
+                    : .installable(isEnabled: ggufTranslationModelManager.activeDownloadModelID == nil)
             }
         }
 

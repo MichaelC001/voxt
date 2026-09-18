@@ -815,11 +815,13 @@ enum CustomLLMModelStorageSupport {
             return false
         }
 
-        guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey]) else {
+        guard ModelWeightFileValidation.hasCompleteIndex(in: directory),
+              let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]) else {
             return false
         }
         for case let url as URL in enumerator where url.pathExtension.lowercased() == "safetensors" {
-            return true
+            if let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+               values.isRegularFile == true, (values.fileSize ?? 0) > 0 { return true }
         }
         return false
     }

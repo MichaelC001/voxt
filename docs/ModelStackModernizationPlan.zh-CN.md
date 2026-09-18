@@ -1,10 +1,26 @@
 # Voxt 模型栈现代化方案
 
-日期：2026-09-17
+初始分析：2026-09-17；后续计划调整：2026-09-18
 分支：`chore/model-stack-modernization`
-基线提交：`9807381e4b76e4bf1bcb6f692683136208322718`
+分析基线：`9807381e4b76e4bf1bcb6f692683136208322718`
+Voxt 清理提交：`95ade09`
 
 本文记录实施前基线与目标。当前分支已开始代码实施；实际完成项、检查结果和阻断项见 [实施记录](ModelStackModernizationImplementation.zh-CN.md)。不能把本文的目标或预期性能视为已经验证的结果。目标是把依赖、本地 ASR / LLM 目录、说话人分离、推理链路和设置 UI 收敛到更短、更清楚的路径上，同时保持现有核心业务和用户流程不变。
+
+## 0. 当前进度与接续入口（2026-09-18）
+
+| 项目 | 当前状态 | 下一步 |
+|---|---|---|
+| FluidAudio / VBx 与隐藏模型 | Voxt 源码已清理并提交 | macOS 编译、迁移和替代能力验收 |
+| Audio fork 同步与升级 | 已推送 fork `main`，包含上游 `3e97855` 的祖先历史，0 behind | 不再重复同步或重做 fork 候选 |
+| Audio fork 构建 / 测试 | Xcode 26.5 / Swift 6.3.2；669 个 Swift Testing 和 2 个 XCTest 通过 | 不能代替 Voxt 测试或真实模型回放 |
+| Voxt MLX 依赖 | 工作区已切入 Audio `2a6e75d` / MLX `0.31.6` / LM `c6446cf` 及 API 适配 | Mac 真实解析、编译、loader / 模型回归 |
+| UI / 链路优化 | 安装校验后台缓存、live 分组增量缓存、投递取消和非阻塞回收已落地工作区 | Swift 编译、取消竞态和 Instruments 验证 |
+| 发布验收 | 未完成 | 实际 lockfile、质量 / 延迟 / 内存 / 包体报告 |
+
+目标 fork revision：`2a6e75d28ae6a399ba7c7aec842384ef7a3142b5`。它与通过 CI 的 `33e72855c0169377ae5ddae83b0ce5da0673e920` 文件树相同（`4f1c756bff39e3ad320e2b12ce3f1726dd2a268b`），仅补充上游合并历史。[成功运行](https://github.com/hehehai/mlx-audio-swift/actions/runs/35309904287)。
+
+以下现状分析的旧数字以分析基线为准；当前实施状态以本节和 [实施记录](ModelStackModernizationImplementation.zh-CN.md) 为准。已删除的 fork 开发分支不再作为接续入口。A–D 的后续源码已实施在工作区；E 的集中本地验收脚本已提供，但本地 Linux 无法执行 Xcode，因此未触发新 Actions，也不能标为产品验收完成。
 
 ## 1. 目标与硬约束
 
@@ -38,7 +54,7 @@
 
 ### 2.1 依赖真实状态
 
-当前 Xcode 直接依赖：
+分析基线（`9807381`）的 Xcode 直接依赖；不是当前分支的完成状态：
 
 | 包 | 当前钉死方式 | 当前值 | 上游最新 | 结论 |
 |---|---|---|---|---|
@@ -53,7 +69,7 @@
 | PermissionFlow | exact `2.11.2` | 已是最新 | `2.11.2` | 不动 |
 | FaviconFinder | upToNextMajor `5.1.5` | 已是最新 | `5.1.5` | 不动 |
 
-`docs/MLXAudioDependency.md` 仍按 Xcode 26.3 / Swift 6.2 记录工具链上限。CI 已切到 `macos-26` + `Xcode_26.5`。实施第一件事不是改模型，而是确认 26.5 的 Swift 是否已经到 6.3。
+最初文档记录的是 Xcode 26.3 / Swift 6.2 上限。现在已从 fork 成功 CI 确认 Xcode 26.5 配套 Swift 6.3.2，并验证新依赖可构建。Voxt 仍需验证自身 API 与产品目标，不再把工具链版本是否满足作为未知阻断项。
 
 ### 2.2 当前源码未发现 sherpa-onnx 运行时依赖
 
@@ -162,53 +178,40 @@ LLM 目录在 `Voxt/Core/Models/CustomLLMModelSupport.swift`：
 
 ## 4. 依赖升级方案
 
-### 4.1 第一闸门：工具链
+### 4.1 工具链闸门已通过，下一步是 Voxt 集成
 
-在实施任何 MLX bump 前，用 CI 同款命令确认：
+固定接续环境为 Xcode 26.5 / Swift 6.3.2（fork CI 已验证）。Mac 本地仍应打印版本确认；不得为兼容旧 Swift 6.2 编译器单独降级新依赖中的一项。
 
-```bash
-xcodebuild -version
-xcrun swift --version
-```
+目标依赖必须作为一组切换：
 
-判断规则：
+| 依赖 | 升级前引用 | 已切入工作区的目标 |
+|---|---|---|
+| Audio fork | exact `0.1.3-voxt.12` | revision `2a6e75d28ae6a399ba7c7aec842384ef7a3142b5` |
+| mlx-swift | `.12` 的 exact `0.31.4` | 新 fork 的 exact `0.31.6` |
+| mlx-swift-lm | revision `d2424294a6c3bbd0de37a0761d80efc05e6813dd` | revision `c6446cf7bfb7cea76408013b614d4b2c530eaa03` |
+| swift-transformers | 旧图解析值待 lockfile 确认 | 新 fork 的 exact `1.3.4` |
+| swift-huggingface | 旧图解析值待 lockfile 确认 | 新 fork 的 exact `0.10.2` |
 
-| Swift | mlx-swift | mlx-swift-lm | mlx-audio-swift |
-|---|---|---|---|
-| 仍是 6.2 | 留在 `0.31.4` | 留在 `d242429` 或官方 `3.31.4` | 可同步 fork 的 STT 修复，但 **不能** 把 `mlx-swift` 改成 `0.31.5+` |
-| 已是 6.3 | 升到 `0.31.6` | 升到 `main` 上验证过的 commit，优先包含 `#620` 首 token 清 cache | 新 voxt tag，并解开 fork 对 `0.31.4` 的 exact pin |
+没有必须先发新 tag 的技术阻断；目标 revision 已在远程可获取。工程不得引用浮动 `main`、已删除的开发分支或本机绝对路径。
 
-当前 fork `v0.1.3-voxt.12` 的 `Package.swift` 是：
+### 4.2 Voxt 集成步骤
 
-```text
-mlx-swift.git, exact: "0.31.4"
-mlx-swift-lm.git, upToNextMajor from: "3.31.4"
-```
+1. 一次性修改 Audio / LM 工程引用、API 适配和 `tools/audit_model_stack.py` 预期，不能只改版本号。
+2. 新模型 `prepare()` 生命周期、有效 EOS、chat conventions、typed prefill 已切入正式源码。保留预量化 loader 与初始 `.remainder` chunking，不同时改变生成策略；一次性 patch 已删除，后续直接审查正式 loader。
+3. 补齐 loader 回归：普通量化 / OptiQ 混合量化、Qwen3.5、Qwen3 VL / Gemma VLM、thinking 关闭、EOS 与尾块、取消 / 切模型。patch 是适配起点，不是这些行为已验证的证明。
+4. 处理未知 checkpoint 必须明确失败；移除目录不等于忽略模型配置错误。模型声明与 tokenizer 模板的工具 / reasoning 协议需要一起核对，不能只假定名称匹配就兼容。
+5. 在统一工具链的 Mac 上真实解析整个 Voxt 图，提交工作区 `Package.resolved`。fork CI artifact 只能帮助核对共同依赖，不能直接复制成 Voxt lockfile。
+6. 一次性 patch、隔离快照生成器及其专用测试已删除，正式源码成为唯一 loader；使用 `tools/run_model_stack_validation.sh` 集中验证，不维护两套应用实现。
+7. 可在发布时为已验证 revision 补不可变 tag，但不阻塞本分支集成，也不复用旧 tag。
 
-所以 Voxt 工程里单独改 `mlx-swift-lm` revision **不会**让 `mlx-swift` 升到 0.31.6。必须先改 fork，再改 Voxt pin。
-
-### 4.2 MLX 升级步骤
-
-1. 确认工具链。
-2. 若 Swift 6.3 可用：
-   1. 把 `hehehai/mlx-audio-swift` 的 `main` 同步到 `Blaizzy/mlx-audio-swift`。
-   2. 将 fork 的 `mlx-swift` 依赖改为 `from: "0.31.6"` 或 `exact: "0.31.6"`。
-   3. 打新 tag，例如 `v0.1.3-voxt.13`。规则见 `docs/MLXAudioDependency.md`。
-   4. Voxt 把 `mlx-audio-swift` 指到新 tag。
-   5. Voxt 把 `mlx-swift-lm` 指到包含 `#620` 的 commit，并在真实 Mac 上验证 Qwen3 ASR live、MOSS、Nemotron、Qwen3.5 LLM。
-3. 若仍是 Swift 6.2：
-   1. 不碰 `mlx-swift 0.31.5+`。
-   2. 只评估 `0.1.3-voxt.12` 之后、仍兼容 0.31.4 的 STT 修复是否值得同步。
-   3. 把“Swift 6.3 + mlx-swift 0.31.6 + mlx-swift-lm `#620`”列为后续闸门，不在本轮强行升级。
-
-`#620`（生成首 token 时清 MLX cache）是本轮最值得追的 LLM / ASR 首包加速。没有 6.3 就不要为了它破坏当前可构建基线。
+LM `#620` 是首个生成 token 处的 cache 管理变更，不直接等于 ASR 首包或 LLM TTFT 提速，必须测量完整链路。
 
 ### 4.3 其他依赖
 
 - **删除** `FluidAudio` 包引用、product、`#if canImport(FluidAudio)` 全部分支。
 - **保留** `llama.swift`，不升级除非 Hy-MT2 加载失败。
-- Sparkle / GRDB / swift-log：升级可以做，但不是本轮主路径。建议在 MLX 验证后再锁 `Package.resolved`。
-- `Package.resolved` 现在被 `.gitignore` 忽略，但 CI 使用 `-onlyUsePackageVersionsFromResolvedFile`。本轮应改为提交 MLX 相关 resolved 文件，或至少在 CI 打印并校验 `mlx-swift` / `mlx-swift-lm` / `mlx-audio-swift` 的实际 revision。否则每次解析都会漂。
+- Sparkle `2.10.0` / GRDB `7.11.1` / swift-log `1.15.1` 已在 `95ade09` 更新并固定；FaviconFinder `5.1.5`、PermissionFlow `2.11.2`、llama.swift `2.10549.0` 保留。Voxt API 兼容仍需完整构建确认。
+- 工作区 `Package.resolved` 已解除 gitignore，但尚未生成。接续要求真实解析后入库，而不只是打印 pin；CI 和发布均严格使用同一锁文件。无 lockfile 的 bootstrap 只用于初始化，不是每次发布重新解析。
 
 ### 4.4 体积相关的依赖事实
 
@@ -501,7 +504,7 @@ VAD 热路径去掉 `MainActorSync.run`：
 
 保持现有 `CustomLLMModelManager.runLocalPromptRequest`。可做的加速都是静默的：
 
-1. Swift 6.3 后吃到 mlx-swift-lm `#620`，降低首 token 前的 cache 压力。
+1. 集成新 LM 的 cache 管理修复后，对比 TTFT、总耗时、峰值内存；不预设 `#620` 会缩短首 token 延迟。
 2. 核实后的现状：`customLLMWarmupReposForIdle()` 没有调用者，本地模型实际按会话预热，idle 只处理远程连接。删除这个死方法，保留现有按需本地预热，不额外增加空闲模型加载。
    - 本地流式预览增加 50 ms 更新间隔，第一块立即送出，结束时补发尾块，减少主线程全文清洗与 UI 更新。
    - 不改变最终输出或添加用户设置。
@@ -586,71 +589,68 @@ VAD 热路径去掉 `MainActorSync.run`：
 
 不要在本轮把 `MLXTranscriber` 强行拆成 10 个文件。先删分支，再看是否还需要按 live mode 拆。拆文件本身不给用户带来速度。
 
-## 9. 分阶段实施
+## 9. 接续实施批次（取代初版“最后才升 MLX”的顺序）
 
-每阶段都必须保持：能编译、现有听写 / 会议 / 翻译 / 改写主流程可走、旧选择可迁移。
+每批次保持业务入口、快捷键、输出语义和配置流程不变。阶段提交不等于每次 push；优先本地验证整个批次后，再统一推送一次。
 
-### 阶段 0. 基线与闸门
+### A. Voxt 接入已通过库级 CI 的 MLX 组合（P0）
 
-1. 记录 Xcode 26.5 的 Swift 版本。
-2. 记录当前 `Package.resolved` 实际 pin（即使未入库）。
-3. 列出 FluidAudio / NemoTextProcessing 在派生构建里的体积，作为删 VBx 的对比基线。
-4. 跑现有单测：`xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO`。
+范围：`Voxt.xcodeproj/project.pbxproj`、`MemoryEfficientModelContainerLoader.swift`、`CustomLLMModelManager.swift`、依赖审计、测试 / release workflow、实际 lockfile。
 
-出口：一份“能否升 mlx-swift 0.31.6”的是/否结论。不要猜测。
+1. 按第 4 节同步固定 Audio / LM 引用并适配所有使用到的 API，不再等待发布 fork tag。
+2. 保留现有预量化层加载，增加 loader 生命周期 / EOS / thinking / VLM / 输出尾块回归，不把新参数开放成额外 UI。
+3. 将 fork 已验证的工具链修复应用到 Voxt 的本地验收入口和 CI：`xcode-select`、`SDKROOT`、compiler PATH 必须来自同一 Xcode；默认不移除编译检查或失败测试。
+4. 实际解析完整 Voxt 依赖图、审计并入库 `Package.resolved`。保持 `-onlyUsePackageVersionsFromResolvedFile` 的后续构建语义。
+5. 回归通过后删除一次性候选 patch / generator；正式源文件成为唯一实现。保留独立构建旧基线的能力，但不留用户可见的旧引擎开关。
 
-### 阶段 1. 完全删除 FluidAudio（已确定）
+出口：本地 Mac 的 Debug / Release build、全量 XCTest、默认 ASR / LLM / VLM 冒烟通过；没有 FluidAudio 重新进入依赖图。仅 Linux 静态通过时，本批次仍是“待 Mac 验证”。
 
-本阶段不再评估是否保留 FluidAudio；验证的是替代链路可靠性和实际减量。
+### B. 模型安装状态后台化与设置页局部刷新（P1）
 
-1. 核对 Sortformer 的模型容量、有效参数和会议质量，确定原 VBx 专用参数删除范围。
-2. 独立说话人分离默认使用 Sortformer；旧 `offlineVBx` 一次性迁移。
-3. 删除 FluidAudio 整包、offline / streaming 引擎、fallback、下载 / 存储实现和独占依赖。
-4. 删除相关配置区域、选择器、文案、失效参数；更新功能设置、引导、测试和 smoke 脚本。
-5. 按第 6.4 节检查依赖图、动态 / 静态链接和资源，独立确认 ONNX / sherpa 无残留，记录实际体积差值。
+范围：ASR / LLM / GGUF / Sortformer manager 及 `ModelInstallSnapshots`、`ModelSettingsObservation`。
 
-验收：会议终稿分离通过质量回归；历史会议不变；旧用户无需重配。替代模型缺失 / 下载失败时使用现有下载状态与重试入口，不阻塞音频保存、不假报分离完成、不偷偷恢复 FluidAudio。
+1. 先列出磁盘校验、目录枚举、大小统计、删除 / 移动及模型加载的实际执行线程；复用现有 manager / snapshot，不新增平行状态源。
+2. 将耗时文件检查放到明确的后台隔离边界，MainActor 只发布不可变快照；`Task {}` 不等于离开 MainActor。
+3. 扫描结果携带 storage-root / repo / revision，切目录、卸载、取消下载后的旧结果不能覆盖新状态。
+4. 下载进度只更新行状态；目录成员只在安装 / 卸载 / 选择等生命周期事件变化时重建。状态未知沿用现有 loading 表达，不能临时误报“未安装”并触发重复下载。
+5. 后台校验仍必须覆盖缺失分片、损坏 config、未完成下载和外置盘失联，不能靠减少检查来换取快感。
 
-### 阶段 2. 删除隐藏 ASR / LLM 及整链
+出口：慢盘 / 大缓存 / 切目录 / 同时下载删除的确定性测试通过；模型页无主线程目录遍历，打开和下载期间 UI 响应有 Instruments 证据。
 
-1. 按第 5 节删 catalog。
-2. 收紧 canonical / fallback。
-3. 删 loader、hint、series grouping、测试夹具中的隐藏 repo。
-4. 设置页打开时不再扫描已删 repo。
+### C. 会议 live 列表增量处理（P1）
 
-验收：
+范围：`MeetingDetailViewModel.updateLiveSegments`、`MeetingTranscriptListSupport` 和现有虚拟列表。
 
-- 可见 ASR 仍是 11 个，可见 LLM 仍是 12 个。
-- 选择已删 repo 的用户启动后落到映射目标，不弹新向导。
-- `MLXModelCatalog.supportedModels == availableModels`。
-- `CustomLLMModelCatalog.supportedModels == availableModels`。
+1. 现有翻译状态局部更新保留；新增针对 live snapshot 的稳定 ID / revision 差分，避免每次字幕变更都重新排序和分组全部历史。
+2. partial 文本可被模型修订：不能假设只有末尾追加，也不能丢弃旧段修正。只重建受影响分组；搜索、全量替换、说话人改名等明确走全量重建。
+3. 异步计算使用值快照及 revision，较早结果不可覆盖较新字幕。保留滚动锚点、编辑状态、搜索结果和翻译缓存。
+4. 节流只作用于可替换的显示快照，不丢终稿、存储或错误事件。
 
-### 阶段 3. 链路与 UI 去阻塞
+出口：长会议、乱序 / 重复更新、partial 改写、翻译搜索、重命名、删除撤销和会话切换测试通过；实际更新成本与受影响数据规模相符。
 
-1. VAD 热路径去 `MainActorSync`。
-2. 设置页去掉 `AnyView` 生命周期包装，目录进度局部更新。
-3. 会议详情直播增量更新。
-4. 删除未使用的空闲本地 warmup 方法；保留按会话预热，节流本地 LLM 预览更新。
-5. 推荐徽章与默认模型一致。
+### D. 推理所有权、背压、取消与内存回收（P1，先可靠再调速）
 
-验收：不改变任何用户步骤；打开模型设置、下载、会议滚动的主线程工作量下降。
+范围：`MeetingLocalInferenceCoordinator`、`MeetingMLXNativeFeedScheduler`、模型生命周期和 `IdleMemoryReclamation`。
 
-### 阶段 4. MLX 升级
+1. 保留现有优先级有界车道，不未经测量就增加 GPU 并发。核对 permit 是否覆盖真实推理时段，而不只是 `feedAudio` 入队动作。
+2. 审查当前 `try? withPermit` 后仍推进 `pendingOffset` 的路径：取消 / 拒绝必须显式处理，不得把未投递音频标成已消费。10 秒队列上限触发时也必须保留可恢复音频和清晰状态。
+3. finish 必须排空已接收音频、保留最后结构化结果；cancel 必须停止投递、释放任务和 permit，不能无限等待 event stream。
+4. 本轮采用更保守的回收设计：删除全局 `Stream.gpu.synchronize()` / `Stream.cpu.synchronize()`，后台仅清理 allocator 未使用缓存，不触碰在用模型或等待新会话的 GPU 工作。增加 pending load 阻断。若未来恢复显式全局同步，必须先建立覆盖全部使用者的独占权，不能只搬到 detached task。
+5. 不用 `@unchecked Sendable`、无界 detached task 或每 token 全局清 cache 代替模型所有权控制。
 
-仅当阶段 0 判定 Swift 6.3 可用，或明确留在 0.31.4 只同步 audio fork 修复。
+出口：停止 / 取消 / 队列过载 / 模型切换 / 内存压力 / 回收时再启动等测试通过；不能丢音频或卡住 UI。尚未得到 GPU profile 的参数调整保持现状。
 
-1. 按 `docs/MLXAudioDependency.md` 打 fork tag。
-2. 升级 `mlx-audio-swift` / `mlx-swift-lm`。
-3. 真机验证：Qwen3 0.6B 听写首包、Qwen3.5 4B 增强 / 翻译、MOSS 会议、Nemotron 流式、Sortformer。
-4. 更新 `docs/MLXAudioDependency.md` 的 Current pin。
-5. 如决定提交 `Package.resolved`，一并入库。
+### E. 一次性本地验收包与 CI 复核（P0 发布闸门）
 
-### 阶段 5. 收尾
+1. Mac 本地完成：语法 / 工程 / 依赖审计、Debug / Release build、全量 XCTest、选定模型回放和损坏缓存 smoke，生成结果摘要 / xcresult。
+2. 确认迁移幂等且不动历史数据；旧 ID、缺失替代权重和下载失败沿用现有状态 / 重试入口。
+3. 按第 6.4 节审计 Release 动态 / 静态链接及资源，记录 App / zip / DMG 体积。相同机型与配置测量 ASR 首包 / Final、LLM TTFT / 总耗时、峰值内存和 UI 主线程时间；无基线则不写提速百分比。
+4. 本地集中修完同类问题后再统一提交 / push，一轮 CI 验证最终 SHA。CI 失败先阅读完整日志、批量排查，不逐条错误提交试跑。
+5. 没有 Mac 环境时，明确停在待验证边界；不能用 tree-sitter、Python 测试或 fork 测试代替 app 类型检查。若只能使用 CI 完成 macOS 验证，先说明限制并集中准备后再运行。
+6. 纯历史 merge 且 tree hash 与已通过版本相同才可跳过重复 CI；代码、依赖或 workflow 变更不能援引旧绿色结果。
+7. 对所有退役 runtime 设防回归门禁；保留必要旧数据迁移测试，不为追求“零旧字符串”删除迁移安全性。
 
-1. 清 sherpa 历史测试，或保留最小迁移断言。
-2. 更新 `docs/LocalModelPruningEvaluation.zh-CN.md` 指向本方案，避免两份清单打架。
-3. 依赖审计脚本或 release 步骤：禁止 FluidAudio / sherpa / onnxruntime 再进入工程。
-4. 跑 `VoxtTests` 全量；模型集成测试仍用 `VOXT_RUN_MODEL_TESTS=1` 在有模型的机器上跑，不作为默认 CI。
+**Plan 完成定义**：A–D 的实施及对应测试完成，E 的 app 构建、质量、性能与包体证据齐备。允许 tag 晚于集成，但不允许把缺失的验证标成完成。当前另一路 onboarding / 录音引导工作不纳入本轮修改或提交。
 
 ## 10. 迁移矩阵
 
@@ -718,15 +718,15 @@ VAD 热路径去掉 `MainActorSync.run`：
 
 | 风险 | 处理 |
 |---|---|
-| Xcode 26.5 仍是 Swift 6.2，mlx-swift 0.31.6 无法解析 | 阶段 4 降级为只同步 audio fork；不阻塞 VBx 和隐藏模型删除 |
+| Xcode / SDK / JIT 子进程混用工具链 | fork 已验证 Xcode 26.5 / Swift 6.3.2；Voxt 同步统一系统 xcode-select、SDKROOT 和 compiler PATH，不只设置 DEVELOPER_DIR |
 | Sortformer 在多人会议上的容量或质量不满足现有核心业务 | 以真实 checkpoint 和会议样本验证；不随意改 `numSpeakers`。关键退化阻断发布，修复替代链路，不恢复 FluidAudio |
 | 有用户长期使用隐藏模型 | 静默映射到同系列主推。不在 UI 上挽留 |
 | `MemoryEfficientModelContainerLoader` 与新 mlx-swift-lm API 不兼容 | 阶段 4 先适配 loader，失败则暂缓 lm bump |
-| 提交 `Package.resolved` 引起无关 diff | 只在阶段 4 处理，或 CI 校验 pin 而不入库 |
+| 缺失或不匹配的 `Package.resolved` | 集成批次在 Mac 生成并审查整个 app 依赖图后入库；不手写 / 拼接，不拿 fork lockfile 代替 |
 | FluidAudio 移除不完整或混淆 ONNX 来源 | 源码、工程、resolved 图、链接映射、动态库与资源联合审计；旧名称只允许存在于迁移 / 测试 / 历史文档 |
 
 ## 13. 建议执行顺序（一句话）
 
-先验证 Sortformer 并完整移除 FluidAudio / VBx、独立完成 ONNX 残留审计，再删隐藏模型和失效配置，再修热路径和设置页阻塞，最后在工具链允许时升级 MLX。
+已完成的源码清理不重复做；现在先接入通过库级 CI 的固定 MLX 组合，再完成安装状态后台化、会议增量更新与推理可靠性检查，最后集中进行 Voxt 本地验收及一轮 CI 复核。
 
-这个顺序保证：即使 MLX 暂时不能升，产品也已经更轻、更清楚、更好用；用户仍然是“选模型、下载、说话”，没有多学一步。
+用户仍然是“选模型、下载、说话”，不增加流程。只在有测试 / 实测证据时将对应项标为完成，不把 fork 通过、源码提交或静态检查当作产品交付完成。

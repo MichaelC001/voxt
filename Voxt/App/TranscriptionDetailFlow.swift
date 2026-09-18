@@ -184,7 +184,7 @@ extension AppDelegate {
             }
             return nil
         case .localLLM(let repo):
-            guard customLLMManager.isModelDownloaded(repo: repo) else { return nil }
+            guard customLLMManager.canAttemptInference(repo: repo) else { return nil }
             return .customLLM(repo: repo)
         case .remoteLLM(let provider):
             guard RemoteModelConfigurationStore.isStoredLLMConfigurationConfigured(

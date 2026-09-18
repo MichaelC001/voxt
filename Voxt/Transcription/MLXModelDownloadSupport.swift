@@ -7,7 +7,7 @@ import HuggingFace
 
 enum MLXModelDownloadSupport {
     private static let modelEntryAllowedExtensions: Set<String> = ["safetensors", "json", "txt", "wav", "jinja", "model", "mvn"]
-    static let whisperTokenizerAssetPaths: [String] = [
+    nonisolated static let whisperTokenizerAssetPaths: [String] = [
         "tokenizer.json",
         "tokenizer_config.json",
         "special_tokens_map.json",
@@ -24,7 +24,7 @@ enum MLXModelDownloadSupport {
         return formatter
     }()
 
-    enum DownloadValidationError: LocalizedError {
+    nonisolated enum DownloadValidationError: LocalizedError {
         case missingFiles
         case sizeMismatch(expected: Int64, actual: Int64)
         case emptyFileList
@@ -34,8 +34,8 @@ enum MLXModelDownloadSupport {
             case .missingFiles:
                 return "Downloaded files are incomplete."
             case .sizeMismatch(let expected, let actual):
-                let expectedText = byteFormatter.string(fromByteCount: expected)
-                let actualText = byteFormatter.string(fromByteCount: actual)
+                let expectedText = ByteCountFormatter.string(fromByteCount: expected, countStyle: .file)
+                let actualText = ByteCountFormatter.string(fromByteCount: actual, countStyle: .file)
                 return "Download incomplete (expected ~\(expectedText), got \(actualText))."
             case .emptyFileList:
                 return "No downloadable files were found for this model."
@@ -277,7 +277,21 @@ enum MLXModelDownloadSupport {
         return url
     }
 
-    static func validateDownloadedModel(
+    @concurrent
+    nonisolated static func validateDownloadedModelInBackground(
+        at url: URL,
+        repo: String? = nil,
+        sizeState: MLXModelManager.ModelSizeState,
+        downloadSizeTolerance: Double,
+        fileManager: FileManager
+    ) async throws {
+        try await ModelDiskOperations.perform {
+            try validateDownloadedModel(at: url, repo: repo, sizeState: sizeState,
+                downloadSizeTolerance: downloadSizeTolerance, fileManager: fileManager)
+        }
+    }
+
+    nonisolated static func validateDownloadedModel(
         at url: URL,
         repo: String? = nil,
         sizeState: MLXModelManager.ModelSizeState,
@@ -296,7 +310,7 @@ enum MLXModelDownloadSupport {
             return (try? JSONSerialization.jsonObject(with: data)) != nil
         }
 
-        guard hasWeights, configValid else {
+        guard hasWeights, configValid, ModelWeightFileValidation.hasCompleteIndex(in: url) else {
             throw DownloadValidationError.missingFiles
         }
 
@@ -316,7 +330,7 @@ enum MLXModelDownloadSupport {
         }
     }
 
-    static func clearDirectory(at url: URL, fileManager: FileManager) throws {
+    nonisolated static func clearDirectory(at url: URL, fileManager: FileManager) throws {
         guard fileManager.fileExists(atPath: url.path) else { return }
         do {
             try fileManager.removeItem(at: url)
@@ -329,7 +343,7 @@ enum MLXModelDownloadSupport {
         }
     }
 
-    static func isModelDirectoryValid(
+    nonisolated static func isModelDirectoryValid(
         _ directory: URL,
         repo: String? = nil,
         fileManager: FileManager
@@ -362,7 +376,7 @@ enum MLXModelDownloadSupport {
             return false
         }
 
-        return hasWeights && hasRequiredAuxiliaryFiles(
+        return hasWeights && ModelWeightFileValidation.hasCompleteIndex(in: directory) && hasRequiredAuxiliaryFiles(
             at: directory,
             repo: repo,
             files: files,
@@ -397,7 +411,7 @@ enum MLXModelDownloadSupport {
         }
     }
 
-    static func whisperTokenizerRepo(for repo: String) -> String? {
+    nonisolated static func whisperTokenizerRepo(for repo: String) -> String? {
         let lowercasedRepo = repo.lowercased()
         guard lowercasedRepo.contains("whisper") else { return nil }
         if lowercasedRepo.contains("tiny") {
@@ -418,7 +432,7 @@ enum MLXModelDownloadSupport {
         return "openai/whisper-large-v3"
     }
 
-    static func missingWhisperTokenizerAssetPaths(
+    nonisolated static func missingWhisperTokenizerAssetPaths(
         at directory: URL,
         fileManager: FileManager
     ) -> [String] {
@@ -431,7 +445,7 @@ enum MLXModelDownloadSupport {
         url.host?.contains("hf-mirror.com") == true
     }
 
-    private static func allFiles(at root: URL, fileManager: FileManager) -> [URL] {
+    private nonisolated static func allFiles(at root: URL, fileManager: FileManager) -> [URL] {
         guard let enumerator = fileManager.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
@@ -450,7 +464,7 @@ enum MLXModelDownloadSupport {
         return files
     }
 
-    private static func hasRequiredAuxiliaryFiles(
+    private nonisolated static func hasRequiredAuxiliaryFiles(
         at directory: URL,
         repo: String?,
         files _: [URL],
@@ -468,7 +482,7 @@ enum MLXModelDownloadSupport {
         }
     }
 
-    private static func resolvedModelType(
+    private nonisolated static func resolvedModelType(
         at directory: URL,
         repo: String?,
         fileManager: FileManager
@@ -484,7 +498,7 @@ enum MLXModelDownloadSupport {
         return repo?.lowercased().contains("sensevoice") == true ? "sensevoice" : nil
     }
 
-    private static func hasSenseVoiceTokenizerAssets(at directory: URL, fileManager: FileManager) -> Bool {
+    private nonisolated static func hasSenseVoiceTokenizerAssets(at directory: URL, fileManager: FileManager) -> Bool {
         if fileManager.fileExists(atPath: directory.appendingPathComponent("tokenizer.json").path) {
             return true
         }

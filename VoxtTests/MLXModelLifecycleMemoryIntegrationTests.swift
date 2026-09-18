@@ -39,12 +39,13 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
 
         configureModelStorageRoot(modelRoot)
         let probeManager = MLXModelManager(modelRepo: repo)
+        _ = try await probeManager.refreshInstallation(repo: repo)
         guard probeManager.isModelDownloaded(repo: repo) else {
             throw XCTSkip("The requested memory-stress model is not installed: \(repo)")
         }
         await probeManager.shutdownForApplicationTermination()
 
-        let baseline = settledMemorySample(cycle: 0)
+        let baseline = await settledMemorySample(cycle: 0)
         report(baseline, repo: repo)
 
         var allSamples = [baseline]
@@ -77,7 +78,7 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
                 try await Task.sleep(for: .seconds(settleSeconds))
             }
 
-            let sample = settledMemorySample(
+            let sample = await settledMemorySample(
                 cycle: cycle,
                 elapsedMilliseconds: Int(Date().timeIntervalSince(cycleStartedAt) * 1_000)
             )
@@ -136,12 +137,13 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
 
         configureModelStorageRoot(modelRoot)
         let probeManager = CustomLLMModelManager(modelRepo: repo)
+        _ = try await probeManager.refreshInstallation(repo: repo)
         guard probeManager.isModelDownloaded(repo: repo) else {
             throw XCTSkip("The requested memory-stress LLM is not installed: \(repo)")
         }
         await probeManager.shutdownForApplicationTermination()
 
-        let baseline = settledMemorySample(cycle: 0)
+        let baseline = await settledMemorySample(cycle: 0)
         report(baseline, repo: repo)
         var allSamples = [baseline]
         var samples: [MemorySample] = []
@@ -153,7 +155,7 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
             await manager.shutdownForApplicationTermination()
             XCTAssertFalse(manager.hasLoadedInferenceModel)
 
-            let sample = settledMemorySample(
+            let sample = await settledMemorySample(
                 cycle: cycle,
                 elapsedMilliseconds: Int(Date().timeIntervalSince(cycleStartedAt) * 1_000)
             )
@@ -208,6 +210,7 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
 
         configureModelStorageRoot(modelRoot)
         let manager = CustomLLMModelManager(modelRepo: repo)
+        _ = try await manager.refreshInstallation(repo: repo)
         guard manager.isModelDownloaded(repo: repo) else {
             throw XCTSkip("The requested generation-test LLM is not installed: \(repo)")
         }
@@ -271,8 +274,15 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
     private func settledMemorySample(
         cycle: Int,
         elapsedMilliseconds: Int = 0
-    ) -> MemorySample {
-        let reclaimedBytes = IdleMemoryReclamationSupport.releaseAllocatorCaches()
+    ) async -> MemorySample {
+        // This fixture has explicitly stopped its model work. Settle GPU queues
+        // off MainActor for comparable measurements; production idle cleanup must
+        // not insert these global fences into interactive sessions.
+        await Task.detached(priority: .utility) {
+            Stream.gpu.synchronize()
+            Stream.cpu.synchronize()
+        }.value
+        let reclaimedBytes = await IdleMemoryReclamationSupport.releaseAllocatorCaches()
         let mlx = Memory.snapshot()
         return MemorySample(
             cycle: cycle,

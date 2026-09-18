@@ -149,7 +149,12 @@ class CustomLLMModelManager: ObservableObject {
 
     private(set) var stateByRepo: [String: ModelState] = [:]
     private var downloadedStateByRepo: [String: Bool] = [:]
-    private var downloadedStateCachePrimed = false
+    private let installationCache = ModelInstallationCache()
+    private var deletingRepos: Set<String> = []
+    private var storageRevision = UUID()
+    private var storageRoots: [URL] = []
+    private var downloadStorageRevisions: [String: UUID] = [:]
+    @Published private(set) var installationRevision: UInt64 = 0
     private var localSizeTextByRepo: [String: String] = [:]
     private var modelRepo: String
     private var hubBaseURL: URL
@@ -202,11 +207,23 @@ class CustomLLMModelManager: ObservableObject {
             VoxtLog.modelInfo("Canonicalized custom LLM repo '\(modelRepo)' -> '\(repoSelection.effectiveRepo)'")
         }
         VoxtLog.modelInfo("Custom LLM manager initialized. repo=\(repoSelection.effectiveRepo), hub=\(hubBaseURL.absoluteString)")
+        storageRoots = [writeRootURL()] + readableRootURLs()
+        installationCache.onChange = { [weak self] repo, snapshot in
+            guard let self else { return }
+            self.downloadedStateByRepo[repo] = snapshot.isInstalled
+            self.localSizeTextByRepo[repo] = snapshot.allocatedBytes > 0
+                ? MLXModelStorageSupport.formatByteCount(snapshot.allocatedBytes) : nil
+            if self.downloadTasksByRepo[repo] == nil {
+                self.applyInstallationState(snapshot, repo: repo)
+            }
+            self.installationRevision &+= 1
+        }
         checkExistingModel()
     }
 
     var currentModelRepo: String { modelRepo }
     var hasLoadedInferenceModel: Bool { inferenceContainer != nil }
+    var hasPendingModelLoad: Bool { inferenceLoadCoordinator.hasPendingLoad }
     var hasActiveInference: Bool { activeInferenceCount > 0 }
 
     func refreshMemoryOptimizationPolicy() {
@@ -226,7 +243,8 @@ class CustomLLMModelManager: ObservableObject {
     func prewarmModel(repo: String) async throws {
         let canonicalRepo = Self.canonicalModelRepo(repo)
         try await withActiveInference {
-            guard isModelDownloaded(repo: canonicalRepo) else {
+            let installation = try await refreshInstallation(repo: canonicalRepo)
+            guard installation.isInstalled else {
                 throw NSError(
                     domain: "Voxt.CustomLLM",
                     code: 404,
@@ -437,7 +455,7 @@ class CustomLLMModelManager: ObservableObject {
             minP: settings.minP.map(Float.init) ?? 0,
             repetitionPenalty: repetitionPenalty,
             repetitionContextSize: 32,
-            prefillStepSize: prefillStepSize
+            prefill: .init(stepSize: prefillStepSize, chunking: .remainder)
         )
     }
 
@@ -460,7 +478,8 @@ class CustomLLMModelManager: ObservableObject {
     ) async throws -> String {
         return try await withActiveInference {
             try Task.checkCancellation()
-            guard isModelDownloaded(repo: request.repo) else {
+            let installation = try await refreshInstallation(repo: request.repo)
+            guard installation.isInstalled else {
                 throw NSError(
                     domain: "Voxt.CustomLLM",
                     code: 404,
@@ -618,7 +637,7 @@ class CustomLLMModelManager: ObservableObject {
             suffix = ", mode=\(mode)"
         }
         let maxTokens = params.maxTokens.map(String.init) ?? "0"
-        let prefillStepSize = params.prefillStepSize.map(String.init) ?? "0"
+        let prefillStepSize = params.prefill.stepSize.map(String.init) ?? "0"
         return "Custom LLM \(request.kind.logLabel) started. repo=\(request.repo), inputChars=\(request.inputCharacterCount), maxTokens=\(maxTokens), temperature=\(params.temperature), topP=\(params.topP), prefillStep=\(prefillStepSize)\(suffix), family=\(behavior.family.logLabel), thinkingDisabled=\(behavior.disablesThinking)"
     }
 
@@ -656,6 +675,8 @@ class CustomLLMModelManager: ObservableObject {
 
     private func container(for repo: String) async throws -> ModelContainer {
         let repo = Self.canonicalModelRepo(repo)
+        let revision = storageRevision
+        guard !deletingRepos.contains(repo) else { throw CancellationError() }
         guard Self.availableModels.contains(where: { $0.id == repo }) else {
             throw NSError(
                 domain: "Voxt.CustomLLM",
@@ -667,7 +688,8 @@ class CustomLLMModelManager: ObservableObject {
             return cached
         }
 
-        guard let directory = readableCacheDirectory(for: repo, requireValid: true) else {
+        let installation = try await refreshInstallation(repo: repo)
+        guard let directory = installation.directory else {
             throw NSError(
                 domain: "Voxt.CustomLLM",
                 code: -10,
@@ -686,6 +708,8 @@ class CustomLLMModelManager: ObservableObject {
                 token: token
             )
         }
+        try Task.checkCancellation()
+        guard revision == storageRevision else { throw CancellationError() }
         if CustomLLMModelCatalog.supportsImageInput(repo: repo) {
             _ = MLXVLM.TrampolineModelFactory.modelFactory()
         }
@@ -698,6 +722,7 @@ class CustomLLMModelManager: ObservableObject {
             )
         }
         try Task.checkCancellation()
+        guard revision == storageRevision, !deletingRepos.contains(repo) else { throw CancellationError() }
         inferenceContainer = container
         inferenceModelRepo = repo
         return container
@@ -770,7 +795,7 @@ class CustomLLMModelManager: ObservableObject {
         }
             VoxtLog.modelInfo("Custom LLM model changed: \(modelRepo) -> \(repoSelection.effectiveRepo)")
         modelRepo = repoSelection.effectiveRepo
-        releaseInferenceResources(resetActiveInferenceCount: true)
+        releaseInferenceResources()
         lastLoggedModelPresence = nil
         lastInvalidRepoLogged = nil
         checkExistingModel()
@@ -825,26 +850,38 @@ class CustomLLMModelManager: ObservableObject {
     }
 
     func isModelDownloaded(repo: String) -> Bool {
-        let canonicalRepo = Self.canonicalModelRepo(repo)
-        guard Self.availableModels.contains(where: { $0.id == canonicalRepo }) else { return false }
-        primeDownloadedStateCacheIfNeeded()
-        if let cached = downloadedStateByRepo[canonicalRepo] {
-            return cached
-        }
-        guard let modelDir = readableCacheDirectory(for: canonicalRepo, requireValid: true) else { return false }
-        let isDownloaded = CustomLLMModelStorageSupport.isModelDirectoryValid(modelDir)
-        downloadedStateByRepo[canonicalRepo] = isDownloaded
-        return isDownloaded
+        let repo = Self.canonicalModelRepo(repo)
+        guard Self.availableModels.contains(where: { $0.id == repo }) else { return false }
+        requestInstallation(repo)
+        return downloadedStateByRepo[repo] ?? false
+    }
+
+    /// Preflight must not reject an installed model while its first background
+    /// scan is pending. The async inference entry point waits for validation.
+    func canAttemptInference(repo: String) -> Bool {
+        isModelDownloaded(repo: repo) || isCheckingInstallation(repo: repo)
+    }
+
+    func isCheckingInstallation(repo: String) -> Bool {
+        let repo = Self.canonicalModelRepo(repo)
+        guard Self.availableModels.contains(where: { $0.id == repo }) else { return false }
+        requestInstallation(repo)
+        return downloadedStateByRepo[repo] == nil
+    }
+
+    @discardableResult
+    func refreshInstallation(repo: String) async throws -> ModelInstallationSnapshot {
+        let repo = Self.canonicalModelRepo(repo)
+        guard !isShuttingDownForApplicationTermination, !deletingRepos.contains(repo),
+              Self.availableModels.contains(where: { $0.id == repo }) else { throw CancellationError() }
+        let request = installationRequest(repo)
+        return try await installationCache.value(repo) { request.scan() }
     }
 
     func hasResumableDownload(repo: String) -> Bool {
-        let canonicalRepo = Self.canonicalModelRepo(repo)
-        guard !isModelDownloaded(repo: canonicalRepo),
-              let modelDir = writeCacheDirectory(for: canonicalRepo),
-              FileManager.default.fileExists(atPath: modelDir.path) else {
-            return false
-        }
-        return FileManager.default.directoryContainsRegularFiles(at: modelDir)
+        let repo = Self.canonicalModelRepo(repo)
+        requestInstallation(repo)
+        return installationCache.peek(repo)?.hasPartialDownload ?? false
     }
 
     private func shouldReuseSavedDownloadSource(for repo: String) -> Bool {
@@ -855,19 +892,9 @@ class CustomLLMModelManager: ObservableObject {
     }
 
     func modelSizeOnDisk(repo: String) -> String {
-        let canonicalRepo = Self.canonicalModelRepo(repo)
-        if let cached = localSizeTextByRepo[canonicalRepo] {
-            return cached
-        }
-        guard let modelDir = readableCacheDirectory(for: canonicalRepo, requireValid: true),
-              let size = try? FileManager.default.allocatedSizeOfDirectory(at: modelDir),
-              size > 0
-        else {
-            return ""
-        }
-        let text = CustomLLMModelStorageSupport.formatByteCount(Int64(size))
-        localSizeTextByRepo[canonicalRepo] = text
-        return text
+        let repo = Self.canonicalModelRepo(repo)
+        requestInstallation(repo)
+        return localSizeTextByRepo[repo] ?? ""
     }
 
     func cachedModelSizeText(repo: String) -> String? {
@@ -875,15 +902,10 @@ class CustomLLMModelManager: ObservableObject {
     }
 
     func modelDirectoryURL(repo: String) -> URL? {
-        let canonicalRepo = Self.canonicalModelRepo(repo)
-        if let modelDir = readableCacheDirectory(for: canonicalRepo, requireValid: true),
-           FileManager.default.fileExists(atPath: modelDir.path) {
-            return modelDir
-        }
-        guard let modelDir = readableCacheDirectory(for: canonicalRepo, requireValid: false),
-              FileManager.default.fileExists(atPath: modelDir.path)
-        else { return nil }
-        return modelDir
+        let repo = Self.canonicalModelRepo(repo)
+        requestInstallation(repo)
+        let snapshot = installationCache.peek(repo)
+        return snapshot?.directory ?? snapshot?.existingDirectory
     }
 
     func remoteSizeText(repo: String) -> String {
@@ -894,38 +916,30 @@ class CustomLLMModelManager: ObservableObject {
         _ = repo
     }
 
-    func checkExistingModel() {
-        guard writeCacheDirectory(for: modelRepo) != nil else {
-            setState(.error("Invalid model identifier"), for: modelRepo)
-            downloadedStateByRepo[modelRepo] = false
-            if lastInvalidRepoLogged != modelRepo {
-                VoxtLog.modelError("Invalid custom LLM repo identifier: \(modelRepo)")
-                lastInvalidRepoLogged = modelRepo
-            }
+    func checkExistingModel(refresh: Bool = false) {
+        guard !isShuttingDownForApplicationTermination else { return }
+        if refresh, !installationCache.hasPendingRequest(modelRepo), downloadTasksByRepo[modelRepo] == nil {
+            invalidateLocalCache(for: modelRepo)
+        }
+        guard Self.availableModels.contains(where: { $0.id == modelRepo }) else {
+            setState(.notDownloaded, for: modelRepo)
             return
         }
-        lastInvalidRepoLogged = nil
-        let isDownloaded = readableCacheDirectory(for: modelRepo, requireValid: true) != nil
-        downloadedStateByRepo[modelRepo] = isDownloaded
-        if isDownloaded {
-            setState(.downloaded, for: modelRepo)
-        } else if downloadTasksByRepo[modelRepo] == nil, hasResumableDownload(repo: modelRepo) {
-            setPausedState(
-                progress: 0,
-                completed: 0,
-                total: 0,
-                currentFile: nil,
-                completedFiles: 0,
-                totalFiles: 0,
-                for: modelRepo
-            )
-        } else {
-            setState(.notDownloaded, for: modelRepo)
+        requestInstallation(modelRepo)
+        guard let snapshot = installationCache.peek(modelRepo) else {
+            return
         }
-        let downloaded = (state == .downloaded)
-        if lastLoggedModelPresence?.repo != modelRepo || lastLoggedModelPresence?.downloaded != downloaded {
-            VoxtLog.modelInfo("Custom LLM local model state refreshed: repo=\(modelRepo), downloaded=\(downloaded)")
-            lastLoggedModelPresence = (modelRepo, downloaded)
+        guard downloadTasksByRepo[modelRepo] == nil else { return }
+        applyInstallationState(snapshot, repo: modelRepo)
+    }
+
+    private func applyInstallationState(_ snapshot: ModelInstallationSnapshot, repo: String) {
+        if snapshot.isInstalled {
+            setState(.downloaded, for: repo)
+        } else if snapshot.hasPartialDownload {
+            setPausedState(progress: 0, completed: 0, total: 0, currentFile: nil, completedFiles: 0, totalFiles: 0, for: repo)
+        } else {
+            setState(.notDownloaded, for: repo)
         }
     }
 
@@ -983,9 +997,18 @@ class CustomLLMModelManager: ObservableObject {
 
     private func performDownload(forRepo repo: String) async {
         let canonicalRepo = Self.canonicalModelRepo(repo)
-        if downloadTasksByRepo[canonicalRepo] != nil { return }
+        if downloadTasksByRepo[canonicalRepo] != nil || deletingRepos.contains(canonicalRepo) { return }
+        do {
+            let installation = try await refreshInstallation(repo: canonicalRepo)
+            if installation.isInstalled { return }
+        } catch { return }
+        guard downloadTasksByRepo[canonicalRepo] == nil, !isShuttingDownForApplicationTermination,
+              !deletingRepos.contains(canonicalRepo) else { return }
+        installationCache.invalidate(canonicalRepo)
 
         SystemNotificationSupport.requestAuthorizationIfNeeded()
+        let revision = storageRevision
+        downloadStorageRevisions[canonicalRepo] = revision
         let task = Task { [weak self] in
             guard let self else { return }
             defer {
@@ -993,7 +1016,14 @@ class CustomLLMModelManager: ObservableObject {
                 downloadTasksByRepo[canonicalRepo] = nil
                 downloadStopActionsByRepo[canonicalRepo] = nil
                 activeDownloadRepos.remove(canonicalRepo)
+                downloadStorageRevisions.removeValue(forKey: canonicalRepo)
+                if revision != storageRevision {
+                    invalidateLocalCache(for: canonicalRepo)
+                    clearPerRepoState(for: canonicalRepo)
+                    requestInstallation(canonicalRepo)
+                }
             }
+            guard revision == storageRevision, !Task.isCancelled else { return }
             activeDownloadRepos.insert(canonicalRepo)
             if let pausedState = pausedDownloadSnapshot(for: canonicalRepo) {
                 setDownloadingState(
@@ -1020,7 +1050,12 @@ class CustomLLMModelManager: ObservableObject {
             do {
                 setPausedStatusMessage(nil, for: canonicalRepo)
                 let modelDir = try await performDownloadWithFallback(for: canonicalRepo)
-                guard CustomLLMModelStorageSupport.isModelDirectoryValid(modelDir) else {
+                let valid = await Task.detached(priority: .utility) {
+                    CustomLLMModelStorageSupport.isModelDirectoryValid(modelDir)
+                }.value
+                try Task.checkCancellation()
+                guard revision == storageRevision else { throw CancellationError() }
+                guard valid else {
                     setPausedStatusMessage(nil, for: canonicalRepo)
                     let message = "Downloaded files are incomplete."
                     setState(.error(message), for: canonicalRepo)
@@ -1031,12 +1066,15 @@ class CustomLLMModelManager: ObservableObject {
                     VoxtLog.modelError("Custom LLM download produced incomplete files: \(canonicalRepo)")
                     return
                 }
+                try Task.checkCancellation()
+                guard revision == storageRevision else { throw CancellationError() }
                 markDownloadCompleted(for: canonicalRepo)
                 SystemNotificationSupport.postModelDownloadSucceeded(
                     modelName: displayTitle(for: canonicalRepo)
                 )
                 VoxtLog.modelInfo("Custom LLM download completed: \(canonicalRepo)")
             } catch is CancellationError {
+                guard revision == storageRevision else { return }
                 cancelDownloadProgressTask(for: canonicalRepo)
                 switch downloadStopActionsByRepo[canonicalRepo] {
                 case .pause:
@@ -1044,18 +1082,21 @@ class CustomLLMModelManager: ObservableObject {
                     VoxtLog.modelInfo("Custom LLM download paused: \(canonicalRepo)")
                 case .cancel, .none:
                     setPausedStatusMessage(nil, for: canonicalRepo)
-                    cleanupPartialDownload(for: canonicalRepo)
+                    await cleanupPartialDownload(for: canonicalRepo)
+                    guard revision == storageRevision else { return }
                     clearSelectedDownloadSource(for: canonicalRepo)
                     markCancelledDownloadUnavailable(for: canonicalRepo)
                     VoxtLog.modelWarning("Custom LLM download cancelled: \(canonicalRepo)")
                 }
             } catch {
+                guard revision == storageRevision else { return }
                 cancelDownloadProgressTask(for: canonicalRepo)
                 if pauseDownloadIfNetworkIssue(error, repo: canonicalRepo) {
                     return
                 }
                 setPausedStatusMessage(nil, for: canonicalRepo)
-                clearHubCache(for: canonicalRepo)
+                await clearHubCache(for: canonicalRepo)
+                guard revision == storageRevision else { return }
                 let message = "Download failed: \(error.localizedDescription)"
                 setState(.error(message), for: canonicalRepo)
                 SystemNotificationSupport.postModelDownloadFailed(
@@ -1085,18 +1126,68 @@ class CustomLLMModelManager: ObservableObject {
             return
         }
 
-        if let modelDir = writeCacheDirectory(for: canonicalRepo) {
-            try? FileManager.default.removeItem(at: modelDir)
+        schedulePartialCleanup(for: canonicalRepo)
+    }
+
+    func cancelDownloadAndWait(repo: String) async {
+        cancelDownload(repo: repo)
+        await downloadTasksByRepo[Self.canonicalModelRepo(repo)]?.value
+    }
+
+    private func schedulePartialCleanup(for repo: String) {
+        guard !isModelDownloaded(repo: repo), !deletingRepos.contains(repo) else { return }
+        let directories = [writeCacheDirectory(for: repo)].compactMap { $0 }
+        let root = writeRootURL()
+        let revision = storageRevision
+        invalidateLocalCache(for: repo)
+        clearSelectedDownloadSource(for: repo)
+        setPausedStatusMessage(nil, for: repo)
+        setState(.notDownloaded, for: repo)
+        activeDownloadRepos.insert(repo)
+        downloadStopActionsByRepo[repo] = .cancel
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                downloadTasksByRepo[repo] = nil
+                downloadStopActionsByRepo[repo] = nil
+                activeDownloadRepos.remove(repo)
+                invalidateLocalCache(for: repo)
+                requestInstallation(repo)
+            }
+            do {
+                try await ModelDiskOperations.remove(directories)
+                try await ModelDiskOperations.perform {
+                    if let id = Repo.ID(rawValue: repo) {
+                        CustomLLMModelStorageSupport.clearHubCache(for: id, rootDirectory: root)
+                    }
+                }
+                guard revision == storageRevision else { return }
+                setState(.notDownloaded, for: repo)
+            } catch {
+                guard revision == storageRevision else { return }
+                setState(.error("Couldn't remove partial model files: \(error.localizedDescription)"), for: repo)
+            }
         }
-        clearSelectedDownloadSource(for: canonicalRepo)
-        clearHubCache(for: canonicalRepo)
-        invalidateLocalCache(for: canonicalRepo)
-        setState(.notDownloaded, for: canonicalRepo)
+        downloadTasksByRepo[repo] = task
     }
 
     func refreshStorageRoot() {
+        let nextRoots = [writeRootURL()] + readableRootURLs()
+        if nextRoots != storageRoots {
+            storageRoots = nextRoots
+            storageRevision = UUID()
+            // Old work may finish after cancellation. Its captured revision must
+            // not publish into, clean up, or start a fallback in the new root.
+            for (repo, task) in downloadTasksByRepo {
+                downloadStopActionsByRepo[repo] = .pause
+                task.cancel()
+                cancelDownloadProgressTask(for: repo)
+            }
+            releaseInferenceResources()
+        }
         downloadedStateByRepo.removeAll()
-        downloadedStateCachePrimed = false
+        installationCache.invalidateAll()
+        installationRevision &+= 1
         localSizeTextByRepo.removeAll()
         MLXModelPerRepoStateSupport.resetCustomLLMStorageRootState(
             currentPausedStatusMessage: &pausedStatusMessage,
@@ -1167,16 +1258,18 @@ class CustomLLMModelManager: ObservableObject {
 
         var lastError: Error?
         for candidate in downloadAttemptCandidates(from: selection) {
+            try Task.checkCancellation()
             do {
                 return try await performDownload(using: candidate.url, repo: canonicalRepo)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
+                try Task.checkCancellation()
                 lastError = error
                 VoxtLog.modelWarning(
                     "Custom LLM download source failed. repo=\(canonicalRepo), source=\(candidate.displayName), error=\(error.localizedDescription)"
                 )
-                clearHubCache(for: canonicalRepo)
+                await clearHubCache(for: canonicalRepo)
             }
         }
 
@@ -1269,7 +1362,7 @@ class CustomLLMModelManager: ObservableObject {
                 let startTime = Date()
                 while !Task.isCancelled {
                     await MainActor.run {
-                        guard let self else { return }
+                        guard !Task.isCancelled, let self else { return }
                         let effectiveCurrentFileCompleted = CustomLLMModelDownloadSupport.inFlightBytes(
                             progress: progress,
                             expectedFileBytes: expectedFileBytes,
@@ -1347,49 +1440,58 @@ class CustomLLMModelManager: ObservableObject {
     }
 
     @discardableResult
-    func deleteModel() -> Result<Void, Error> {
-        setPausedStatusMessage(nil, for: modelRepo)
-        return deleteModel(repo: modelRepo)
+    func deleteModel() async -> Result<Void, Error> {
+        await deleteModel(repo: modelRepo)
     }
 
     @discardableResult
-    func deleteModel(repo: String) -> Result<Void, Error> {
-        let canonicalRepo = Self.canonicalModelRepo(repo)
-        if canonicalRepo == modelRepo {
-            setPausedStatusMessage(nil, for: canonicalRepo)
+    func deleteModel(repo: String) async -> Result<Void, Error> {
+        let repo = Self.canonicalModelRepo(repo)
+        guard !hasActiveInference, !deletingRepos.contains(repo) else {
+            return .failure(NSError(domain: "Voxt.CustomLLM", code: 1005,
+                userInfo: [NSLocalizedDescriptionKey: "The model is currently in use. Try again when generation finishes."]))
         }
-        VoxtLog.modelInfo("Deleting custom LLM model cache: \(canonicalRepo)")
-        if canonicalRepo == inferenceModelRepo {
-            releaseInferenceResources(resetActiveInferenceCount: true)
+        deletingRepos.insert(repo)
+        defer { deletingRepos.remove(repo) }
+        let roots = readableRootURLs()
+        let directories = roots.compactMap { CustomLLMModelStorageSupport.cacheDirectory(for: repo, rootDirectory: $0) }
+        invalidateLocalCache(for: repo)
+        let download = downloadTasksByRepo[repo]
+        if download != nil { cancelDownload(repo: repo) }
+        let loads = inferenceLoadCoordinator.cancelAll()
+        await download?.value
+        for task in loads { await task.waitForCompletion() }
+        if inferenceModelRepo == repo { releaseInferenceResources() }
+        do {
+            try await ModelDiskOperations.remove(directories)
+            await Task.detached(priority: .utility) {
+                if let id = Repo.ID(rawValue: repo) {
+                    for root in roots { CustomLLMModelStorageSupport.clearHubCache(for: id, rootDirectory: root) }
+                }
+            }.value
+            clearSelectedDownloadSource(for: repo)
+            invalidateLocalCache(for: repo)
+            clearPerRepoState(for: repo)
+            setState(.notDownloaded, for: repo)
+            requestInstallation(repo)
+            return .success(())
+        } catch {
+            invalidateLocalCache(for: repo)
+            setState(.error("Couldn't uninstall local LLM: \(error.localizedDescription)"), for: repo)
+            return .failure(error)
         }
-        let modelDirectories = allReadableCacheDirectories(for: canonicalRepo, requireValid: false)
-        let rootDirectories = Set(modelDirectories.compactMap { rootDirectory(forModelDirectory: $0, repo: canonicalRepo) })
-        for rootDirectory in rootDirectories {
-            clearHubCache(for: canonicalRepo, rootDirectory: rootDirectory)
-        }
-        for modelDir in modelDirectories {
-            do {
-                try FileManager.default.removeItem(at: modelDir)
-                VoxtLog.modelInfo("Deleted custom LLM model directory. repo=\(canonicalRepo), path=\(modelDir.path)")
-            } catch {
-                setState(.error("Couldn't uninstall local LLM: \(error.localizedDescription)"), for: canonicalRepo)
-                VoxtLog.modelError("Failed to delete custom LLM model directory. repo=\(canonicalRepo), error=\(error.localizedDescription)")
-                return .failure(error)
-            }
-        }
-        clearSelectedDownloadSource(for: canonicalRepo)
-        invalidateLocalCache(for: canonicalRepo)
-        clearPerRepoState(for: canonicalRepo)
-        setState(.notDownloaded, for: canonicalRepo)
-        return .success(())
     }
 
     private func invalidateLocalCache(for repo: String) {
+        installationCache.invalidate(repo)
+        installationRevision &+= 1
         downloadedStateByRepo.removeValue(forKey: repo)
         localSizeTextByRepo.removeValue(forKey: repo)
     }
 
     private func markDownloadCompleted(for repo: String) {
+        installationCache.invalidate(repo)
+        requestInstallation(repo)
         downloadedStateByRepo[repo] = true
         localSizeTextByRepo.removeValue(forKey: repo)
         if repo == modelRepo {
@@ -1408,26 +1510,32 @@ class CustomLLMModelManager: ObservableObject {
         }
     }
 
-    private func cleanupPartialDownload(for repo: String) {
-        if let modelDir = writeCacheDirectory(for: repo) {
-            try? FileManager.default.removeItem(at: modelDir)
+    private func cleanupPartialDownload(for repo: String) async {
+        let directories = [writeCacheDirectory(for: repo)].compactMap { $0 }
+        // This compensating cleanup is requested BY cancellation, so it must not
+        // inherit the cancelled download task's flag. Paths are captured first.
+        let result = await Task.detached(priority: .utility) {
+            try await ModelDiskOperations.remove(directories)
+        }.result
+        if case .failure(let error) = result {
+            VoxtLog.modelWarning("Partial model cleanup failed. repo=\(repo), error=\(error.localizedDescription)")
         }
     }
 
-    private func primeDownloadedStateCacheIfNeeded() {
-        guard !downloadedStateCachePrimed else { return }
-        downloadedStateCachePrimed = true
+    private func installationRequest(_ repo: String) -> ModelInstallationRequest {
+        let directories = readableRootURLs().compactMap { CustomLLMModelStorageSupport.cacheDirectory(for: repo, rootDirectory: $0) }
+        return ModelInstallationRequest(
+            directories: directories,
+            partialDirectories: [writeCacheDirectory(for: repo)].compactMap { $0 },
+            validate: { CustomLLMModelStorageSupport.isModelDirectoryValid($0) }
+        )
+    }
 
-        for model in Self.supportedModels {
-            let canonicalRepo = Self.canonicalModelRepo(model.id)
-            guard downloadedStateByRepo[canonicalRepo] == nil else { continue }
-            guard let modelDir = readableCacheDirectory(for: canonicalRepo, requireValid: true),
-                  FileManager.default.fileExists(atPath: modelDir.path) else {
-                downloadedStateByRepo[canonicalRepo] = false
-                continue
-            }
-            downloadedStateByRepo[canonicalRepo] = CustomLLMModelStorageSupport.isModelDirectoryValid(modelDir)
-        }
+    private func requestInstallation(_ repo: String) {
+        guard !isShuttingDownForApplicationTermination, !deletingRepos.contains(repo), installationCache.needsRequest(repo) else { return }
+        guard Self.availableModels.contains(where: { $0.id == repo }) else { return }
+        let request = installationRequest(repo)
+        installationCache.request(repo) { request.scan() }
     }
 
     private func fetchRemoteSize() {
@@ -1456,6 +1564,7 @@ class CustomLLMModelManager: ObservableObject {
     ) {
         let canonicalRepo = Self.canonicalModelRepo(repo)
         guard downloadTasksByRepo[canonicalRepo] != nil,
+              downloadStorageRevisions[canonicalRepo] == storageRevision,
               downloadStopActionsByRepo[canonicalRepo] == nil else { return }
         let nextState = ModelState.downloading(
             progress: progress,
@@ -1747,46 +1856,15 @@ class CustomLLMModelManager: ObservableObject {
         )
     }
 
-    private func readableCacheDirectory(for repo: String, requireValid: Bool) -> URL? {
-        allReadableCacheDirectories(for: repo, requireValid: requireValid).first
-    }
-
-    private func allReadableCacheDirectories(for repo: String, requireValid: Bool) -> [URL] {
-        readableRootURLs().compactMap { rootDirectory in
-            guard let modelDir = CustomLLMModelStorageSupport.cacheDirectory(for: repo, rootDirectory: rootDirectory),
-                  FileManager.default.fileExists(atPath: modelDir.path) else {
-                return nil
+    private func clearHubCache(for repo: String) async {
+        let root = writeRootURL()
+        await Task.detached(priority: .utility) {
+            try? await ModelDiskOperations.perform {
+                if let id = Repo.ID(rawValue: repo) {
+                    CustomLLMModelStorageSupport.clearHubCache(for: id, rootDirectory: root)
+                }
             }
-            if requireValid && !CustomLLMModelStorageSupport.isModelDirectoryValid(modelDir) {
-                return nil
-            }
-            return modelDir
-        }
-    }
-
-    private func rootDirectory(forModelDirectory modelDirectory: URL, repo: String) -> URL? {
-        for rootDirectory in readableRootURLs() {
-            guard let expectedDirectory = CustomLLMModelStorageSupport.cacheDirectory(for: repo, rootDirectory: rootDirectory) else {
-                continue
-            }
-            if expectedDirectory.standardizedFileURL.path == modelDirectory.standardizedFileURL.path {
-                return rootDirectory
-            }
-        }
-        if let expectedDirectory = writeCacheDirectory(for: repo),
-           expectedDirectory.standardizedFileURL.path == modelDirectory.standardizedFileURL.path {
-            return writeRootURL()
-        }
-        return nil
-    }
-
-    private func clearHubCache(for repo: String) {
-        clearHubCache(for: repo, rootDirectory: writeRootURL())
-    }
-
-    private func clearHubCache(for repo: String, rootDirectory: URL) {
-        guard let repoID = Repo.ID(rawValue: repo) else { return }
-        CustomLLMModelStorageSupport.clearHubCache(for: repoID, rootDirectory: rootDirectory)
+        }.value
     }
 
     private func shouldRepairModelDirectory(_ directory: URL, for repo: String) -> Bool {
@@ -1830,6 +1908,7 @@ class CustomLLMModelManager: ObservableObject {
             return
         }
         isShuttingDownForApplicationTermination = true
+        installationCache.invalidateAll()
 
         let downloadTasks = Array(downloadTasksByRepo.values)
         for repo in Array(downloadTasksByRepo.keys) {
@@ -1854,7 +1933,7 @@ class CustomLLMModelManager: ObservableObject {
         }
         await waitForActiveInferencesToFinish()
 
-        releaseInferenceResources(resetActiveInferenceCount: false)
+        releaseInferenceResources()
         VoxtLog.modelInfo("Custom LLM model released for application termination.", verbose: true)
     }
 
@@ -1896,14 +1975,11 @@ class CustomLLMModelManager: ObservableObject {
         idleUnloadTask = nil
     }
 
-    private func releaseInferenceResources(resetActiveInferenceCount: Bool) {
+    private func releaseInferenceResources() {
         cancelIdleUnloadTask()
         inferenceLoadCoordinator.cancelAll()
         inferenceContainer = nil
         inferenceModelRepo = nil
-        if resetActiveInferenceCount {
-            activeInferenceCount = 0
-        }
         Memory.clearCache()
     }
 
@@ -1911,7 +1987,7 @@ class CustomLLMModelManager: ObservableObject {
         guard activeInferenceCount == 0 else { return }
         guard inferenceContainer != nil, inferenceModelRepo == expectedRepo else { return }
 
-        releaseInferenceResources(resetActiveInferenceCount: false)
+        releaseInferenceResources()
         VoxtLog.modelInfo(
             "Custom LLM model released. repo=\(expectedRepo ?? "unknown"), reason=\(reason)"
         )

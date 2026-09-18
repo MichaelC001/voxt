@@ -575,6 +575,15 @@ enum MeetingVADModelStorage {
 
     static let repo = SileroVADModelSupport.repo
 
+    static func validatedModelDirectory() async -> URL? {
+        let directories = ModelStorageDirectoryManager.resolvedReadableRootURLs().compactMap {
+            MLXModelStorageSupport.cacheDirectory(for: repo, rootDirectory: $0)
+        }
+        return await Task.detached(priority: .utility) {
+            directories.first { isValidModelDirectory($0) }
+        }.value
+    }
+
     static func modelDirectory(requireValid: Bool) -> URL? {
         for rootDirectory in ModelStorageDirectoryManager.resolvedReadableRootURLs() {
             guard let directory = MLXModelStorageSupport.cacheDirectory(
@@ -613,16 +622,20 @@ enum MeetingVADModelStorage {
     }
 
     nonisolated private static func isValidSileroModelDirectory(_ directory: URL, fileManager: FileManager) -> Bool {
-        guard fileManager.fileExists(atPath: directory.appendingPathComponent("config.json").path) else {
-            return false
-        }
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent("config.json")),
+              (try? JSONSerialization.jsonObject(with: data)) != nil,
+              ModelWeightFileValidation.hasCompleteIndex(in: directory) else { return false }
         guard let entries = try? fileManager.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: nil
         ) else {
             return false
         }
-        return entries.contains { $0.pathExtension == "safetensors" }
+        return entries.contains {
+            guard $0.pathExtension == "safetensors",
+                  let values = try? $0.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]) else { return false }
+            return values.isRegularFile == true && (values.fileSize ?? 0) > 0
+        }
     }
 
     static func clearHubCache(rootDirectory: URL = ModelStorageDirectoryManager.resolvedWriteRootURL()) {

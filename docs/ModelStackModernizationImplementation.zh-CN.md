@@ -1,133 +1,137 @@
 # 模型栈现代化：实施与验证记录
 
 分支：`chore/model-stack-modernization`
-实施环境：Linux x86_64，无 Xcode、macOS SDK、Apple GPU。
-对应方案：[ModelStackModernizationPlan.zh-CN.md](ModelStackModernizationPlan.zh-CN.md)
+初始清理提交：`95ade09`；后续 A–D 源码与测试作为本分支的阶段性提交一起审查。提交 / PR 不代表产品验收完成。
+本地环境：Linux x86_64，无 Xcode / macOS SDK / Apple GPU；另临时安装官方 Swift 6.3.2 Linux 工具链用于纯 Foundation 代码验证（不加入项目依赖）。
 
-**状态：已完成主要清理与局部去阻塞代码；尚未完成全部计划，不能作为已经通过 macOS 验收的发布版本。** 尤其 MLX 升级、完整 Swift 构建与模型质量 / 性能实测仍是阻断项。
+**状态：新 MLX 接入和后续核心代码路径已实施，并提供集中本地验收入口；产品级验收仍未完成。** 本地实施期间没有用多次 Actions 逐条试错；提交本轮 PR 后由现有 workflow 统一验证，暂不直接合并或发版。 不能把源码改完、Python 测试或 fork 的绿色 CI 当作 Voxt 发布验收通过。
 
-## 1. 已落地的源码改动
+## 1. 初始清理（已提交）
 
-### FluidAudio 全链路移除
+- FluidAudio / Offline VBx / 流式回退、下载 / 存储和相关 UI 全链路移除。
+- 删除 25 个隐藏 ASR、16 个隐藏 LLM 及专用参数 / 加载分支；保留可见 ASR 11 个、LLM 12 个和 Hy-MT2 GGUF。
+- 保留退役 ID 的迁移、历史会议及原缓存文件，不修改音频 fixtures。
+- 删除目录成员的安装扫描、类型擦除包装和死代码；增加本地预览节流及会议翻译缓存局部更新。
+- Sparkle `2.10.0`、GRDB `7.11.1`、swift-log `1.15.1` 固定引用。
+- 增加源码 / resolved 图 / 发布产物审计。
 
-- 从 Xcode package reference、product、Frameworks 引用中删除 FluidAudio。
-- 删除 Offline VBx、FluidAudio streaming diarizer、失败回退、共享实例和运行时参数。
-- 删除 VBx 模型下载 / 存储实现以及 `canImport(FluidAudio)` 分支。
-- 默认独立说话人分离使用已有 Sortformer；MOSS 原生输出不变。
-- 删除引擎选择器，保留 Sortformer 状态与现有下载重试入口。
-- 删除无效人数提示类型及旧偏好键；没有修改 Sortformer checkpoint 的 `numSpeakers`。
-- 旧 `offlineVBx` 通过设置归一化迁移。新增迁移幂等测试。
-- 历史会议与缓存文件未删除、未重写；音频 fixtures 未修改。
+## 2. Audio fork 的已验证证据
 
-### 隐藏模型和失效参数清理
+- fork `main` 已包含上游 `3e978558404df4ad1bbb0a5634a03df2b0f9dfa5` 的完整祖先历史。
+- `e87d5c5` 修复 Parakeet 对新 LM compile API 的使用；`CompiledTrace` 的权重更新、模型释放回归通过。
+- `33e7285` 统一 Xcode / SDK / CPU JIT 子进程工具链。
+- [Actions 35309904287](https://github.com/hehehai/mlx-audio-swift/actions/runs/35309904287)：Xcode 26.5 / Swift 6.3.2，resolve、build、669 个 Swift Testing 和 2 个 XCTest 通过。
+- `2a6e75d28ae6a399ba7c7aec842384ef7a3142b5` 为后续历史合并；与 `33e7285` 的 tree 均为 `4f1c756bff39e3ad320e2b12ce3f1726dd2a268b`，因此未重复跑 CI。
+- 临时 fork 分支已经删除，正式消费不可变 revision；没有创建新 release tag。
 
-- 删除 25 个隐藏 ASR、16 个隐藏 LLM，保留原有可见 ASR 11 个、LLM 12 个和 Hy-MT2 GGUF。
-- 删除 `hiddenSupport` 状态及“安装后恢复展示”链路。
-- 删除 Voxtral / Canary / Moonshine / MMS / Wav2Vec2 / LASR / Granite / FireRed / GLM-ASR 的本地加载分支、专用能力与参数；远程供应商能力不变。
-- ASR loader 使用目录能力注册表，不再通过 repo 子串猜架构。未知模型不走默认 Qwen loader。
-- 删除 FireRed 分组 / 推理特判、恒为 nil 的自动 bias 合并、无调用者的参数辅助函数。
-- 本地 VLM 能力收敛到实际可加载的目录模型，不再宣称任意匹配名称的 repo 都支持图片。
-- 旧 ID 只作替代模型迁移。配置保存覆盖听写、翻译、改写、会议摘要和笔记标题选择。
-- 清理失效 ASR family 调参、已退役 LLM per-repo 调参和远程体积缓存。退役模型设置不会覆盖替代模型设置；同 checkpoint 的改名 alias 保留参数，现行 ID 优先。
-- 更新模型测试和本地 ASR 清单；远程模型名称 / 图标识别中仍可出现同名品牌，这是共享远程展示能力，不是本地模型运行时。
+边界：fork workflow 排除 `SmokeTests`，部分网络 / 模型测试仍受环境变量控制；这不是所有真实模型、多语言精度和长会议性能的验证报告。
 
-### 局部链路和 UI 优化
+## 3. A：新 MLX 已切入 Voxt 工作区
 
-- 模型目录成员不再依赖逐个磁盘安装快照；去掉仅用于隐藏模型展示的重复扫描。
-- 模型页生命周期改为分段 `some View` 属性，移除该处多层 `AnyView`，保留原有 debounce 与可见性判断。
-- 本地 LLM 预览按 50 ms 限流，首块立即发布，结束补发尾块并去重；最终生成预算和内容不变。
-- 会议翻译状态更新只替换对应缓存行 / 说话人分组，不重新计算全文说话人序号；搜索激活时仍走完整过滤，避免遗漏翻译命中的结果。
-- 删除会议 VAD 偏好读取中多余的同步主线程桥接，直接调用已有 `nonisolated` 读取方法。
-- 删除未被调用的本地 idle warmup 方法；保留会话按需预热，不新增空闲推理。
-- 本地 LLM 推荐系列与默认 Qwen 选择一致。
-
-上述优化尚无 Instruments 或延迟对照结果，不宣称已达到某个提速百分比。
-
-### 非模型依赖和发布门禁
-
-- Sparkle 固定到 `2.10.0`。
-- GRDB 固定到 `7.11.1`。
-- swift-log 固定到 `1.15.1`。
-- FaviconFinder 固定到现有 `5.1.5`，避免范围解析漂移。
-- PermissionFlow `2.11.2`、llama.swift `2.10549.0` 保持。
-- 新增 `tools/audit_model_stack.py`：源码禁用运行时检查、目录检查、resolved 兼容组合校验、macOS App 动态链接 / 文件检查、静态链接映射检查。
-- 新增 `tools/resolve_dependencies.sh`：已有 lockfile 则严格使用；不存在时仅在 macOS 生成供审查的实际解析结果，不伪造 lockfile。
-- 工作区 `Package.resolved` 路径不再被 gitignore 排除。测试 CI 保存解析结果为 artifact；发布前要求 lockfile 已入库。
-- 测试和发布 CI 均指定 Xcode 26.5，打印实际工具链版本。
-- Release 构建生成 link map，并审计 App 与静态链接输入，不能只依赖文本 grep。
-
-## 2. 本环境实际完成的验证
-
-| 检查 | 结果 / 边界 |
+| 组件 | 现行工作区引用 |
 |---|---|
-| `python3 tools/audit_model_stack.py` | 源码审计通过；不是 App 二进制审计 |
-| `python3 -B -m unittest discover -s tools -p 'test_*.py' -v` | 7 个 Python 审计 / 隔离快照工具测试通过 |
-| `bash -n tools/resolve_dependencies.sh tools/run_vad_damaged_cache_smoke.sh` | 通过 |
-| `git diff --check` | 通过 |
-| Xcode pbxproj OpenStep 解析及包引用有效性 | 通过静态检查 |
-| GitHub Actions YAML 解析 | 通过静态检查 |
-| 修改 Swift 文件的 tree-sitter 与基线诊断比较 | 未发现新增语法诊断；解析器存在基线恢复诊断，不等于 Swift 编译或类型检查 |
-| XCTest、SPM 解析、Release build、模型推理 | **未执行：环境不支持** |
-| App / zip / DMG 体积与速度差值 | **未测量** |
+| Audio fork | revision `2a6e75d28ae6a399ba7c7aec842384ef7a3142b5` |
+| mlx-swift | fork exact `0.31.6` |
+| mlx-swift-lm | revision `c6446cf7bfb7cea76408013b614d4b2c530eaa03` |
+| swift-transformers | fork exact `1.3.4` |
+| swift-huggingface | fork exact `0.10.2` |
 
-新增 / 修改 XCTest 覆盖：全部退役 ID 迁移、目录不再隐藏兼容、失效配置清理、同模型 alias 参数优先级、VBx 迁移、本地预览节流、翻译更新缓存及搜索一致性。它们需要在 Mac 上运行才能视为通过。
+- 工程和审计脚本已同步，不引用浮动 main、本地绝对路径或不存在的 tag。
+- 新模型 `prepare()` 生命周期、有效 EOS、model-declared chat conventions、typed prefill 已切入正式 loader / manager。
+- 保留预量化 / OptiQ 层加载；prefill 暂保留 `.remainder`，避免依赖升级同时改变分块策略。
+- loader 标记 `@concurrent`，防止 approachable concurrency 下将同步权重处理留在调用者 MainActor。
+- 删除一次性 `mlx-next.patch`、隔离候选生成器及其专用测试，避免维护两套实现。
+- 新增 `tools/configure_xcode.sh`，测试与发布 workflow 共用一致 Xcode / SDK / compiler PATH，并采用 fork 已验证的 MetalToolchain 安装步骤；共享开发机不自动 sudo 切工具链。
 
-## 3. 阻断项与尚未完成的工作
+**待验证**：Swift 类型检查、真实 OptiQ/VLM 权重、tokenizer / model reasoning 和 EOS 行为；工作区 `Package.resolved` 仍必须在 Mac 真实解析后生成，未伪造。
 
-### MLX fork 候选已准备，正式切换尚未完成
+## 4. B：安装校验与文件操作
 
-用户提供本地 fork 后，已在 `../mlx-audio-swift` 的 `chore/voxt-model-stack-modernization` 分支继续实施：
+主要新增：`ModelInstallationCache.swift`、`ModelDiskOperations.swift`、`ModelWeightFileValidation.swift`。
 
-- 从 Voxt 使用的 `.12` tag 出发合入上游至 `3e97855`，保留结构化 ended、Qwen KV / language 和 Nemotron 流式补丁。
-- Manifest 升为 Swift 6.3，候选组合为 `mlx-swift 0.31.6`、LM `c6446cf`、transformers `1.3.4`、huggingface `0.10.2`。
-- 适配新 LM 可抛错的缓存 API，保留双方测试并新增流式输出契约测试。
-- 删除与候选不匹配的旧 fork lockfile，CI 改为真实解析后严格构建 / 测试，保存解析图 artifact。
-- Voxt 新增隔离联调快照工具和 API 适配 patch；保留预量化加载，适配新模型 `prepare()`、EOS / chat conventions 和 typed prefill。
-- fork 候选已作本地提交 `0bfe9f31e6473b461f3bdf2c3382f2478792976e`，未创建发布 tag、未推送远程。生成隔离快照已成功；7 个 Python 工具测试通过。fork 与 Voxt 候选都仍需 macOS 编译和模型回归。
+- ASR / LLM / GGUF / Sortformer 的安装目录检查使用后台扫描和不可变结果；MainActor 只接收状态。阻塞扫描使用并发上限为 2 的文件操作队列，不占用 Swift cooperative executor。
+- Silero VAD 辅助仓库单独列入 artifact 管理白名单，不进入 ASR 目录或 STT loader；VAD 的目录与模型校验也移出主线程，避免清理隐藏 ASR 时误伤有效 VAD。
+- 存储目录变化会取消旧任务并切换 revision；下载完成、失败、进度和加载结果均不能回写到新 root。模型切换和 root 切换不清零仍在使用的 lease。
+- 合并同 repo 的并发扫描；cache invalidation 身份防止旧 storage root / 卸载前结果回写。
+- 等待扫描可取消，不需等待慢盘返回；取消单个等待者不取消其他调用者共用的扫描。
+- 模型行新增内部 `checking` 状态，未知时不显示可点的安装按钮。它不是新配置步骤。
+- 推理前置检查不把“正在扫描”当作“未安装”；真实异步执行入口等待安装校验。
+- 安装完成信号单独触发目录刷新，不依赖当前选中模型的下载进度。
+- ASR / LLM / GGUF 卸载改为 async；使用中的模型不能被删除，等待下载 / 加载结束后再后台移除磁盘文件。取消下载的清理同样固定目标路径后在后台执行，不继承已取消任务的清理中止标志。
+- ASR shadow 目录准备、完整性验证 / 文件移动和 Sortformer 验证加载移出主线程。
+- 增加 safetensors index 完整分片检查及路径限制；允许 Hugging Face snapshot 的正常符号链接。空权重、坏 config、缺失分片不算安装成功；GGUF 至少检查文件 magic，实际结构由 runtime 加载校验。
+- 现有模型选择、暂停 / 继续、重试、下载源和卸载确认流程保留。
 
-共享工程不引用尚未发布的 fork，正式兼容组合仍保持：
+新增 `ModelInstallationCacheTests` 覆盖异步检查、合并扫描、失效结果、取消、分片缺失和 checking 操作状态。原 manager 生命周期测试改为显式等待扫描完成，补充 Silero artifact、跨 root 加载和切模型时保留 lease 的回归。
 
-- `mlx-audio-swift`: `0.1.3-voxt.12`
-- `mlx-swift`: audio fork 的 **exact 0.31.4**
-- `mlx-swift-lm`: `d2424294a6c3bbd0de37a0761d80efc05e6813dd`
+模型回放、内存与 GGUF 集成测试也已等待初始安装扫描，避免把 unknown 当作未安装而全部 XCTSkip。六组 ASR 集成测试不再硬编码开发者 `/Users/...` 模型路径；复用当前配置或 `VOXT_MODEL_STORAGE_ROOT`，覆盖时在 teardown 恢复原偏好。
 
-`mlx-swift 0.31.6` 要求 Swift 6.3。即便 Xcode 26.5 满足工具链，现有 fork 的 exact pin 仍需更新。Audio fork 含结构化 ended 输出、Qwen KV / language、Nemotron streaming 等产品所需改动，不能简单换上游 tag 或 main 丢掉这些 API。
+对于配置好的本地模型，前置扫描尚未完成时不提前判定“未安装”并切换到其他 provider；请求进入异步校验，会议摘要选项保留用户配置的待检查本地模型。
 
-下一步必须：
+## 5. C：会议 live 快照增量缓存
 
-1. 在 macOS 确认 `xcrun swift --version`。
-2. 在 Mac 验证现有 fork 候选，修复编译 / 回归问题后再提交并发布不可变 revision / 新 tag；本次已修改本地 fork，但没有推送远程或创建 tag。
-3. 使用 `tools/prepare_mlx_upgrade.py` 联调 audio / mlx-swift / lm 及 `tools/mlx-next.patch`，验证预量化 loader、OptiQ、VLM、Qwen / MOSS / Nemotron ended 输出；通过后将已验证改动切入正式工程。
-4. 更新 audit 中的兼容组合，再运行完整 XCTest 与模型回放。
-5. `mlx-swift-lm #620` 是 cache 管理变更，不能在未测量时直接称为首 token 提速。
+新增 `MeetingTranscriptListCache.swift` 并接入 `MeetingDetailViewModel`。
 
-### macOS 构建与发布图未验证
+- 全快照仍会做线性比较以检测任意旧段修订，不假设永远只在尾部追加。
+- 文本修改复用说话人序号；严格时间顺序的追加只为新增 speaker 分配序号；删除、重排、时间修订或同时间戳排序才完整重建。
+- 复用未变的说话人分组，仅对变化组重新排序 / 计数；缓存只保留当前快照，删除后旧组不会残留。
+- 保留完整搜索过滤语义、翻译局部更新、说话人改名和历史编辑；不异步发布可能过期的 UI 快照。
+- 新增测试覆盖旧段改写、删除 / 撤销、搜索子集、乱序快照和名称变更。
 
-- 当前工作区仍无实际生成的 `Package.resolved`。需在 Mac 生成、检查并提交；发布门禁会拒绝缺失的 lockfile。
-- 新依赖 API 兼容、Swift actor / Sendable / SwiftUI 类型检查均需真实编译确认。
-- FluidAudio 独占包资源与二进制是否完全消失，要通过 Release 链接映射和 App 审计确认。
-- Sortformer 的多人 / 重叠讲话 / 长会议身份稳定性需要真实模型验证，不默认接受替换质量退化。
+不是 O(1) 列表承诺：读取 / 比较传入的全量 snapshot 仍为 O(n)，减少的是重复的全量排序、分组构建和词数计算。收益需 Instruments 测量。
 
-### 更大范围性能重构暂未实施
+## 6. D：背压、取消和回收
 
-- 模型管理器的所有安装校验尚未整体迁移到后台 actor；本次删除了隐藏目录扫描和重复目录成员扫描。
-- 会议 live 全量快照处理尚未改为完整增量索引；本次优化了翻译状态更新。
-- shared MLX allocator 的同步回收、全局推理仲裁、原生流式背压与取消需要真机 profile 后再调整，不能靠增加 detached task 破坏所有权和串行保障。
+- 拆出可注入投递操作的 `MeetingMLXNativeFeedScheduler`。
+- 成功投递才推进音频 offset；permit 失败不会吞音频，也不会在 finish 假报成功。
+- cancel 后悬挂的投递恢复时不再重新写回已清空队列的 offset。
+- 队列过载明确终止当前 live 路径并发送失败事件，不再静默压缩时间线；捕获音频由现有会议 archive 保留供终稿处理。
+- native event 消费遇到 ended / failed 即结束；finish 增加 120 秒 watchdog，缺失结束事件时取消队列和消费者，避免永久卡住会议终稿。
+- 修正推理协调器延迟取消留下无限 tombstone 的问题；保留已有优先级和队列上限。
+- 深度回收不再同步等待全局 CPU / GPU stream；后台仅调用 allocator 的空闲缓存回收和 malloc pressure relief，不修改在用模型状态。
+- 模型加载中的状态也阻止 idle reclamation，避免只有尚未生成容器的加载任务被漏判。
 
-这些是未完成事项，不应在发布说明中写成已提速或全部重构完成。
+**设计边界**：原生 `feedAudio` 是同步入队 API，permit 覆盖的是投递而不是整个后端异步 GPU 推理周期。本轮没有声称已将所有原生推理全局串行化，也没有盲目提高 GPU 并发。取消后的 native 后端资源完成时机、超时和长会议质量仍需真机验证。
 
-## 4. Mac 上的接续验证
+新增测试覆盖正常排空、拒绝投递不消费、悬挂投递取消、显式过载、pending load 回收阻断。
+
+## 7. E：集中本地验收入口
+
+新增 `tools/run_model_stack_validation.sh`：
+
+1. 检查同一套 Xcode / SDK / JIT 环境。
+2. Python 工具测试与源码审计、diff 检查。
+3. 真实 SPM 解析和兼容组合审计；`--update-lock` 显式允许当前升级重算旧 lockfile。
+4. Debug build、完整 XCTest（xcresult）、Release build。
+5. Release App、静态 link maps 和动态库 / 资源审计，输出 App 大小。
+6. 保存工具链、基线提交、工作区差异、解析图、模型测试开关、日志和结果状态。
+
+脚本不提交、不 push、不触发 Actions、不创建 tag。模型测试仍需已有权重和显式 opt-in；其结果不能用工具测试代替。
 
 ```bash
-export DEVELOPER_DIR=/Applications/Xcode_26.5.app/Contents/Developer
-bash tools/resolve_dependencies.sh
-# 检查生成的 Package.resolved；确认兼容组合与所有传递依赖后再入库。
-xcodebuild build -project Voxt.xcodeproj -scheme Voxt \
-  -destination 'platform=macOS' -onlyUsePackageVersionsFromResolvedFile \
-  CODE_SIGNING_ALLOWED=NO
-xcodebuild test -project Voxt.xcodeproj -scheme Voxt \
-  -destination 'platform=macOS' -onlyUsePackageVersionsFromResolvedFile \
-  CODE_SIGNING_ALLOWED=NO
+# 在 Xcode 26.5 / Swift 6.3.2 的 Mac 上，确认系统 xcode-select 与 DEVELOPER_DIR 一致。
+bash tools/run_model_stack_validation.sh --update-lock
+# 有测试权重时，再在本地显式执行模型回放：
+VOXT_RUN_MODEL_TESTS=1 VOXT_MODEL_STORAGE_ROOT="/absolute/path/to/existing/models" \
+  bash tools/run_model_stack_validation.sh
 ```
 
-有权重的 Apple Silicon Mac 再运行 `VOXT_RUN_MODEL_TESTS=1` 的模型回放，并按方案记录首包、Final、LLM TTFT、峰值内存、长会议质量与 UI 主线程时间。使用相同架构、工具链、Release 配置比较包体，不能将下载的 XCFramework 压缩包大小当作 App 减量。
+## 8. 当前检查结果与未完成门禁
+
+| 检查 | 结果 / 状态 |
+|---|---|
+| Python 审计工具测试 | 5 个通过 |
+| 源码禁用 runtime / 固定依赖审计 | 通过 |
+| shell、workflow YAML、pbxproj 包引用静态检查 | 通过 |
+| Swift 6.3.2 实际 parser | 修改 / 新增 Swift 文件解析通过；不是全 app 类型检查 |
+| Swift 6.3.2 隔离 Foundation 编译与运行 | 直接编译真实安装缓存、分片校验、文件删除、音频投递调度器、协调器及会议列表缓存；失效结果、删除、投递失败 / 取消、字幕修订 / 追加 / 删除 / 撤销断言通过 |
+| 隔离运行边界 | 会话接口和 macOS thermal state 在临时 harness 中使用测试替身，MLX 后端与 UI 未参与；不能据此宣称整个应用编译通过 |
+| `git diff --check` | 通过 |
+| 本地完整验收脚本 | 在入口明确拒绝：`Xcode validation requires macOS.` |
+| Voxt 实际 lockfile、Debug / Release / XCTest | **待 Mac 执行** |
+| ASR / LLM / VLM 质量、长会议、取消、内存压力回放 | **待 Mac 执行** |
+| Instruments、峰值内存和 App / zip / DMG 对比 | **未测量** |
+
+因此当前不能标记“整个 plan 验收完成”。先在 Mac 收集完整批次的构建 / 测试日志，集中修复同类问题后再统一提交并跑一轮 CI；不以多次 Actions 单点试错。纯 Foundation 隔离编译和静态审计不能代替完整 macOS / MLX 的类型检查和回放。
+
+另一路 onboarding / 录音练习的工作区改动未被覆盖。为了 async 卸载，仅调整了 `OnboardingSettingsSteps.swift` 中原有卸载回调的 await；没有修改用户正在开发的引导行为。

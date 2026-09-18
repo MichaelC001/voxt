@@ -113,14 +113,9 @@ final class MLXLongFormReplayIntegrationTests: XCTestCase {
         Array(resolvedLongFormClipPaths().prefix(limit))
     }
 
-    private func resolvedModelRepoAndHubURL() throws -> (repo: String, hubURL: URL) {
+    private func resolvedModelRepoAndHubURL() async throws -> (repo: String, hubURL: URL) {
         let defaults = UserDefaults.standard
-        defaults.set("/Users/guanwei/x/models", forKey: AppPreferenceKey.modelStorageRootPath)
-        defaults.removeObject(forKey: AppPreferenceKey.modelStorageRootBookmark)
-        ModelStorageDirectoryManager.setAuthorizedRootURLForTesting(
-            URL(fileURLWithPath: "/Users/guanwei/x/models", isDirectory: true)
-        )
-        addTeardownBlock { ModelStorageDirectoryManager.resetForTesting() }
+        ModelTestGate.configureStorageRoot(for: self)
         let hubURL = defaults.bool(forKey: AppPreferenceKey.useHfMirror)
             ? MLXModelManager.mirrorHubBaseURL
             : MLXModelManager.defaultHubBaseURL
@@ -129,6 +124,7 @@ final class MLXLongFormReplayIntegrationTests: XCTestCase {
             defaults.string(forKey: AppPreferenceKey.mlxModelRepo) ?? MLXModelManager.defaultModelRepo
         )
         let probeManager = MLXModelManager(modelRepo: preferredRepo, hubBaseURL: hubURL)
+        try await ModelTestGate.waitForASRInstallations(probeManager)
         if probeManager.isModelDownloaded(repo: preferredRepo),
            MLXModelManager.isMultilingualModelRepo(preferredRepo) {
             return (preferredRepo, hubURL)
@@ -153,7 +149,7 @@ final class MLXLongFormReplayIntegrationTests: XCTestCase {
             throw XCTSkip("No long-form MLX replay clip is available.")
         }
 
-        let resolved = try resolvedModelRepoAndHubURL()
+        let resolved = try await resolvedModelRepoAndHubURL()
         let transcriber = MLXTranscriber(
             modelManager: MLXModelManager(modelRepo: resolved.repo, hubBaseURL: resolved.hubURL)
         )
@@ -195,7 +191,7 @@ final class MLXLongFormReplayIntegrationTests: XCTestCase {
             throw XCTSkip("No long-form MLX replay clips are available.")
         }
 
-        let resolved = try resolvedModelRepoAndHubURL()
+        let resolved = try await resolvedModelRepoAndHubURL()
         let transcriber = MLXTranscriber(
             modelManager: MLXModelManager(modelRepo: resolved.repo, hubBaseURL: resolved.hubURL)
         )
@@ -220,7 +216,7 @@ final class MLXLongFormReplayIntegrationTests: XCTestCase {
             throw XCTSkip("No long-form MLX replay clips are available.")
         }
 
-        let resolved = try resolvedModelRepoAndHubURL()
+        let resolved = try await resolvedModelRepoAndHubURL()
         let transcriber = MLXTranscriber(
             modelManager: MLXModelManager(modelRepo: resolved.repo, hubBaseURL: resolved.hubURL)
         )
@@ -276,7 +272,7 @@ final class MLXLongFormReplayIntegrationTests: XCTestCase {
     func testOfficialCompositeLongFixturesPreserveTailAnchors() async throws {
         try requireModelTestsEnabled()
         let manifest = try officialFixtureManifest()
-        let resolved = try resolvedModelRepoAndHubURL()
+        let resolved = try await resolvedModelRepoAndHubURL()
         let transcriber = MLXTranscriber(
             modelManager: MLXModelManager(modelRepo: resolved.repo, hubBaseURL: resolved.hubURL)
         )

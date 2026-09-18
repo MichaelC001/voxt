@@ -57,6 +57,7 @@ final class GGUFUTF8OutputAccumulatorTests: XCTestCase {
     func testInstalledGGUFModelIsExplicitlyReleasedDuringApplicationTermination() async throws {
         try ModelTestGate.requireEnabled("GGUF native termination integration test")
         let manager = GGUFTranslationModelManager(modelID: .hyMT2Q4KM)
+        _ = try await manager.refreshInstallation(id: .hyMT2Q4KM)
         guard manager.isModelDownloaded(id: .hyMT2Q4KM) else {
             throw XCTSkip("Installed GGUF model is required for the native termination integration test.")
         }

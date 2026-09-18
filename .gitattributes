@@ -1,2 +1,0 @@
-# Unified diff context includes space-prefixed empty lines; keep source checks enabled.
-tools/mlx-next.patch whitespace=-blank-at-eol,-blank-at-eof

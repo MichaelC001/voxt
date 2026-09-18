@@ -22,6 +22,17 @@ final class IdleMemoryReclamationTests: XCTestCase {
         XCTAssertFalse(makeState(hasActiveLLMInference: true).canReclaim)
     }
 
+    func testPendingLoadsBlockReclamationBeforeAContainerExists() {
+        var state = makeState()
+        state.hasPendingASRLoad = true
+        XCTAssertEqual(state.disposition, .retryAfterTransientWork)
+        XCTAssertTrue(state.blockerSummary.contains("asr-loading"))
+        state.hasPendingASRLoad = false
+        state.hasPendingLLMLoad = true
+        XCTAssertEqual(state.disposition, .retryAfterTransientWork)
+        XCTAssertTrue(state.blockerSummary.contains("llm-loading"))
+    }
+
     func testTranscriberWorkAndTerminationBlockReclamation() {
         XCTAssertFalse(makeState(isTranscriberRecording: true).canReclaim)
         XCTAssertFalse(makeState(isTranscriberFinalizing: true).canReclaim)

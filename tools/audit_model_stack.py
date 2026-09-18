@@ -26,6 +26,15 @@ def source_errors(root):
     project = (root / "Voxt.xcodeproj/project.pbxproj").read_text()
     if FORBIDDEN.search(project):
         errors.append("Retired dependency in Xcode project")
+    required_revisions = [
+        "2a6e75d28ae6a399ba7c7aec842384ef7a3142b5",
+        "c6446cf7bfb7cea76408013b614d4b2c530eaa03",
+    ]
+    for revision in required_revisions:
+        if f"revision = {revision};" not in project:
+            errors.append(f"Missing fixed model dependency revision: {revision}")
+    if "XCLocalSwiftPackageReference" in project:
+        errors.append("Local package override in shared release project")
     for path in (root / "Voxt").rglob("*.swift"):
         text = path.read_text()
         if RETIRED_API.search(text) or re.search(r"(?:import|canImport\()\s*FluidAudio", text):
@@ -48,9 +57,11 @@ def resolved_errors(path):
             errors.append(f"Retired resolved dependency: {pin['identity']}")
     # Update only together with the tested MLX compatibility set.
     expected = {
-        "mlx-audio-swift": ("version", "0.1.3-voxt.12"),
-        "mlx-swift": ("version", "0.31.4"),
-        "mlx-swift-lm": ("revision", "d2424294a6c3bbd0de37a0761d80efc05e6813dd"),
+        "mlx-audio-swift": ("revision", "2a6e75d28ae6a399ba7c7aec842384ef7a3142b5"),
+        "mlx-swift": ("version", "0.31.6"),
+        "mlx-swift-lm": ("revision", "c6446cf7bfb7cea76408013b614d4b2c530eaa03"),
+        "swift-transformers": ("version", "1.3.4"),
+        "swift-huggingface": ("version", "0.10.2"),
         "sparkle": ("version", "2.10.0"),
         "grdb.swift": ("version", "7.11.1"),
         "swift-log": ("version", "1.15.1"),
