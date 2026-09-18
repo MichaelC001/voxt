@@ -133,49 +133,37 @@ struct MLXLoadedModelBox: @unchecked Sendable {
 
 private nonisolated enum MLXSTTModelLoader {
     static func load(repo: String, directory: URL) async throws -> MLXLoadedModelBox {
-        let lower = repo.lowercased()
         let model: any STTGenerationModel
-
-        if lower.contains("forcedaligner") {
+        // The manager resolves migration aliases before choosing a directory. Never
+        // infer an architecture from a repository name or load retired weights.
+        guard MLXModelCatalog.availableModels.contains(where: { $0.id == repo }) else {
             throw NSError(
                 domain: "MLXModelManager",
                 code: 1001,
-                userInfo: [NSLocalizedDescriptionKey: "Qwen3-ForcedAligner is alignment-only and not supported by Voxt transcription."]
+                userInfo: [NSLocalizedDescriptionKey: "Unsupported local ASR model: \(repo)"]
             )
-        } else if lower.contains("glmasr") || lower.contains("glm-asr") {
-            model = try await GLMASRModel.fromModelDirectory(directory)
-        } else if lower.contains("whisper") {
+        }
+        switch MLXModelCatalog.capability(for: repo).family {
+        case .whisper:
             model = try await WhisperModel.fromDirectory(directory)
-        } else if lower.contains("firered") {
-            model = try FireRedASR2Model.fromDirectory(directory)
-        } else if lower.contains("sensevoice") {
+        case .senseVoice:
             model = try SenseVoiceModel.fromDirectory(directory)
-        } else if lower.contains("qwen3-asr") || lower.contains("qwen3_asr") {
+        case .qwen3ASR:
             model = try await Qwen3ASRMemoryEfficientLoader.load(from: directory)
-        } else if lower.contains("moss-transcribe-diarize") || lower.contains("moss_transcribe_diarize") {
+        case .mossTranscribeDiarize:
             model = try await MossTranscribeDiarizeModel.fromModelDirectory(directory)
-        } else if lower.contains("voxtral") {
-            model = try VoxtralRealtimeModel.fromDirectory(directory)
-        } else if lower.contains("cohere") {
+        case .cohereTranscribe:
             model = try CohereTranscribeModel.fromDirectory(directory)
-        } else if lower.contains("canary") {
-            model = try await CanaryModel.fromModelDirectory(directory)
-        } else if lower.contains("wav2vec") || lower.contains("wav2vec2")
-            || lower.contains("/mms-") || lower.contains("mms_") || lower.contains("mms-")
-        {
-            model = try Wav2Vec2CTCModel.fromModelDirectory(directory)
-        } else if lower.contains("lasr") {
-            model = try LasrCTCModel.fromModelDirectory(directory)
-        } else if lower.contains("moonshine") {
-            model = try await MoonshineModel.fromModelDirectory(directory)
-        } else if lower.contains("parakeet") {
+        case .parakeet:
             model = try ParakeetModel.fromDirectory(directory)
-        } else if lower.contains("granite") {
-            model = try await GraniteSpeechModel.fromModelDirectory(directory)
-        } else if lower.contains("nemotron") {
+        case .nemotronASR:
             model = try NemotronASRModel.fromDirectory(directory)
-        } else {
-            model = try await Qwen3ASRMemoryEfficientLoader.load(from: directory)
+        case .generic:
+            throw NSError(
+                domain: "MLXModelManager",
+                code: 1001,
+                userInfo: [NSLocalizedDescriptionKey: "Unsupported local ASR architecture."]
+            )
         }
 
         return MLXLoadedModelBox(model: model)
@@ -507,12 +495,7 @@ class MLXModelManager: ObservableObject {
     }
 
     func displayModelsIncludingInstalled() -> [ModelOption] {
-        let localStateRepos = Set(Self.supportedModels.compactMap { model -> String? in
-            let repo = Self.canonicalModelRepo(model.id)
-            let snapshot = catalogSnapshot(for: repo)
-            return snapshot.isDownloaded || snapshot.isDownloading || snapshot.isPaused ? repo : nil
-        })
-        return MLXModelCatalog.displayModels(includingInstalled: localStateRepos.union([Self.canonicalModelRepo(modelRepo)]))
+        Self.availableModels
     }
 
     nonisolated static func isRealtimeCapableModelRepo(_ repo: String) -> Bool {
@@ -523,17 +506,8 @@ class MLXModelManager: ObservableObject {
         MLXModelCatalog.liveMode(for: repo)
     }
 
-    nonisolated static func transcriptionBehavior(for repo: String) -> TranscriptionBehavior {
-        let canonicalRepo = canonicalModelRepo(repo)
-        if canonicalRepo.localizedCaseInsensitiveContains("firered") {
-            return TranscriptionBehavior(
-                correctionMode: .finalizationOnly,
-                allowsQuickStopPass: false,
-                preloadsOnRecordingStart: true
-            )
-        }
-
-        return TranscriptionBehavior(
+    nonisolated static func transcriptionBehavior(for _: String) -> TranscriptionBehavior {
+        TranscriptionBehavior(
             correctionMode: .incremental,
             allowsQuickStopPass: true,
             preloadsOnRecordingStart: true

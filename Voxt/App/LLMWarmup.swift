@@ -68,23 +68,6 @@ extension AppDelegate {
         cancelLLMWarmupTasks(except: [])
     }
 
-    private func customLLMWarmupReposForIdle() -> Set<String> {
-        let availability = FeatureSettingsStore.availability()
-        var repos = Set<String>()
-
-        if let enhancementRepo = resolvedTranscriptionEnhancementLocalRepo() {
-            repos.insert(enhancementRepo)
-        }
-        if availability.translationEnabled, translationModelProvider == .customLLM {
-            repos.insert(translationCustomLLMRepo)
-        }
-        if availability.rewriteEnabled, rewriteModelProvider == .customLLM {
-            repos.insert(rewriteCustomLLMRepo)
-        }
-
-        return repos.filter { customLLMManager.isModelDownloaded(repo: $0) }
-    }
-
     private func customLLMWarmupReposForSession(outputMode: SessionOutputMode) -> Set<String> {
         let availability = FeatureSettingsStore.availability()
         var repos = Set<String>()

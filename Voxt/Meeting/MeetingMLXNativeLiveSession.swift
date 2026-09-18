@@ -167,13 +167,6 @@ private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession 
         state = .connecting
 
         let configuration = try await streamingTranscriber.makeMeetingNativeStreamingConfiguration()
-        guard configuration.liveMode != .nativeVoxtralLive else {
-            throw NSError(
-                domain: "Voxt.Meeting.NativeMLX",
-                code: -10,
-                userInfo: [NSLocalizedDescriptionKey: "Hidden support models are excluded from meeting optimization."]
-            )
-        }
         self.configuration = configuration
         defersSilenceFinalization = MeetingNativeLiveSegmentationPolicy.shouldDeferSilenceFinalization(
             timingGranularity: MLXModelCatalog.capability(for: modelManager.currentModelRepo).timingGranularity

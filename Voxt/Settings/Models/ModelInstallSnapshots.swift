@@ -231,8 +231,7 @@ extension ModelSettingsView {
     func modelTableRow(
         id: String,
         title: String,
-        snapshot: LocalModelInstallSnapshot,
-        allowsUseAndInstall: Bool = true
+        snapshot: LocalModelInstallSnapshot
     ) -> ModelTableRow {
         ModelTableRow(
             id: id,
@@ -244,34 +243,11 @@ extension ModelSettingsView {
             onTapTitle: snapshot.canOpenLocation ? {
                 performInstallAction(snapshot.target, kind: .openLocation)
             } : nil,
-            actions: allowsUseAndInstall
-                ? ModelSettingsInstallActionResolver.tableActions(
-                    for: snapshot,
-                    perform: performInstallAction(_:kind:)
-                )
-                : hiddenSupportModelTableActions(for: snapshot)
-        )
-    }
-
-    private func hiddenSupportModelTableActions(for snapshot: LocalModelInstallSnapshot) -> [ModelTableAction] {
-        switch snapshot.state {
-        case .downloading, .paused, .cancelling, .uninstalling:
-            return ModelSettingsInstallActionResolver.tableActions(
+            actions: ModelSettingsInstallActionResolver.tableActions(
                 for: snapshot,
                 perform: performInstallAction(_:kind:)
             )
-        case .installed:
-            return [
-                ModelTableAction(
-                    title: AppLocalization.localizedString("Uninstall"),
-                    role: .destructive
-                ) {
-                    performInstallAction(snapshot.target, kind: .uninstall)
-                }
-            ]
-        case .installable:
-            return []
-        }
+        )
     }
 
     private func mlxInstallStatusText(

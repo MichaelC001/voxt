@@ -88,16 +88,13 @@ extension FeatureSettingsView {
                     title: featureSettingsLocalized("Speaker Separation Model"),
                     detail: meetingSpeakerDiarizationModelDetailText
                 ) {
-                    SettingsMenuPicker(
-                        selection: meetingSpeakerDiarizationModel,
-                        options: MeetingDiarizationMode.allCases.map {
-                            SettingsMenuOption(value: $0, title: $0.title)
-                        },
-                        selectedTitle: meetingSpeakerDiarizationModel.wrappedValue.title,
-                        width: 220,
-                        leadingAccessory: meetingSpeakerDiarizationModelLeadingAccessory,
-                        selectedStatusSystemImageName: meetingSpeakerDiarizationModelStatusIconName
-                    )
+                    HStack(spacing: 8) {
+                        Text(MeetingDiarizationMode.sortformerV2.title)
+                        meetingSpeakerDiarizationModelDownloadControl
+                        if case .downloaded = meetingDiarizationModelManager.state {
+                            Image(systemName: "checkmark.circle.fill")
+                        }
+                    }
                 }
             }
         }
@@ -144,35 +141,19 @@ extension FeatureSettingsView {
         case .downloaded:
             return AppLocalization.format(
                 "%@ %@",
-                meetingSpeakerDiarizationModel.wrappedValue.title,
+                MeetingDiarizationMode.sortformerV2.title,
                 featureSettingsLocalized("model is ready.")
             )
         case .notDownloaded:
             return AppLocalization.format(
                 "%@ %@",
-                meetingSpeakerDiarizationModel.wrappedValue.detail,
+                MeetingDiarizationMode.sortformerV2.detail,
                 featureSettingsLocalized("Download the model before meeting details can use speaker separation.")
             )
         case let .downloading(_, detail):
             return detail ?? featureSettingsLocalized("Installing speaker separation model...")
         case let .error(message):
             return AppLocalization.format("Download failed: %@", message)
-        }
-    }
-
-    var meetingSpeakerDiarizationModelStatusIconName: String? {
-        if case .downloaded = meetingDiarizationModelManager.state {
-            return "checkmark.circle.fill"
-        }
-        return nil
-    }
-
-    var meetingSpeakerDiarizationModelLeadingAccessory: AnyView? {
-        switch meetingDiarizationModelManager.state {
-        case .downloaded:
-            return nil
-        case .notDownloaded, .downloading, .error:
-            return AnyView(meetingSpeakerDiarizationModelDownloadControl)
         }
     }
 
@@ -184,20 +165,6 @@ extension FeatureSettingsView {
             set: { mode in
                 featureSettings.meeting.chunkingModeRawValue = mode.rawValue
                 saveFeatureSettings()
-            }
-        )
-    }
-
-    var meetingSpeakerDiarizationModel: Binding<MeetingDiarizationMode> {
-        Binding(
-            get: {
-                featureSettings.meeting.speakerDiarizationModel
-            },
-            set: { mode in
-                featureSettings.meeting.speakerDiarizationModelRawValue = mode.rawValue
-                saveFeatureSettings()
-                meetingDiarizationModelManager.refresh()
-                meetingDiarizationModelManager.ensureSelectedModelInstalled()
             }
         )
     }

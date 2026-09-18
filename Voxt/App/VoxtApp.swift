@@ -375,7 +375,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppPreferenceKey.hotkeyDebugLoggingEnabled: false,
             AppPreferenceKey.llmDebugLoggingEnabled: false,
             AppPreferenceKey.meetingChunkingMode: MeetingChunkingMode.quality.rawValue,
-            AppPreferenceKey.meetingSpeakerDiarizationModel: MeetingDiarizationMode.offlineVBx.rawValue,
+            AppPreferenceKey.meetingSpeakerDiarizationModel: MeetingDiarizationMode.sortformerV2.rawValue,
             AppPreferenceKey.meetingFinalTranscriptOptimizationEnabled: true,
             AppPreferenceKey.networkProxyMode: VoxtNetworkSession.ProxyMode.system.rawValue,
             AppPreferenceKey.customProxyScheme: VoxtNetworkSession.ProxyScheme.http.rawValue,

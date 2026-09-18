@@ -378,7 +378,6 @@
 "Whisper (On-device)" = "Whisper (On-device)";
 "Legacy Whisper selections now use MLX Whisper models. Requires a one-time model download." = "Legacy Whisper selections now use MLX Whisper models. Requires a one-time model download.";
 "Transcribe" = "Transcribe";
-"Translate to English" = "Translate to English";
 "Whisper Tiny" = "Whisper Tiny";
 "Whisper Base" = "Whisper Base";
 "Whisper Small" = "Whisper Small";
@@ -392,7 +391,6 @@
 "Whisper Models" = "Whisper Models";
 "Whisper Configuration" = "Whisper Configuration";
 "Configure" = "Configure";
-"Task" = "Task";
 "Enable VAD" = "Enable VAD";
 "Enable Timestamps" = "Enable Timestamps";
 "Temperature" = "Temperature";
@@ -1083,7 +1081,6 @@
 "Local" = "Local";
 "Remote" = "Remote";
 "User Main Language" = "User Main Language";
-"Translation Language" = "Translation Language";
 "Current Summary" = "Current Summary";
 "Interface: %@" = "Interface: %@";
 "Main language: %@" = "Main language: %@";
@@ -1792,7 +1789,6 @@
 "Paste a URL to test" = "Paste a URL to test";
 "Presence Penalty" = "Presence Penalty";
 "Prompt variables" = "Prompt variables";
-"Recognition-focused spelling and terminology preferences." = "Recognition-focused spelling and terminology preferences.";
 "Record audio here, then reuse it across models." = "Record audio here, then reuse it across models.";
 "Review the ingest prompt in One-Click Ingest, then try again." = "Review the ingest prompt in One-Click Ingest, then try again.";
 "Review your setup, then start using Voxt." = "Review your setup, then start using Voxt.";
@@ -1903,9 +1899,7 @@
 "Prefer stronger speech signals in noisy environments." = "Prefer stronger speech signals in noisy environments.";
 "Silero VAD model is not downloaded." = "Silero VAD model is not downloaded.";
 "Speaker Separation Model" = "Speaker Separation Model";
-"Offline VBx" = "Offline VBx";
 "Sortformer v2" = "Sortformer v2";
-"Use Offline VBx for final meeting speaker analysis." = "Use Offline VBx for final meeting speaker analysis.";
 "Use NVIDIA Sortformer v2 for final meeting speaker analysis." = "Use NVIDIA Sortformer v2 for final meeting speaker analysis.";
 "model is ready." = "model is ready.";
 "Download the model before meeting details can use speaker separation." = "Download the model before meeting details can use speaker separation.";
@@ -1913,8 +1907,6 @@
 "Preparing download..." = "Preparing download...";
 "Compiling model..." = "Compiling model...";
 "Compiling %@" = "Compiling %@";
-"Offline VBx requires macOS 14 or later." = "Offline VBx requires macOS 14 or later.";
-"Offline VBx is not available in this build." = "Offline VBx is not available in this build.";
 
 /* Onboarding guide window */
 "Add punctuation and paragraph flow. Example: spoken pauses become readable sentences." = "Add punctuation and paragraph flow. Example: spoken pauses become readable sentences.";
@@ -2045,26 +2037,17 @@
 "Voice Activity" = "Voice Activity";
 "Best for clean, dense narration without long silences." = "Best for clean, dense narration without long silences.";
 "Better for meetings and podcasts with silence or non-speech sections." = "Better for meetings and podcasts with silence or non-speech sections.";
-"Translate from English" = "Translate from English";
 "MMS" = "MMS";
 "Long Audio Segmentation" = "Long Audio Segmentation";
 "Punctuation and Capitalization" = "Punctuation and Capitalization";
 "Max Output Tokens" = "Max Output Tokens";
 "Increase this only when long recordings are being truncated." = "Increase this only when long recordings are being truncated.";
-"Canary supports transcription in 25 European languages and translation only when the source or target is English." = "Canary supports transcription in 25 European languages and translation only when the source or target is English.";
-"Increase this only when transcription or translation is being truncated." = "Increase this only when transcription or translation is being truncated.";
 "Keep this at 0 for deterministic decoding; higher values sample alternative tokens." = "Keep this at 0 for deterministic decoding; higher values sample alternative tokens.";
-"Model language" = "Model language";
-"MMS Adapter Language" = "MMS Adapter Language";
 "Use the checkpoint's ISO 639-3 adapter code, for example eng, cmn, jpn, deu, or fra." = "Use the checkpoint's ISO 639-3 adapter code, for example eng, cmn, jpn, deu, or fra.";
-"This checkpoint uses greedy CTC decoding and does not expose sampling or prompt controls." = "This checkpoint uses greedy CTC decoding and does not expose sampling or prompt controls.";
-"LASR uses greedy CTC decoding. Language and vocabulary are defined by the checkpoint." = "LASR uses greedy CTC decoding. Language and vocabulary are defined by the checkpoint.";
 "Checkpoint Defaults" = "Checkpoint Defaults";
 "Adapter: %@" = "Adapter: %@";
 "Max Output: %@ · Temp %.2f" = "Max Output: %@ · Temp %.2f";
 "%@ · Temp %.2f" = "%@ · Temp %.2f";
-"Task source" = "Task source";
-"Task output" = "Task output";
 "No transcript was produced for this recording." = "No transcript was produced for this recording.";
 "The audio recording is saved and available for playback." = "The audio recording is saved and available for playback.";
 "To do" = "To do";
@@ -2131,14 +2114,12 @@
 "Unassigned" = "Unassigned";
 "Key %d" = "Key %d";
 "Accurate (1120 ms)" = "Accurate (1120 ms)";
-"Accurate (960 ms)" = "Accurate (960 ms)";
 "Aliyun Bailian" = "Aliyun Bailian";
 "Aliyun Bailian API Key is required for testing." = "Aliyun Bailian API Key is required for testing.";
 "Aliyun Bailian ASR" = "Aliyun Bailian ASR";
 "At least 2" = "At least 2";
 "Authorization granted. Open the browser and click Test if you want to verify URL reading." = "Authorization granted. Open the browser and click Test if you want to verify URL reading.";
 "Authorization granted. This app may not support browser URL reading. Click Test if you want to verify." = "Authorization granted. This app may not support browser URL reading. Click Test if you want to verify.";
-"Balanced (480 ms)" = "Balanced (480 ms)";
 "Balanced (560 ms)" = "Balanced (560 ms)";
 "Browser URL read test failed: open a webpage in the browser and try again." = "Browser URL read test failed: open a webpage in the browser and try again.";
 "Budget" = "Budget";
@@ -2154,15 +2135,11 @@
 "Failed to encode Aliyun Qwen realtime payload." = "Failed to encode Aliyun Qwen realtime payload.";
 "Failed to encode Aliyun WebSocket payload." = "Failed to encode Aliyun WebSocket payload.";
 "Fast (160 ms)" = "Fast (160 ms)";
-"Fastest (240 ms)" = "Fastest (240 ms)";
 "General MLX ASR" = "General MLX ASR";
 "Higher values allow more variation. Keep this near 0 for deterministic dictation." = "Higher values allow more variation. Keep this near 0 for deterministic dictation.";
-"Increase this only when long utterances are being truncated." = "Increase this only when long utterances are being truncated.";
-"LASR" = "LASR";
 "Language detection" = "Language detection";
 "Let speaker analysis estimate the speaker count automatically." = "Let speaker analysis estimate the speaker count automatically.";
 "Local GGUF" = "Local GGUF";
-"Longer delay produces more stable realtime text." = "Longer delay produces more stable realtime text.";
 "MLX uses language hints by default. Some model families also expose model-specific local tuning in the Configure dialog." = "MLX uses language hints by default. Some model families also expose model-specific local tuning in the Configure dialog.";
 "MOSS" = "MOSS";
 "Max 2" = "Max 2";
@@ -2187,7 +2164,6 @@
 "Responsive (320 ms)" = "Responsive (320 ms)";
 "Review how app-aware prompt switching works across apps and pages." = "Review how app-aware prompt switching works across apps and pages.";
 "Review meeting capture, summary, segmentation, and speaker separation settings." = "Review meeting capture, summary, segmentation, and speaker separation settings.";
-"Select one of the language adapters included in the FL102 checkpoint." = "Select one of the language adapters included in the FL102 checkpoint.";
 "Unsupported MMS adapter language. Choose an adapter from the FL102 checkpoint list." = "Unsupported MMS adapter language. Choose an adapter from the FL102 checkpoint list.";
 "This model only accepts explicit language routing for the listed languages here. Any other primary language falls back to Automatic." = "This model only accepts explicit language routing for the listed languages here. Any other primary language falls back to Automatic.";
 "Primary language %@ is not supported by this model. Recognition will fall back to Automatic." = "Primary language %@ is not supported by this model. Recognition will fall back to Automatic.";
@@ -2202,7 +2178,6 @@
 "Single Pass" = "Single Pass";
 "Smaller chunks update sooner; larger chunks favor recognition accuracy." = "Smaller chunks update sooner; larger chunks favor recognition accuracy.";
 "Streaming Latency" = "Streaming Latency";
-"Subtitle (2400 ms)" = "Subtitle (2400 ms)";
 "Summary generation starts after this meeting is saved to history." = "Summary generation starts after this meeting is saved to history.";
 "Supported routes" = "Supported routes";
 "Thinking Budget" = "Thinking Budget";
@@ -2210,7 +2185,6 @@
 "This model uses checkpoint-defined decoding and does not expose additional controls." = "This model uses checkpoint-defined decoding and does not expose additional controls.";
 "This removes the downloaded model files from this Mac. You can download them again later." = "This removes the downloaded model files from this Mac. You can download them again later.";
 "Top Logprobs" = "Top Logprobs";
-"Transcription Delay" = "Transcription Delay";
 "Transcription HTTP · Beijing" = "Transcription HTTP · Beijing";
 "Transcription HTTP · Singapore" = "Transcription HTTP · Singapore";
 "Transcription HTTP · US (Virginia)" = "Transcription HTTP · US (Virginia)";

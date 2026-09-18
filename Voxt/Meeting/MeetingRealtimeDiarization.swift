@@ -128,7 +128,6 @@ actor MeetingRealtimeDiarizationStage {
         chunk: BufferedMeetingChunk,
         captureMode: MeetingCaptureMode
     ) async -> [MeetingTranscriptSegment] {
-        guard MeetingDiarizationMode.stored() == .sortformerV2 else { return [segment] }
         let source = audioSource(for: chunk.speaker)
         guard captureMode.capabilities.shouldRunRealtimeDiarization(for: source),
               chunk.isFinal,

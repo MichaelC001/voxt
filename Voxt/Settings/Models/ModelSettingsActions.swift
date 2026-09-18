@@ -20,14 +20,6 @@ enum MLXConfigurationSummarySupport {
                 return AppLocalization.format("%@ · %@", tuning.preset.title, hasContext)
             }
             return hasContext
-        case .graniteSpeech:
-            let hasPrompt = tuning.granitePromptBias.isEmpty
-                ? AppLocalization.localizedString("Prompt Off")
-                : AppLocalization.localizedString("Prompt On")
-            if usesRecognitionPreset {
-                return AppLocalization.format("%@ · %@", tuning.preset.title, hasPrompt)
-            }
-            return hasPrompt
         case .senseVoice:
             return AppLocalization.localizedString(tuning.senseVoiceUseITN ? "ITN On" : "ITN Off")
         case .mossTranscribeDiarize:
@@ -46,19 +38,7 @@ enum MLXConfigurationSummarySupport {
             )
         case .nemotronASR:
             return tuning.nemotronStreamLatency.title
-        case .voxtralRealtime:
-            return tuning.voxtralTranscriptionDelay.title
-        case .canary:
-            return AppLocalization.format(
-                "%@ · Temp %.2f",
-                tuning.canaryTaskMode.title,
-                tuning.canaryTemperature
-            )
-        case .moonshine:
-            return AppLocalization.format("Max Output: %@ · Temp %.2f", String(tuning.moonshineMaxTokens), tuning.moonshineTemperature)
-        case .mmsCTC:
-            return AppLocalization.format("Adapter: %@", tuning.mmsLanguageCode)
-        case .wav2vec2CTC, .parakeet, .lasrCTC:
+        case .parakeet:
             return AppLocalization.localizedString("Checkpoint Defaults")
         case .generic:
             return tuning.preset.title
@@ -150,8 +130,7 @@ extension ModelSettingsView {
             return modelTableRow(
                 id: model.id,
                 title: model.title,
-                snapshot: snapshot,
-                allowsUseAndInstall: MLXModelManager.isAvailableModelRepo(model.id)
+                snapshot: snapshot
             )
         }
     }

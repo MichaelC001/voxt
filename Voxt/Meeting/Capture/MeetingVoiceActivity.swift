@@ -75,9 +75,7 @@ actor MeetingVoiceActivityDetector {
     }
 
     private nonisolated static func currentModeFromSettings() -> LocalVADMode {
-        MainActorSync.run {
-            LocalVADMode.stored()
-        }
+        LocalVADMode.stored()
     }
 
     private nonisolated static func currentSileroSensitivityFromSettings() -> MeetingSileroVADSensitivity {
@@ -443,9 +441,7 @@ actor MeetingOfflineVoiceActivityDetector {
         sampleRate: Double,
         fallbackThreshold: Float
     ) async -> [ASROfflineSpeechRange]? {
-        let mode = MainActorSync.run {
-            LocalVADMode.stored()
-        }
+        let mode = LocalVADMode.stored()
         switch ASRVoiceActivityRuntimePolicy.effectiveBackend(mode: mode, useCase: .meeting) {
         case .off:
             return nil

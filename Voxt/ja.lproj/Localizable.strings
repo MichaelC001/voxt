@@ -370,7 +370,6 @@
 "Whisper (On-device)" = "Whisper オンデバイス";
 "Legacy Whisper selections now use MLX Whisper models. Requires a one-time model download." = "従来の Whisper 選択は MLX Whisper モデルに移行されます。初回にモデルのダウンロードが必要です。";
 "Transcribe" = "文字起こし";
-"Translate to English" = "英語に翻訳";
 "Whisper Tiny" = "Whisper Tiny";
 "Whisper Base" = "Whisper Base";
 "Whisper Small" = "Whisper Small";
@@ -384,7 +383,6 @@
 "Whisper Models" = "Whisper モデル";
 "Whisper Configuration" = "Whisper 設定";
 "Configure" = "設定";
-"Task" = "タスク";
 "Enable VAD" = "VAD を有効化";
 "Enable Timestamps" = "タイムスタンプを有効化";
 "Temperature" = "温度";
@@ -1047,7 +1045,6 @@
 "Local" = "ローカル";
 "Remote" = "リモート";
 "User Main Language" = "メイン言語";
-"Translation Language" = "翻訳言語";
 "Current Summary" = "現在の概要";
 "Interface: %@" = "表示言語: %@";
 "Main language: %@" = "メイン言語: %@";
@@ -1681,7 +1678,6 @@
 "Paste a URL to test" = "テストする URL を貼り付け";
 "Presence Penalty" = "出現ペナルティ";
 "Prompt variables" = "プロンプト変数";
-"Recognition-focused spelling and terminology preferences." = "認識重視の綴りと用語の設定。";
 "Record audio here, then reuse it across models." = "ここで音声を録音し、複数モデルで再利用できます。";
 "Review the ingest prompt in One-Click Ingest, then try again." = "One-Click Ingest の取り込みプロンプトを確認してから、もう一度お試しください。";
 "Review your setup, then start using Voxt." = "設定内容を確認して、Voxt を使い始めましょう。";
@@ -1857,9 +1853,7 @@
 "Subtitles Mode" = "字幕モード";
 "Recording Mode" = "録音モード";
 "Speaker Separation Model" = "音声分離モデル";
-"Offline VBx" = "Offline VBx";
 "Sortformer v2" = "Sortformer v2";
-"Use Offline VBx for final meeting speaker analysis." = "最終的な会議の話者分析に Offline VBx を使用します。";
 "Use NVIDIA Sortformer v2 for final meeting speaker analysis." = "最終的な会議の話者分析に NVIDIA Sortformer v2 を使用します。";
 "model is ready." = "モデルの準備ができています。";
 "Download the model before meeting details can use speaker separation." = "会議詳細で音声分離を使用するには、先にモデルをダウンロードしてください。";
@@ -1867,8 +1861,6 @@
 "Preparing download..." = "ダウンロードを準備中...";
 "Compiling model..." = "モデルをコンパイル中...";
 "Compiling %@" = "%@ をコンパイル中";
-"Offline VBx requires macOS 14 or later." = "Offline VBx には macOS 14 以降が必要です。";
-"Offline VBx is not available in this build." = "このビルドでは Offline VBx を利用できません。";
 
 /* Onboarding guide window */
 "Add punctuation and paragraph flow. Example: spoken pauses become readable sentences." = "句読点と段落の流れを整えます。例：話し言葉の間を読みやすい文にします。";
@@ -1999,26 +1991,17 @@
 "Voice Activity" = "音声区間";
 "Best for clean, dense narration without long silences." = "長い無音がない明瞭で連続したナレーションに適しています。";
 "Better for meetings and podcasts with silence or non-speech sections." = "無音や非音声区間を含む会議やポッドキャストに適しています。";
-"Translate from English" = "英語から翻訳";
 "MMS" = "MMS";
 "Long Audio Segmentation" = "長時間音声の分割";
 "Punctuation and Capitalization" = "句読点と大文字化";
 "Max Output Tokens" = "最大出力トークン";
 "Increase this only when long recordings are being truncated." = "長い録音が途中で切れる場合のみ増やしてください。";
-"Canary supports transcription in 25 European languages and translation only when the source or target is English." = "Canary は25の欧州言語の文字起こしに対応し、翻訳は入力元または翻訳先が英語の場合に対応します。";
-"Increase this only when transcription or translation is being truncated." = "文字起こしや翻訳が途中で切れる場合のみ増やしてください。";
 "Keep this at 0 for deterministic decoding; higher values sample alternative tokens." = "決定的なデコードには 0 を使用します。値を上げると別のトークンをサンプリングします。";
-"Model language" = "モデル言語";
-"MMS Adapter Language" = "MMS アダプター言語";
 "Use the checkpoint's ISO 639-3 adapter code, for example eng, cmn, jpn, deu, or fra." = "チェックポイントの ISO 639-3 アダプターコードを使用します。例: eng、cmn、jpn、deu、fra。";
-"This checkpoint uses greedy CTC decoding and does not expose sampling or prompt controls." = "このチェックポイントは greedy CTC デコードを使用し、サンプリングやプロンプト設定はありません。";
-"LASR uses greedy CTC decoding. Language and vocabulary are defined by the checkpoint." = "LASR は greedy CTC デコードを使用し、言語と語彙はチェックポイントで定義されます。";
 "Checkpoint Defaults" = "チェックポイントの既定値";
 "Adapter: %@" = "アダプター: %@";
 "Max Output: %@ · Temp %.2f" = "最大出力: %@ · 温度 %.2f";
 "%@ · Temp %.2f" = "%@ · 温度 %.2f";
-"Task source" = "タスク入力言語";
-"Task output" = "タスク出力言語";
 "No transcript was produced for this recording." = "この録音の文字起こしは生成されませんでした。";
 "The audio recording is saved and available for playback." = "録音は保存され、再生できます。";
 "To do" = "未着手";
@@ -2126,14 +2109,12 @@
 "Use the Silero default threshold for general meeting audio." = "一般的な会議音声には Silero の既定しきい値を使用します。";
 "Use the local Silero VAD model for stronger speech detection." = "より確実な音声検出にローカル Silero VAD モデルを使用します。";
 "Accurate (1120 ms)" = "高精度（1120 ms）";
-"Accurate (960 ms)" = "高精度（960 ms）";
 "Aliyun Bailian" = "Alibaba Cloud Bailian";
 "Aliyun Bailian API Key is required for testing." = "テストには Alibaba Cloud Bailian の API Key が必要です。";
 "Aliyun Bailian ASR" = "Alibaba Cloud Bailian ASR";
 "At least 2" = "2 人以上";
 "Authorization granted. Open the browser and click Test if you want to verify URL reading." = "認証されました。URL 読み取りを確認するには、ブラウザを開いてテストをクリックしてください。";
 "Authorization granted. This app may not support browser URL reading. Click Test if you want to verify." = "認証されました。この App はブラウザ URL の読み取りに対応していない可能性があります。テストをクリックして確認できます。";
-"Balanced (480 ms)" = "バランス（480 ms）";
 "Balanced (560 ms)" = "バランス（560 ms）";
 "Browser URL read test failed: open a webpage in the browser and try again." = "ブラウザ URL の読み取りテストに失敗しました。ブラウザで Web ページを開いて再試行してください。";
 "Budget" = "予算";
@@ -2149,15 +2130,11 @@
 "Failed to encode Aliyun Qwen realtime payload." = "Alibaba Cloud Qwen リアルタイムのペイロードをエンコードできませんでした。";
 "Failed to encode Aliyun WebSocket payload." = "Alibaba Cloud WebSocket のペイロードをエンコードできませんでした。";
 "Fast (160 ms)" = "高速（160 ms）";
-"Fastest (240 ms)" = "最速（240 ms）";
 "General MLX ASR" = "汎用 MLX ASR";
 "Higher values allow more variation. Keep this near 0 for deterministic dictation." = "値を高くすると出力の変化が増えます。確定的な音声入力では 0 付近にしてください。";
-"Increase this only when long utterances are being truncated." = "長い発話が途中で切れる場合にのみ増やしてください。";
-"LASR" = "LASR";
 "Language detection" = "言語検出";
 "Let speaker analysis estimate the speaker count automatically." = "話者分析で話者数を自動推定します。";
 "Local GGUF" = "ローカル GGUF";
-"Longer delay produces more stable realtime text." = "遅延を長くするとリアルタイムテキストが安定します。";
 "MLX uses language hints by default. Some model families also expose model-specific local tuning in the Configure dialog." = "MLX は既定で言語ヒントを使用します。一部のモデル系列では、設定ダイアログにモデル固有のローカル調整項目も表示されます。";
 "MOSS" = "MOSS";
 "Max 2" = "最大 2 人";
@@ -2182,7 +2159,6 @@
 "Responsive (320 ms)" = "応答優先（320 ms）";
 "Review how app-aware prompt switching works across apps and pages." = "App やページに応じたプロンプト切り替えの動作を確認します。";
 "Review meeting capture, summary, segmentation, and speaker separation settings." = "会議の収録、要約、分割、話者分離の設定を確認します。";
-"Select one of the language adapters included in the FL102 checkpoint." = "FL102 チェックポイントに含まれる言語アダプターを選択してください。";
 "Unsupported MMS adapter language. Choose an adapter from the FL102 checkpoint list." = "未対応の MMS アダプター言語です。FL102 チェックポイントの一覧から選択してください。";
 "This model only accepts explicit language routing for the listed languages here. Any other primary language falls back to Automatic." = "このモデルはここに列挙した明示的な言語ルーティングのみ受け付けます。それ以外の主言語は Automatic にフォールバックします。";
 "Primary language %@ is not supported by this model. Recognition will fall back to Automatic." = "主言語 %@ はこのモデルでサポートされていません。認識は Automatic にフォールバックします。";
@@ -2197,7 +2173,6 @@
 "Single Pass" = "シングルパス";
 "Smaller chunks update sooner; larger chunks favor recognition accuracy." = "チャンクを小さくすると更新が速くなり、大きくすると認識精度が優先されます。";
 "Streaming Latency" = "ストリーミング遅延";
-"Subtitle (2400 ms)" = "字幕（2400 ms）";
 "Summary generation starts after this meeting is saved to history." = "この会議を履歴に保存した後、要約生成を開始します。";
 "Supported routes" = "対応ルート";
 "Thinking Budget" = "思考予算";
@@ -2205,7 +2180,6 @@
 "This model uses checkpoint-defined decoding and does not expose additional controls." = "このモデルはチェックポイントで定義されたデコード設定を使用し、追加の調整項目はありません。";
 "This removes the downloaded model files from this Mac. You can download them again later." = "この Mac からダウンロード済みモデルを削除します。後で再ダウンロードできます。";
 "Top Logprobs" = "上位 Logprobs";
-"Transcription Delay" = "文字起こし遅延";
 "Transcription HTTP · Beijing" = "文字起こし HTTP · 北京";
 "Transcription HTTP · Singapore" = "文字起こし HTTP · シンガポール";
 "Transcription HTTP · US (Virginia)" = "文字起こし HTTP · 米国（バージニア）";

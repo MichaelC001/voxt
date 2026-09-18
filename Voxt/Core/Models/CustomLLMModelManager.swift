@@ -493,8 +493,9 @@ class CustomLLMModelManager: ObservableObject {
             var aggregated = ""
             var firstChunkLatencyMs: Int?
             var completionInfo: GenerateCompletionInfo?
-            var repetitionStop: LLMOutputRepetition?
             let repetitionGuard = LLMOutputRepetitionGuard()
+            var partialDelivery = LocalLLMPartialDelivery()
+            var lastPublishedPreview = ""
             for try await event in session.streamDetails(
                 to: request.prompt,
                 images: inputImages,
@@ -508,16 +509,17 @@ class CustomLLMModelManager: ObservableObject {
                     }
                     aggregated += chunk
                     if let repetition = repetitionGuard.repeatedSuffix(in: aggregated) {
-                        repetitionStop = repetition
                         aggregated = repetition.truncatedText
                         VoxtLog.modelWarning(
                             "Custom LLM \(request.kind.logLabel) repetition guard stopped generation. repo=\(request.repo), repeatedUnitChars=\(repetition.repeatedUnit.count), repetitions=\(repetition.repetitionCount), outputChars=\(aggregated.count)"
                         )
                         break
                     }
-                    if let onPartialText {
+                    if let onPartialText,
+                       partialDelivery.shouldPublish(at: ProcessInfo.processInfo.systemUptime) {
                         let preview = CustomLLMOutputSanitizer.normalizeResultText(aggregated)
-                        if !preview.isEmpty {
+                        if !preview.isEmpty, preview != lastPublishedPreview {
+                            lastPublishedPreview = preview
                             onPartialText(preview)
                         }
                     }
@@ -530,9 +532,10 @@ class CustomLLMModelManager: ObservableObject {
             let response = aggregated
             let modelElapsedMs = Int(Date().timeIntervalSince(modelStartedAt) * 1000)
             let totalElapsedMs = Int(Date().timeIntervalSince(overallStartedAt) * 1000)
-            if repetitionStop != nil, let onPartialText {
+            // Flush even if the last chunk arrived inside the preview interval.
+            if let onPartialText {
                 let preview = CustomLLMOutputSanitizer.normalizeResultText(aggregated)
-                if !preview.isEmpty {
+                if !preview.isEmpty, preview != lastPublishedPreview {
                     onPartialText(preview)
                 }
             }
@@ -633,6 +636,7 @@ class CustomLLMModelManager: ObservableObject {
         source: CustomLLMContainerLoadSource,
         elapsedMs: Int
     ) {
+        let repo = Self.canonicalModelRepo(repo)
         let startedAt = Date()
         if let cached = inferenceContainer, inferenceModelRepo == repo {
             return (
@@ -651,6 +655,14 @@ class CustomLLMModelManager: ObservableObject {
     }
 
     private func container(for repo: String) async throws -> ModelContainer {
+        let repo = Self.canonicalModelRepo(repo)
+        guard Self.availableModels.contains(where: { $0.id == repo }) else {
+            throw NSError(
+                domain: "Voxt.CustomLLM",
+                code: -10,
+                userInfo: [NSLocalizedDescriptionKey: "Unsupported local LLM model: \(repo)"]
+            )
+        }
         if let cached = inferenceContainer, inferenceModelRepo == repo {
             return cached
         }
@@ -743,12 +755,8 @@ class CustomLLMModelManager: ObservableObject {
     }
 
     func displayModelsIncludingInstalled() -> [ModelOption] {
-        let localStateRepos = Set(Self.supportedModels.compactMap { model -> String? in
-            let repo = Self.canonicalModelRepo(model.id)
-            let snapshot = catalogSnapshot(for: repo)
-            return snapshot.isDownloaded || snapshot.isDownloading || snapshot.isPaused ? repo : nil
-        })
-        return Self.displayModels(includingInstalled: localStateRepos.union([Self.canonicalModelRepo(modelRepo)]))
+        // Catalog membership no longer depends on disk state.
+        Self.availableModels
     }
 
     func updateModel(repo: String) {
@@ -818,6 +826,7 @@ class CustomLLMModelManager: ObservableObject {
 
     func isModelDownloaded(repo: String) -> Bool {
         let canonicalRepo = Self.canonicalModelRepo(repo)
+        guard Self.availableModels.contains(where: { $0.id == canonicalRepo }) else { return false }
         primeDownloadedStateCacheIfNeeded()
         if let cached = downloadedStateByRepo[canonicalRepo] {
             return cached

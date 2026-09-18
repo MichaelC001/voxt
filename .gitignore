@@ -15,6 +15,7 @@ DerivedData/
 # SwiftPM
 .build/
 Package.resolved
+!Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # User settings
 *.swp

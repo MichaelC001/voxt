@@ -1,0 +1,89 @@
+--- a/Voxt/Core/Models/MemoryEfficientModelContainerLoader.swift
++++ b/Voxt/Core/Models/MemoryEfficientModelContainerLoader.swift
+@@ -94,8 +94,7 @@
+         let modelConfiguration = resolvedModelConfiguration(
+             configuration,
+             baseConfig: baseConfig,
+-            configData: configData,
+-            includeConfigDataForToolFormat: true
++            model: model
+         )
+         let messageGenerator: any MessageGenerator = if let model = model as? any LLMModel {
+             model.messageGenerator(tokenizer: tokenizer)
+@@ -160,8 +159,7 @@
+         let modelConfiguration = resolvedModelConfiguration(
+             configuration,
+             baseConfig: baseConfig,
+-            configData: configData,
+-            includeConfigDataForToolFormat: false
++            model: model
+         )
+         return ModelContainer(
+             context: ModelContext(
+@@ -206,10 +204,9 @@
+     private static func resolvedModelConfiguration(
+         _ configuration: ResolvedModelConfiguration,
+         baseConfig: BaseConfiguration,
+-        configData: Data,
+-        includeConfigDataForToolFormat: Bool
++        model: any LanguageModel
+     ) -> ModelConfiguration {
+-        var eosTokenIDs = Set(baseConfig.eosTokenIds?.values ?? [])
++        var eosTokenIDs = baseConfig.effectiveEOSTokenIds
+         var stopStrings = configuration.stopStrings
+         let generationConfigURL = configuration.modelDirectory
+             .appendingPathComponent("generation_config.json")
+@@ -225,18 +222,17 @@
+             stopStrings.formUnion(generationConfig.stopStrings)
+         }
+ 
+-        let toolCallFormat = configuration.toolCallFormat
+-            ?? ToolCallFormat.infer(
+-                from: baseConfig.modelType,
+-                configData: includeConfigDataForToolFormat ? configData : nil
+-            )
++        // The current LM API declares conventions on each concrete model.
++        // Keep explicit configuration overrides ahead of architecture defaults.
++        let toolCallFormat = configuration.toolCallFormat ?? model.toolCallFormat
+         return ModelConfiguration(
+             directory: configuration.modelDirectory,
+             defaultPrompt: configuration.defaultPrompt,
+             extraEOSTokens: configuration.extraEOSTokens,
+             stopStrings: stopStrings,
+             eosTokenIds: eosTokenIDs,
+-            toolCallFormat: toolCallFormat
++            toolCallFormat: toolCallFormat,
++            reasoningConfig: configuration.reasoningConfig ?? model.reasoningConfig
+         )
+     }
+ 
+@@ -288,6 +284,9 @@
+             parameters: ModuleParameters.unflattened(weights),
+             verify: [.all]
+         )
++        // New LM models materialize derived inference-only state after weights
++        // are installed. Forward passes must not perform this mutation lazily.
++        try model.prepare()
+         try withError {
+             eval(model)
+         }
+--- a/Voxt/Core/Models/CustomLLMModelManager.swift
++++ b/Voxt/Core/Models/CustomLLMModelManager.swift
+@@ -437,7 +437,7 @@
+             minP: settings.minP.map(Float.init) ?? 0,
+             repetitionPenalty: repetitionPenalty,
+             repetitionContextSize: 32,
+-            prefillStepSize: prefillStepSize
++            prefill: .init(stepSize: prefillStepSize, chunking: .remainder)
+         )
+     }
+ 
+@@ -618,7 +618,7 @@
+             suffix = ", mode=\(mode)"
+         }
+         let maxTokens = params.maxTokens.map(String.init) ?? "0"
+-        let prefillStepSize = params.prefillStepSize.map(String.init) ?? "0"
++        let prefillStepSize = params.prefill.stepSize.map(String.init) ?? "0"
+         return "Custom LLM \(request.kind.logLabel) started. repo=\(request.repo), inputChars=\(request.inputCharacterCount), maxTokens=\(maxTokens), temperature=\(params.temperature), topP=\(params.topP), prefillStep=\(prefillStepSize)\(suffix), family=\(behavior.family.logLabel), thinkingDisabled=\(behavior.disablesThinking)"
+     }
+ 

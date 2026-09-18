@@ -378,7 +378,6 @@
 "Whisper (On-device)" = "Whisper 本地转录";
 "Legacy Whisper selections now use MLX Whisper models. Requires a one-time model download." = "旧版 Whisper 选择现在会迁移到 MLX Whisper 模型，需要一次性下载模型。";
 "Transcribe" = "转录";
-"Translate to English" = "翻译为英文";
 "Whisper Tiny" = "Whisper Tiny";
 "Whisper Base" = "Whisper Base";
 "Whisper Small" = "Whisper Small";
@@ -392,7 +391,6 @@
 "Whisper Models" = "Whisper 模型";
 "Whisper Configuration" = "Whisper 配置";
 "Configure" = "配置";
-"Task" = "任务";
 "Enable VAD" = "启用 VAD";
 "Enable Timestamps" = "启用时间戳";
 "Temperature" = "温度";
@@ -1083,7 +1081,6 @@
 "Local" = "本地";
 "Remote" = "远程";
 "User Main Language" = "主语言";
-"Translation Language" = "翻译语言";
 "Current Summary" = "当前摘要";
 "Interface: %@" = "界面：%@";
 "Main language: %@" = "主语言：%@";
@@ -1738,7 +1735,6 @@
 "Paste a URL to test" = "粘贴一个 URL 进行测试";
 "Presence Penalty" = "存在惩罚";
 "Prompt variables" = "提示变量";
-"Recognition-focused spelling and terminology preferences." = "偏重识别的拼写和术语偏好。";
 "Record audio here, then reuse it across models." = "先在这里录音，然后在不同模型间复用。";
 "Review the ingest prompt in One-Click Ingest, then try again." = "请先检查 One-Click Ingest 的导入提示词，然后再试一次。";
 "Review your setup, then start using Voxt." = "检查你的设置，然后开始使用 Voxt。";
@@ -1903,9 +1899,7 @@
 "Prefer stronger speech signals in noisy environments." = "嘈杂环境中优先识别更强的人声信号。";
 "Silero VAD model is not downloaded." = "Silero VAD 模型尚未下载。";
 "Speaker Separation Model" = "分离人声模型";
-"Offline VBx" = "Offline VBx";
 "Sortformer v2" = "Sortformer v2";
-"Use Offline VBx for final meeting speaker analysis." = "使用 Offline VBx 进行最终会议发言人分析。";
 "Use NVIDIA Sortformer v2 for final meeting speaker analysis." = "使用 NVIDIA Sortformer v2 进行最终会议发言人分析。";
 "model is ready." = "模型已就绪。";
 "Download the model before meeting details can use speaker separation." = "会议详情使用人声分离前需要先下载模型。";
@@ -1913,8 +1907,6 @@
 "Preparing download..." = "正在准备下载...";
 "Compiling model..." = "正在编译模型...";
 "Compiling %@" = "正在编译 %@";
-"Offline VBx requires macOS 14 or later." = "Offline VBx 需要 macOS 14 或更高版本。";
-"Offline VBx is not available in this build." = "当前构建不支持 Offline VBx。";
 
 /* Onboarding guide window */
 "Add punctuation and paragraph flow. Example: spoken pauses become readable sentences." = "补全标点和段落节奏。例如：口语停顿会整理成可读句子。";
@@ -2045,26 +2037,17 @@
 "Voice Activity" = "语音活动切分";
 "Best for clean, dense narration without long silences." = "适合没有长静音的清晰、连续叙述。";
 "Better for meetings and podcasts with silence or non-speech sections." = "更适合包含静音或非语音片段的会议和播客。";
-"Translate from English" = "从英文翻译";
 "MMS" = "MMS";
 "Long Audio Segmentation" = "长音频切分";
 "Punctuation and Capitalization" = "标点和大小写";
 "Max Output Tokens" = "最大输出 Token";
 "Increase this only when long recordings are being truncated." = "仅在长录音输出被截断时增大此值。";
-"Canary supports transcription in 25 European languages and translation only when the source or target is English." = "Canary 支持 25 种欧洲语言的转写；翻译任务要求源语言或目标语言为英文。";
-"Increase this only when transcription or translation is being truncated." = "仅在转写或翻译输出被截断时增大此值。";
 "Keep this at 0 for deterministic decoding; higher values sample alternative tokens." = "设为 0 可保持确定性解码；更高的值会采样其他 Token。";
-"Model language" = "模型语言";
-"MMS Adapter Language" = "MMS Adapter 语言";
 "Use the checkpoint's ISO 639-3 adapter code, for example eng, cmn, jpn, deu, or fra." = "使用检查点中的 ISO 639-3 Adapter 代码，例如 eng、cmn、jpn、deu 或 fra。";
-"This checkpoint uses greedy CTC decoding and does not expose sampling or prompt controls." = "此检查点使用贪心 CTC 解码，不提供采样或提示词控制。";
-"LASR uses greedy CTC decoding. Language and vocabulary are defined by the checkpoint." = "LASR 使用贪心 CTC 解码，语言和词表由检查点定义。";
 "Checkpoint Defaults" = "检查点默认配置";
 "Adapter: %@" = "Adapter：%@";
 "Max Output: %@ · Temp %.2f" = "最大输出：%@ · 温度 %.2f";
 "%@ · Temp %.2f" = "%@ · 温度 %.2f";
-"Task source" = "任务源语言";
-"Task output" = "任务输出语言";
 "No transcript was produced for this recording." = "这段录音未生成转写文本。";
 "The audio recording is saved and available for playback." = "录音已保存，可以直接播放。";
 "To do" = "待处理";
@@ -2131,14 +2114,12 @@
 "Unassigned" = "未设置";
 "Key %d" = "按键 %d";
 "Accurate (1120 ms)" = "准确（1120 毫秒）";
-"Accurate (960 ms)" = "准确（960 毫秒）";
 "Aliyun Bailian" = "阿里云百炼";
 "Aliyun Bailian API Key is required for testing." = "测试需要阿里云百炼 API Key。";
 "Aliyun Bailian ASR" = "阿里云百炼 ASR";
 "At least 2" = "至少 2 人";
 "Authorization granted. Open the browser and click Test if you want to verify URL reading." = "授权成功。如需验证 URL 读取，请打开浏览器并点击测试。";
 "Authorization granted. This app may not support browser URL reading. Click Test if you want to verify." = "授权成功。此 App 可能不支持浏览器 URL 读取，可点击测试进行验证。";
-"Balanced (480 ms)" = "均衡（480 毫秒）";
 "Balanced (560 ms)" = "均衡（560 毫秒）";
 "Browser URL read test failed: open a webpage in the browser and try again." = "浏览器 URL 读取测试失败：请在浏览器中打开网页后重试。";
 "Budget" = "预算";
@@ -2154,15 +2135,11 @@
 "Failed to encode Aliyun Qwen realtime payload." = "无法编码阿里云 Qwen 实时请求数据。";
 "Failed to encode Aliyun WebSocket payload." = "无法编码阿里云 WebSocket 请求数据。";
 "Fast (160 ms)" = "快速（160 毫秒）";
-"Fastest (240 ms)" = "最快（240 毫秒）";
 "General MLX ASR" = "通用 MLX ASR";
 "Higher values allow more variation. Keep this near 0 for deterministic dictation." = "数值越高，生成变化越大。确定性听写建议保持接近 0。";
-"Increase this only when long utterances are being truncated." = "仅在长语音被截断时提高此值。";
-"LASR" = "LASR";
 "Language detection" = "语言检测";
 "Let speaker analysis estimate the speaker count automatically." = "让说话人分析自动估算人数。";
 "Local GGUF" = "本地 GGUF";
-"Longer delay produces more stable realtime text." = "延迟越长，实时文本越稳定。";
 "MLX uses language hints by default. Some model families also expose model-specific local tuning in the Configure dialog." = "MLX 默认使用语言提示。部分模型系列还会在配置对话框中提供专用的本地调节选项。";
 "MOSS" = "MOSS";
 "Max 2" = "最多 2 人";
@@ -2187,7 +2164,6 @@
 "Responsive (320 ms)" = "响应优先（320 毫秒）";
 "Review how app-aware prompt switching works across apps and pages." = "查看提示词如何根据不同 App 和页面自动切换。";
 "Review meeting capture, summary, segmentation, and speaker separation settings." = "检查会议采集、摘要、分段和说话人分离设置。";
-"Select one of the language adapters included in the FL102 checkpoint." = "选择 FL102 检查点中包含的语言适配器。";
 "Unsupported MMS adapter language. Choose an adapter from the FL102 checkpoint list." = "不支持的 MMS 适配器语言。请从 FL102 检查点列表中选择适配器。";
 "This model only accepts explicit language routing for the listed languages here. Any other primary language falls back to Automatic." = "此模型仅接受此处列出的显式语言路由。其他主语言会回退到自动。";
 "Primary language %@ is not supported by this model. Recognition will fall back to Automatic." = "主语言 %@ 不受此模型支持。识别将回退到自动。";
@@ -2202,7 +2178,6 @@
 "Single Pass" = "单次处理";
 "Smaller chunks update sooner; larger chunks favor recognition accuracy." = "分块越小更新越快，分块越大越有利于识别准确率。";
 "Streaming Latency" = "流式延迟";
-"Subtitle (2400 ms)" = "字幕（2400 毫秒）";
 "Summary generation starts after this meeting is saved to history." = "会议保存到历史记录后开始生成摘要。";
 "Supported routes" = "支持的路由";
 "Thinking Budget" = "思考预算";
@@ -2210,7 +2185,6 @@
 "This model uses checkpoint-defined decoding and does not expose additional controls." = "此模型使用检查点定义的解码设置，不提供其他控制项。";
 "This removes the downloaded model files from this Mac. You can download them again later." = "这会从此 Mac 删除已下载的模型文件，之后仍可重新下载。";
 "Top Logprobs" = "最高对数概率数";
-"Transcription Delay" = "转录延迟";
 "Transcription HTTP · Beijing" = "转录 HTTP · 北京";
 "Transcription HTTP · Singapore" = "转录 HTTP · 新加坡";
 "Transcription HTTP · US (Virginia)" = "转录 HTTP · 美国（弗吉尼亚）";

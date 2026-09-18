@@ -158,7 +158,7 @@ final class ASRHintSettingsTests: XCTestCase {
             target: .mlxAudio,
             settings: ASRHintSettings(),
             userLanguageCodes: ["zh-Hant"],
-            mlxModelRepo: "mlx-community/Qwen3-ASR"
+            mlxModelRepo: "mlx-community/Qwen3-ASR-0.6B-4bit"
         )
 
         XCTAssertEqual(payload.language, "Traditional Chinese")
@@ -252,7 +252,7 @@ final class ASRHintSettingsTests: XCTestCase {
             userLanguageCodes: ["zh-Hans"],
             mlxModelRepo: "mlx-community/Voxtral-Mini-4B-Realtime-6bit"
         )
-        XCTAssertNil(automaticVoxtral.language)
+        XCTAssertEqual(automaticVoxtral.language, "Simplified Chinese")
     }
 
     func testQwenLocalTuningDefaultsToDictionaryTermsOnly() {
@@ -263,12 +263,6 @@ final class ASRHintSettingsTests: XCTestCase {
 
         XCTAssertEqual(settings.qwenContextBias, AppPreferenceKey.asrDictionaryTermsTemplateVariable)
     }
-
-
-
-
-
-
 
 
     func testMLXLocalTuningLoadsStoredSettingsWithoutWhisperTemperature() throws {
@@ -374,42 +368,9 @@ final class ASRHintSettingsTests: XCTestCase {
     }
 
     func testMLXModelFamilyRecognizesLatestMLXAudioFamilies() {
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit"),
-            .nemotronASR
-        )
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit"),
-            .voxtralRealtime
-        )
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "OpenMOSS-Team/MOSS-Transcribe-Diarize"),
-            .mossTranscribeDiarize
-        )
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "Mediform/canary-1b-v2-mlx-q8"),
-            .canary
-        )
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "UsefulSensors/moonshine-tiny"),
-            .moonshine
-        )
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "facebook/wav2vec2-base-960h"),
-            .wav2vec2CTC
-        )
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "facebook/mms-1b-fl102"),
-            .mmsCTC
-        )
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "mlx-community/parakeet-tdt-0.6b-v3"),
-            .parakeet
-        )
-        XCTAssertEqual(
-            MLXModelFamily.family(for: "example/lasr-ctc-checkpoint"),
-            .lasrCTC
-        )
+        XCTAssertEqual(MLXModelFamily.family(for: "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit"), .nemotronASR)
+        XCTAssertEqual(MLXModelFamily.family(for: "OpenMOSS-Team/MOSS-Transcribe-Diarize"), .mossTranscribeDiarize)
+        XCTAssertEqual(MLXModelFamily.family(for: "mlx-community/parakeet-tdt-0.6b-v3"), .parakeet)
     }
 
     func testLatestMLXModelTuningRoundTripsAndSanitizes() {
@@ -419,23 +380,14 @@ final class ASRHintSettingsTests: XCTestCase {
                 cohereUsePunctuation: false,
                 cohereMaxTokens: 4096,
                 cohereTemperature: 1.4,
-                canaryTaskMode: .translateFromEnglish,
-                canaryTranslationLanguage: "DE",
-                canaryUsePunctuation: false,
-                canaryMaxTokens: 12,
-                canaryTemperature: -1,
-                moonshineMaxTokens: 480,
-                moonshineTemperature: 0.35,
-                mmsLanguageCode: " JPN ",
-                nemotronStreamLatency: .fast,
-                voxtralTranscriptionDelay: .accurate
+                nemotronStreamLatency: .fast
             ),
-            for: "Mediform/canary-1b-v2-mlx-q8",
+            for: "beshkenadze/cohere-transcribe-03-2026-mlx-fp16",
             rawValue: nil
         )
 
         let settings = MLXLocalTuningSettingsStore.resolvedSettings(
-            for: "Mediform/canary-1b-v2-mlx-q8",
+            for: "beshkenadze/cohere-transcribe-03-2026-mlx-fp16",
             rawValue: stored
         )
 
@@ -443,27 +395,9 @@ final class ASRHintSettingsTests: XCTestCase {
         XCTAssertFalse(settings.cohereUsePunctuation)
         XCTAssertEqual(settings.cohereMaxTokens, 2048)
         XCTAssertEqual(settings.cohereTemperature, 1.0)
-        XCTAssertEqual(settings.canaryTaskMode, .translateFromEnglish)
-        XCTAssertEqual(settings.canaryTranslationLanguage, "de")
-        XCTAssertFalse(settings.canaryUsePunctuation)
-        XCTAssertEqual(settings.canaryMaxTokens, 32)
-        XCTAssertEqual(settings.canaryTemperature, 0.0)
-        XCTAssertEqual(settings.moonshineMaxTokens, 480)
-        XCTAssertEqual(settings.moonshineTemperature, 0.35)
-        XCTAssertEqual(settings.mmsLanguageCode, "jpn")
         XCTAssertEqual(settings.nemotronStreamLatency, .fast)
-        XCTAssertEqual(settings.voxtralTranscriptionDelay, .accurate)
     }
 
-    func testMMSAdapterSanitizationPreservesUnknownCheckpointAdapterForExplicitFailure() {
-        let sanitized = MLXLocalTuningSettingsStore.sanitized(
-            MLXLocalTuningSettings(mmsLanguageCode: "not-a-real-adapter")
-        )
-
-        XCTAssertEqual(sanitized.mmsLanguageCode, "not-a-real-adapter")
-        XCTAssertFalse(MMSLanguageAdapterOption.isSupported(sanitized.mmsLanguageCode))
-        XCTAssertThrowsError(try MMSLanguageAdapterOption.validatedAdapterCode(sanitized.mmsLanguageCode))
-    }
 
     func testStreamingLatencySettingsUseBackwardCompatibleDefaults() {
         let legacy = """
@@ -477,47 +411,7 @@ final class ASRHintSettingsTests: XCTestCase {
             ).nemotronStreamLatency,
             .balanced
         )
-        XCTAssertEqual(
-            MLXLocalTuningSettingsStore.resolvedSettings(
-                for: "mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit",
-                rawValue: legacy
-            ).voxtralTranscriptionDelay,
-            .balanced
-        )
-    }
-
-    func testCanaryTaskLanguageRoutesRespectOfficialEnglishTranslationConstraint() {
-        let transcription = CanaryLanguageSupport.resolvedTaskLanguages(
-            mode: .transcription,
-            sourceLanguage: "de",
-            translationLanguage: "fr"
-        )
-        XCTAssertEqual(transcription.source, "de")
-        XCTAssertEqual(transcription.target, "de")
-
-        let toEnglish = CanaryLanguageSupport.resolvedTaskLanguages(
-            mode: .translateToEnglish,
-            sourceLanguage: "uk",
-            translationLanguage: "fr"
-        )
-        XCTAssertEqual(toEnglish.source, "uk")
-        XCTAssertEqual(toEnglish.target, "en")
-
-        let fromEnglish = CanaryLanguageSupport.resolvedTaskLanguages(
-            mode: .translateFromEnglish,
-            sourceLanguage: "de",
-            translationLanguage: "es"
-        )
-        XCTAssertEqual(fromEnglish.source, "en")
-        XCTAssertEqual(fromEnglish.target, "es")
-
-        let unsupported = CanaryLanguageSupport.resolvedTaskLanguages(
-            mode: .transcription,
-            sourceLanguage: "zh",
-            translationLanguage: "fr"
-        )
-        XCTAssertEqual(unsupported.source, "en")
-        XCTAssertEqual(unsupported.target, "en")
+        XCTAssertNil(MLXLocalTuningSettingsStore.load(from: legacy)["voxtralRealtime"])
     }
 
     func testMOSSLocalTuningUsesSeparateDictationAndMeetingDefaults() {
@@ -832,27 +726,6 @@ final class ASRHintSettingsTests: XCTestCase {
         )
     }
 
-    func testMLXAutomaticBiasesDoNotInjectMultilingualContextIntoLocalStreamingModels() {
-        let multilingualContext = """
-        Primary language: Chinese
-        Other frequently used languages: English
-        Mixed-language speech may appear. Preserve names, brands, URLs, and code-like text exactly as spoken.
-        """
-
-        let qwenBiases = MLXTranscriptionPlanning.automaticBiases(
-            for: .qwen3ASR,
-            multilingualContext: multilingualContext
-        )
-        XCTAssertNil(qwenBiases.qwenContextBias)
-        XCTAssertNil(qwenBiases.granitePromptBias)
-
-        let graniteBiases = MLXTranscriptionPlanning.automaticBiases(
-            for: .graniteSpeech,
-            multilingualContext: multilingualContext
-        )
-        XCTAssertNil(graniteBiases.qwenContextBias)
-        XCTAssertNil(graniteBiases.granitePromptBias)
-    }
 
     func testResolveDictationSettingsUsesMainLanguageAndContextualPhrases() {
         let settings = ASRHintSettings(

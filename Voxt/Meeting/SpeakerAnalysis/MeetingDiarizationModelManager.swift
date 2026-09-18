@@ -6,10 +6,6 @@ import Foundation
 import HuggingFace
 import MLXAudioVAD
 
-#if canImport(FluidAudio)
-import FluidAudio
-#endif
-
 @MainActor
 final class MeetingDiarizationModelManager: ObservableObject {
     enum State: Equatable {
@@ -41,13 +37,8 @@ final class MeetingDiarizationModelManager: ObservableObject {
     func refresh() {
         selectedMode = MeetingDiarizationMode.stored()
         remoteSizeText = selectedMode.fallbackRemoteSizeText
-        switch selectedMode {
-        case .offlineVBx:
-            state = MeetingOfflineVBxModelStorage.isInstalled ? .downloaded : (state.isDownloading ? state : .notDownloaded)
-        case .sortformerV2:
-            state = MeetingSortformerModelStorage.modelDirectory(requireValid: true) != nil ? .downloaded : (state.isDownloading ? state : .notDownloaded)
-            fetchSortformerRemoteSize()
-        }
+        state = MeetingSortformerModelStorage.modelDirectory(requireValid: true) != nil ? .downloaded : (state.isDownloading ? state : .notDownloaded)
+        fetchSortformerRemoteSize()
     }
 
     func ensureSelectedModelInstalled() {
@@ -71,12 +62,7 @@ final class MeetingDiarizationModelManager: ObservableObject {
             defer { self.downloadTask = nil }
             do {
                 _ = try ModelStorageDirectoryManager.requireWriteRootURL()
-                switch mode {
-                case .offlineVBx:
-                    try await self.downloadOfflineVBx()
-                case .sortformerV2:
-                    _ = try await self.downloadSortformerWithFallback()
-                }
+                _ = try await self.downloadSortformerWithFallback()
                 self.state = .downloaded
                 SystemNotificationSupport.postModelDownloadSucceeded(modelName: mode.title)
                 VoxtLog.meeting("Meeting diarization model ready. mode=\(mode.rawValue)")
@@ -91,35 +77,6 @@ final class MeetingDiarizationModelManager: ObservableObject {
                 VoxtLog.meetingError("Meeting diarization model install failed. mode=\(mode.rawValue), error=\(error.localizedDescription)")
             }
         }
-    }
-
-    private func downloadOfflineVBx() async throws {
-        #if canImport(FluidAudio)
-        guard #available(macOS 14.0, *) else {
-            throw NSError(
-                domain: "Voxt.MeetingDiarization",
-                code: 2001,
-                userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Offline VBx requires macOS 14 or later.")]
-            )
-        }
-        _ = try await OfflineDiarizerModels.load(
-            from: MeetingOfflineVBxModelStorage.writeRootDirectory(),
-            progressHandler: { progress in
-                Task { @MainActor [weak self] in
-                    self?.state = .downloading(
-                        progress: min(max(progress.fractionCompleted, 0), 1),
-                        detail: MeetingOfflineVBxModelStorage.detailText(for: progress)
-                    )
-                }
-            }
-        )
-        #else
-        throw NSError(
-            domain: "Voxt.MeetingDiarization",
-            code: 2002,
-            userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Offline VBx is not available in this build.")]
-        )
-        #endif
     }
 
     private func fetchSortformerRemoteSize() {
@@ -297,57 +254,4 @@ final class MeetingDiarizationModelManager: ObservableObject {
         guard baseURL.host?.contains("hf-mirror.com") != true else { return nil }
         return MLXModelManager.mirrorHubBaseURL
     }
-}
-
-enum MeetingOfflineVBxModelStorage {
-    static let fallbackRemoteSizeText = "120 MB"
-
-    static var isInstalled: Bool {
-        #if canImport(FluidAudio)
-        guard #available(macOS 14.0, *) else { return false }
-        return readableRootDirectories().contains { rootDirectory in
-            isInstalled(in: rootDirectory)
-        }
-        #else
-        return false
-        #endif
-    }
-
-    static func writeRootDirectory() -> URL {
-        ModelStorageDirectoryManager.resolvedWriteRootURL()
-    }
-
-    static func readableRootDirectories() -> [URL] {
-        ModelStorageDirectoryManager.resolvedReadableRootURLs()
-    }
-
-    #if canImport(FluidAudio)
-    @available(macOS 14.0, *)
-    static func isInstalled(in rootDirectory: URL) -> Bool {
-        let directory = rootDirectory.appendingPathComponent(Repo.diarizer.folderName, isDirectory: true)
-        return ModelNames.OfflineDiarizer.requiredModels.allSatisfy { fileName in
-            FileManager.default.fileExists(atPath: directory.appendingPathComponent(fileName).path)
-        }
-    }
-    #endif
-
-    #if canImport(FluidAudio)
-    static func detailText(for progress: DownloadProgress) -> String {
-        switch progress.phase {
-        case .listing:
-            return AppLocalization.localizedString("Preparing download...")
-        case let .downloading(completedFiles, totalFiles):
-            return ModelDownloadProgressFormatter.fileProgressText(
-                currentFile: nil,
-                completedFiles: completedFiles,
-                totalFiles: totalFiles
-            )
-        case let .compiling(modelName):
-            let trimmed = modelName.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty
-                ? AppLocalization.localizedString("Compiling model...")
-                : AppLocalization.format("Compiling %@", trimmed)
-        }
-    }
-    #endif
 }

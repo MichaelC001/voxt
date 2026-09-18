@@ -247,24 +247,6 @@ private struct MLXASRConfigurationSheetView: View {
         ).language ?? AppLocalization.localizedString("Automatic")
     }
 
-    private var resolvedLanguageCode: String? {
-        guard hintSettings.followsUserMainLanguage else { return nil }
-        return ASRHintResolver.resolve(
-            target: .mlxAudio,
-            settings: hintSettings,
-            userLanguageCodes: userLanguageCodes,
-            mlxModelRepo: modelRepo
-        ).language
-    }
-
-    private var canaryTaskLanguages: (source: String, target: String) {
-        CanaryLanguageSupport.resolvedTaskLanguages(
-            mode: tuningSettings.canaryTaskMode,
-            sourceLanguage: resolvedLanguageCode,
-            translationLanguage: tuningSettings.canaryTranslationLanguage
-        )
-    }
-
     private var senseVoiceSupportedLanguageSummary: String {
         AppLocalization.localizedString("Automatic, zh, en, yue, ja, ko")
     }
@@ -287,7 +269,7 @@ private struct MLXASRConfigurationSheetView: View {
             return nil
         }
         switch capability.languageRouting {
-        case .unavailable, .automatic, .adapterISO6393:
+        case .unavailable, .automatic:
             return nil
         case .iso6391, .localeOrISO6391, .languageName:
             guard !capability.supportsLanguage(code: primary.baseLanguageCode) else { return nil }
@@ -301,52 +283,6 @@ private struct MLXASRConfigurationSheetView: View {
     private var showsAutomaticLanguageDetectionSummary: Bool {
         configurationCapabilities.isEmpty
             && (capability.languageRouting == .automatic || family == .generic)
-    }
-
-    private var showsCheckpointDefaultDecodingSummary: Bool {
-        switch family {
-        case .wav2vec2CTC, .lasrCTC:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private var modelLanguageLabel: String? {
-        switch family {
-        case .wav2vec2CTC:
-            return localized("English")
-        default:
-            return nil
-        }
-    }
-
-    private var checkpointDefaultDecodingSummary: String {
-        switch family {
-        case .wav2vec2CTC:
-            return localized("This checkpoint uses greedy CTC decoding and does not expose sampling or prompt controls.")
-        case .lasrCTC:
-            return localized("LASR uses greedy CTC decoding. Language and vocabulary are defined by the checkpoint.")
-        default:
-            return localized("This model uses checkpoint-defined decoding and does not expose additional controls.")
-        }
-    }
-
-    private var canaryTranslationLanguageOptions: [SettingsMenuOption<String>] {
-        CanaryLanguageSupport.translationTargetCodes.map {
-            SettingsMenuOption(value: $0, title: CanaryLanguageSupport.title(for: $0))
-        }
-    }
-
-    private var mmsLanguageAdapterOptions: [SettingsMenuOption<String>] {
-        MMSLanguageAdapterOption.all.map {
-            SettingsMenuOption(value: $0.id, title: $0.title)
-        }
-    }
-
-    private var selectedMMSLanguageAdapterTitle: String {
-        MMSLanguageAdapterOption.all.first(where: { $0.id == tuningSettings.mmsLanguageCode })?.title
-            ?? tuningSettings.mmsLanguageCode
     }
 
     private var mossOutputModeBinding: Binding<MossASROutputMode> {
@@ -498,23 +434,6 @@ private struct MLXASRConfigurationSheetView: View {
                         }
                     }
 
-                    if configurationCapabilities.contains(.voxtralDelay) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(localized("Transcription Delay"))
-                                .font(.subheadline.weight(.medium))
-                            SettingsMenuPicker(
-                                selection: $tuningSettings.voxtralTranscriptionDelay,
-                                options: VoxtralTranscriptionDelay.allCases.map {
-                                    SettingsMenuOption(value: $0, title: $0.title)
-                                },
-                                selectedTitle: tuningSettings.voxtralTranscriptionDelay.title,
-                                width: 240
-                            )
-                            Text(localized("Longer delay produces more stable realtime text."))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
 
                     if configurationCapabilities.contains(.mossPromptAndOutput) {
                         VStack(alignment: .leading, spacing: 8) {
@@ -621,111 +540,6 @@ private struct MLXASRConfigurationSheetView: View {
                         decodingTemperatureControl(value: $tuningSettings.cohereTemperature)
                     }
 
-                    if configurationCapabilities.contains(.canaryTask) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(localized("Task"))
-                                .font(.subheadline.weight(.medium))
-                            SettingsMenuPicker(
-                                selection: Binding(
-                                    get: { tuningSettings.canaryTaskMode.rawValue },
-                                    set: { rawValue in
-                                        guard let mode = CanaryTaskMode(rawValue: rawValue) else { return }
-                                        tuningSettings.canaryTaskMode = mode
-                                    }
-                                ),
-                                options: CanaryTaskMode.allCases.map {
-                                    SettingsMenuOption(value: $0.rawValue, title: $0.title)
-                                },
-                                selectedTitle: tuningSettings.canaryTaskMode.title,
-                                width: 240
-                            )
-                            Text(localized("Canary supports transcription in 25 European languages and translation only when the source or target is English."))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if tuningSettings.canaryTaskMode == .translateFromEnglish {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(localized("Translation Language"))
-                                    .font(.subheadline.weight(.medium))
-                                SettingsMenuPicker(
-                                    selection: $tuningSettings.canaryTranslationLanguage,
-                                    options: canaryTranslationLanguageOptions,
-                                    selectedTitle: CanaryLanguageSupport.title(for: tuningSettings.canaryTranslationLanguage),
-                                    width: 240
-                                )
-                            }
-                        }
-
-                        HStack(alignment: .top, spacing: 16) {
-                            localInfoRow(
-                                label: localized("Task source"),
-                                value: CanaryLanguageSupport.title(for: canaryTaskLanguages.source)
-                            )
-                            localInfoRow(
-                                label: localized("Task output"),
-                                value: CanaryLanguageSupport.title(for: canaryTaskLanguages.target)
-                            )
-                        }
-
-                        Toggle(localized("Punctuation and Capitalization"), isOn: $tuningSettings.canaryUsePunctuation)
-                            .toggleStyle(.switch)
-                        SettingsIntegerStepperField(
-                            title: localized("Max Output Tokens"),
-                            value: $tuningSettings.canaryMaxTokens,
-                            range: 32...2048,
-                            step: 32,
-                            help: localized("Increase this only when transcription or translation is being truncated.")
-                        )
-                        decodingTemperatureControl(value: $tuningSettings.canaryTemperature)
-                    }
-
-                    if configurationCapabilities.contains(.moonshineDecoding) {
-                        localInfoRow(label: localized("Model language"), value: localized("English"))
-                        SettingsIntegerStepperField(
-                            title: localized("Max Output Tokens"),
-                            value: $tuningSettings.moonshineMaxTokens,
-                            range: 32...2048,
-                            step: 32,
-                            help: localized("Increase this only when long utterances are being truncated.")
-                        )
-                        decodingTemperatureControl(value: $tuningSettings.moonshineTemperature)
-                    }
-
-                    if configurationCapabilities.contains(.mmsAdapter) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(localized("MMS Adapter Language"))
-                                .font(.subheadline.weight(.medium))
-                            SettingsMenuPicker(
-                                selection: $tuningSettings.mmsLanguageCode,
-                                options: mmsLanguageAdapterOptions,
-                                selectedTitle: selectedMMSLanguageAdapterTitle,
-                                width: 280
-                            )
-                            if MMSLanguageAdapterOption.isSupported(tuningSettings.mmsLanguageCode) {
-                                Text(localized("Select one of the language adapters included in the FL102 checkpoint."))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text(
-                                    localized(
-                                        "Unsupported MMS adapter language. Choose an adapter from the FL102 checkpoint list."
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                            }
-                        }
-                    }
-
-                    if showsCheckpointDefaultDecodingSummary {
-                        if let modelLanguageLabel {
-                            localInfoRow(label: localized("Model language"), value: modelLanguageLabel)
-                        }
-                        Text(checkpointDefaultDecodingSummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
 
                     if configurationCapabilities.contains(.qwenContext) {
                         Text(localized("Recognition Context"))
@@ -736,14 +550,6 @@ private struct MLXASRConfigurationSheetView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    if configurationCapabilities.contains(.granitePrompt) {
-                        Text(localized("Recognition Prompt"))
-                            .font(.subheadline.weight(.medium))
-                        PromptEditorView(text: $tuningSettings.granitePromptBias, height: 110, variables: Self.dictionaryTermsVariable)
-                        Text(localized("Recognition-focused spelling and terminology preferences."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
 
                     if configurationCapabilities.contains(.senseVoiceITN) {
                         Toggle(localized("Enable ITN"), isOn: $tuningSettings.senseVoiceUseITN)

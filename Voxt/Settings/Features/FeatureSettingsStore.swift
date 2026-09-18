@@ -5,7 +5,8 @@ import Foundation
 
 enum FeatureSettingsStore {
     static func migrateIfNeeded(defaults: UserDefaults = .standard) {
-        removeObsoleteLatencyProfileKeys(defaults: defaults)
+        pruneRetiredModelPreferences(defaults: defaults)
+        removeObsoletePreferenceKeys(defaults: defaults)
         enforceAlwaysOnLegacyFlags(defaults: defaults)
         guard loadRaw(defaults: defaults) != nil else {
             save(deriveFromLegacy(defaults: defaults), defaults: defaults, notify: false)
@@ -33,7 +34,7 @@ enum FeatureSettingsStore {
         defaults: UserDefaults = .standard,
         notify: Bool = true
     ) {
-        removeObsoleteLatencyProfileKeys(defaults: defaults)
+        removeObsoletePreferenceKeys(defaults: defaults)
         enforceAlwaysOnLegacyFlags(defaults: defaults)
         let sanitized = sanitize(settings, defaults: defaults)
         _ = persist(sanitized, defaults: defaults, notify: notify)
@@ -101,10 +102,36 @@ enum FeatureSettingsStore {
         }
     }
 
-    private static func removeObsoleteLatencyProfileKeys(defaults: UserDefaults) {
+    private static func pruneRetiredModelPreferences(defaults: UserDefaults) {
+        if let raw = defaults.string(forKey: AppPreferenceKey.mlxLocalASRTuningSettings) {
+            let settings = MLXLocalTuningSettingsStore.load(from: raw)
+            defaults.set(MLXLocalTuningSettingsStore.storageValue(for: settings), forKey: AppPreferenceKey.mlxLocalASRTuningSettings)
+        }
+        if let raw = defaults.string(forKey: AppPreferenceKey.customLLMGenerationSettingsByRepo) {
+            let settings = CustomLLMGenerationSettingsStore.resolvedByRepo(from: raw)
+            defaults.set(CustomLLMGenerationSettingsStore.storageValue(forByRepo: settings), forKey: AppPreferenceKey.customLLMGenerationSettingsByRepo)
+        }
+        let catalogs: [(String, Set<String>)] = [
+            (AppPreferenceKey.mlxRemoteSizeCache, Set(MLXModelCatalog.availableModels.map(\.id))),
+            (AppPreferenceKey.customLLMRemoteSizeCache, Set(CustomLLMModelCatalog.availableModels.map(\.id)))
+        ]
+        for (key, activeRepos) in catalogs {
+            guard let data = defaults.data(forKey: key),
+                  let sizes = try? JSONDecoder().decode([String: String].self, from: data),
+                  let pruned = try? JSONEncoder().encode(sizes.filter { activeRepos.contains($0.key) })
+            else { continue }
+            defaults.set(pruned, forKey: key)
+        }
+    }
+
+    private static func removeObsoletePreferenceKeys(defaults: UserDefaults) {
         defaults.removeObject(forKey: "enhancementLatencyProfile")
         defaults.removeObject(forKey: "translationLatencyProfile")
         defaults.removeObject(forKey: "rewriteLatencyProfile")
+        // These legacy controls are no longer consumed by speaker analysis.
+        defaults.removeObject(forKey: "meetingSpeakerCountHint")
+        defaults.removeObject(forKey: "meetingSpeakerDiarizationSensitivity")
+        defaults.removeObject(forKey: "meetingSpeakerDiarizationDebugEnabled")
     }
 
     private static func enforceAlwaysOnLegacyFlags(defaults: UserDefaults) {
@@ -455,7 +482,7 @@ enum FeatureSettingsStore {
             transcription: TranscriptionFeatureSettings(
                 asrSelectionID: transcriptionASR,
                 llmEnabled: settings.transcription.llmEnabled,
-                llmSelectionID: settings.transcription.llmSelectionID.textSelection == nil ? fallback.transcription.llmSelectionID : settings.transcription.llmSelectionID,
+                llmSelectionID: sanitizedTextSelection(settings.transcription.llmSelectionID, fallback: fallback.transcription.llmSelectionID),
                 prompt: transcriptionPrompt,
                 promptPresetID: FeaturePromptPresetCatalog.inferredPresetID(
                     storedID: settings.transcription.promptPresetID,
@@ -484,7 +511,7 @@ enum FeatureSettingsStore {
             ),
             rewrite: RewriteFeatureSettings(
                 asrSelectionID: rewriteASR,
-                llmSelectionID: settings.rewrite.llmSelectionID.textSelection == nil ? fallback.rewrite.llmSelectionID : settings.rewrite.llmSelectionID,
+                llmSelectionID: sanitizedTextSelection(settings.rewrite.llmSelectionID, fallback: fallback.rewrite.llmSelectionID),
                 prompt: rewritePrompt,
                 promptPresetID: FeaturePromptPresetCatalog.inferredPresetID(
                     storedID: settings.rewrite.promptPresetID,
@@ -504,7 +531,7 @@ enum FeatureSettingsStore {
                     ),
                     defaults: defaults
                 ),
-                summaryModelSelectionID: settings.meeting.summaryModelSelectionID.textSelection == nil ? fallback.meeting.summaryModelSelectionID : settings.meeting.summaryModelSelectionID,
+                summaryModelSelectionID: sanitizedTextSelection(settings.meeting.summaryModelSelectionID, fallback: fallback.meeting.summaryModelSelectionID),
                 summaryPrompt: AppPromptDefaults.resolvedStoredText(
                     sanitizedPrompt(settings.meeting.summaryPrompt),
                     kind: .transcriptSummary,
@@ -543,9 +570,25 @@ enum FeatureSettingsStore {
         case .dictation:
             return .dictation
         case let .mlx(repo):
-            return .mlx(repo)
+            return .mlx(MLXModelCatalog.isAvailableModelRepo(repo) ? repo : MLXModelCatalog.defaultModelRepo)
         case let .remote(provider):
             return .remoteASR(provider)
+        case .none:
+            return fallback
+        }
+    }
+
+    private static func sanitizedTextSelection(
+        _ selectionID: FeatureModelSelectionID,
+        fallback: FeatureModelSelectionID
+    ) -> FeatureModelSelectionID {
+        switch selectionID.textSelection {
+        case .localLLM(let repo):
+            return .localLLM(CustomLLMModelCatalog.isSupportedModelRepo(repo) ? repo : CustomLLMModelCatalog.defaultModelRepo)
+        case .appleIntelligence:
+            return .appleIntelligence
+        case .remoteLLM(let provider):
+            return .remoteLLM(provider)
         case .none:
             return fallback
         }
@@ -557,7 +600,7 @@ enum FeatureSettingsStore {
     ) -> FeatureModelSelectionID {
         switch selectionID.translationSelection {
         case let .localLLM(repo):
-            return .localLLM(repo)
+            return .localLLM(CustomLLMModelCatalog.isSupportedModelRepo(repo) ? repo : CustomLLMModelCatalog.defaultModelRepo)
         case let .localGGUF(modelID):
             return .localGGUFTranslation(modelID)
         case let .remoteLLM(provider):
@@ -623,9 +666,7 @@ enum FeatureSettingsStore {
         _ settings: TranscriptionNoteFeatureSettings,
         fallbackSelectionID: FeatureModelSelectionID
     ) -> TranscriptionNoteFeatureSettings {
-        let resolvedSelectionID = settings.titleModelSelectionID.textSelection == nil
-            ? fallbackSelectionID
-            : settings.titleModelSelectionID
+        let resolvedSelectionID = sanitizedTextSelection(settings.titleModelSelectionID, fallback: fallbackSelectionID)
         let resolvedShortcut = settings.triggerShortcut.keyCode == HotkeyPreference.modifierOnlyKeyCode
             ? TranscriptionNoteTriggerSettings.defaultShortcut
             : TranscriptionNoteTriggerSettings(

@@ -98,81 +98,79 @@ extension ModelSettingsView {
         .eraseToAnyPublisher()
     }
 
+    private var appearanceObservedContent: some View {
+        mainContent
+            .onAppear(perform: handleOnAppear)
+            .onAppear(perform: reloadCachedConfigurationState)
+            .onAppear(perform: refreshModelStorageDisplayPath)
+            .onAppear(perform: refreshCatalogSnapshot)
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                refreshAppleIntelligenceAvailability()
+            }
+    }
+
+    private var selectionObservedContent: some View {
+        appearanceObservedContent
+            .onChange(of: modelRepo) { _, newValue in
+                handleModelRepoChange(newValue)
+            }
+            .onChange(of: localModelIdleUnloadDelaySeconds) { _, _ in
+                handleLocalModelIdleUnloadDelayChange()
+            }
+            .onChange(of: customLLMRepo) { _, newValue in
+                handleCustomLLMRepoChange(newValue)
+            }
+    }
+
+    private var configurationObservedContent: some View {
+        selectionObservedContent
+            .onChange(of: translationModelProviderRaw) { _, _ in
+                handleTranslationProviderChange()
+            }
+            .onChange(of: rewriteModelProviderRaw) { _, _ in
+                handleRewriteProviderChange()
+            }
+            .onChange(of: remoteLLMProviderConfigurationsRaw) { _, _ in
+                handleRemoteLLMConfigurationsChange()
+            }
+            .onChange(of: remoteASRProviderConfigurationsRaw) { _, _ in
+                handleRemoteASRConfigurationsChange()
+            }
+            .onChange(of: modelStorageRootPath) { _, _ in
+                handleModelStorageRootPathChange()
+            }
+            .onChange(of: featureSettingsRaw) { _, _ in
+                handleFeatureSettingsChange()
+            }
+            .onChange(of: catalogTab) { _, _ in
+                handleCatalogFilterSelectionChange()
+            }
+            .onChange(of: selectedTags) { _, _ in
+                handleCatalogFilterSelectionChange()
+            }
+            .onChange(of: isActive) { _, _ in
+                handleModelSettingsVisibilityChange()
+            }
+            .onChange(of: mainWindowState.isVisible) { _, _ in
+                handleModelSettingsVisibilityChange()
+            }
+    }
+
+    private var stateObservedContent: some View {
+        configurationObservedContent
+            .onReceive(downloadLifecycleRefreshPublisher) { _ in
+                handleImmediateDownloadLifecycleChange()
+            }
+            .onReceive(downloadMetadataRefreshPublisher) { _ in
+                handleDownloadMetadataChange()
+            }
+    }
+
     var contentWithLifecycle: some View {
-        let appeared = AnyView(
-            mainContent
-                .onAppear(perform: handleOnAppear)
-                .onAppear(perform: reloadCachedConfigurationState)
-                .onAppear(perform: refreshModelStorageDisplayPath)
-                .onAppear(perform: refreshCatalogSnapshot)
-                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                    refreshAppleIntelligenceAvailability()
-                }
-        )
-
-        let selectionObserved = AnyView(
-            appeared
-                .onChange(of: modelRepo) { _, newValue in
-                    handleModelRepoChange(newValue)
-                }
-                .onChange(of: localModelIdleUnloadDelaySeconds) { _, _ in
-                    handleLocalModelIdleUnloadDelayChange()
-                }
-                .onChange(of: customLLMRepo) { _, newValue in
-                    handleCustomLLMRepoChange(newValue)
-                }
-        )
-
-        let configurationObserved = AnyView(
-            selectionObserved
-                .onChange(of: translationModelProviderRaw) { _, _ in
-                    handleTranslationProviderChange()
-                }
-                .onChange(of: rewriteModelProviderRaw) { _, _ in
-                    handleRewriteProviderChange()
-                }
-                .onChange(of: remoteLLMProviderConfigurationsRaw) { _, _ in
-                    handleRemoteLLMConfigurationsChange()
-                }
-                .onChange(of: remoteASRProviderConfigurationsRaw) { _, _ in
-                    handleRemoteASRConfigurationsChange()
-                }
-                .onChange(of: modelStorageRootPath) { _, _ in
-                    handleModelStorageRootPathChange()
-                }
-                .onChange(of: featureSettingsRaw) { _, _ in
-                    handleFeatureSettingsChange()
-                }
-                .onChange(of: catalogTab) { _, _ in
-                    handleCatalogFilterSelectionChange()
-                }
-                .onChange(of: selectedTags) { _, _ in
-                    handleCatalogFilterSelectionChange()
-                }
-                .onChange(of: isActive) { _, _ in
-                    handleModelSettingsVisibilityChange()
-                }
-                .onChange(of: mainWindowState.isVisible) { _, _ in
-                    handleModelSettingsVisibilityChange()
-                }
-        )
-
-        let stateObserved = AnyView(
-            configurationObserved
-                .onReceive(downloadLifecycleRefreshPublisher) { _ in
-                    handleImmediateDownloadLifecycleChange()
-                }
-                .onReceive(downloadMetadataRefreshPublisher) { _ in
-                    handleDownloadMetadataChange()
-                }
-        )
-
-        return AnyView(
-            stateObserved
-                .onReceive(modelStateRefreshTimer) { _ in
-                    handleModelStateRefreshTick()
-                }
-        )
+        stateObservedContent
+            .onReceive(modelStateRefreshTimer) { _ in
+                handleModelStateRefreshTick()
+            }
     }
 
     func handleModelRepoChange(_ newValue: String) {

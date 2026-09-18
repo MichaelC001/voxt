@@ -989,8 +989,37 @@ final class MeetingDetailViewModel: ObservableObject {
 
     private func markSegment(_ id: UUID, update: (MeetingTranscriptSegment) -> MeetingTranscriptSegment) {
         guard let index = segments.firstIndex(where: { $0.id == id }) else { return }
-        segments[index] = update(segments[index])
-        refreshTranscriptListCaches()
+        let previous = segments[index]
+        let updated = update(previous)
+        guard updated != previous else { return }
+        segments[index] = updated
+
+        // Translation status/text does not change speaker ordering or word counts.
+        // Keep search filtering authoritative when translated text affects membership.
+        guard searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              previous.id == updated.id,
+              previous.text == updated.text,
+              previous.speaker == updated.speaker,
+              previous.speakerIdentityKey == updated.speakerIdentityKey,
+              previous.startSeconds == updated.startSeconds,
+              let displayedIndex = displayedSegments.firstIndex(where: { $0.id == id }),
+              let groupIndex = speakerGroups.firstIndex(where: { $0.id == updated.speakerIdentityKey }),
+              let segmentIndex = speakerGroups[groupIndex].segments.firstIndex(where: { $0.id == id })
+        else {
+            refreshTranscriptListCaches()
+            return
+        }
+        displayedSegments[displayedIndex] = updated
+        let group = speakerGroups[groupIndex]
+        var groupSegments = group.segments
+        groupSegments[segmentIndex] = updated
+        speakerGroups[groupIndex] = MeetingDetailSpeakerGroup(
+            id: group.id,
+            title: group.title,
+            speaker: group.speaker,
+            segments: groupSegments,
+            wordCount: group.wordCount
+        )
     }
 
     private func cancelTranslationTasks() {
