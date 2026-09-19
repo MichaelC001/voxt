@@ -54,6 +54,47 @@ final class RecordingSessionLifecycleTests: XCTestCase {
         XCTAssertEqual(lifecycle.beginEnding(ending), .skipAlreadyCompleted)
     }
 
+    func testOutputGenerationSurvivesNormalCallbackTeardown() {
+        var lifecycle = RecordingSessionLifecycle()
+        let sessionID = lifecycle.id
+        let generation = lifecycle.outputGeneration
+        XCTAssertTrue(lifecycle.claimOutput(for: sessionID))
+        XCTAssertEqual(lifecycle.beginEnding(sessionID), .execute)
+        lifecycle.invalidateCallbacks()
+        lifecycle.completeEnding(sessionID)
+        XCTAssertFalse(lifecycle.accepts(sessionID))
+        XCTAssertTrue(lifecycle.acceptsOutputGeneration(generation))
+    }
+
+    func testNewSessionInvalidatesOldOutputGeneration() {
+        var lifecycle = RecordingSessionLifecycle()
+        let generation = lifecycle.outputGeneration
+        lifecycle.begin()
+        XCTAssertFalse(lifecycle.acceptsOutputGeneration(generation))
+        XCTAssertTrue(lifecycle.acceptsOutputGeneration(lifecycle.outputGeneration))
+    }
+
+    func testCancellationInvalidatesOldOutputButAllowsFreshManualRequest() {
+        var lifecycle = RecordingSessionLifecycle()
+        let generation = lifecycle.outputGeneration
+        lifecycle.cancel()
+        XCTAssertFalse(lifecycle.acceptsOutputGeneration(generation))
+        XCTAssertFalse(lifecycle.accepts(lifecycle.id))
+        // An explicit manual paste can be requested after cancellation; it is
+        // not a continuation of the cancelled session's automated delivery.
+        XCTAssertTrue(lifecycle.acceptsOutputGeneration(lifecycle.outputGeneration))
+    }
+
+    func testDismissInvalidatesQueuedOutputWithoutCancellingRecording() {
+        var lifecycle = RecordingSessionLifecycle()
+        let sessionID = lifecycle.id
+        let generation = lifecycle.outputGeneration
+        lifecycle.invalidateOutputDelivery()
+        XCTAssertFalse(lifecycle.acceptsOutputGeneration(generation))
+        XCTAssertTrue(lifecycle.accepts(sessionID))
+        XCTAssertFalse(lifecycle.isCancelled)
+    }
+
     func testBeginResetsCancellationAndCommitTogether() {
         var lifecycle = RecordingSessionLifecycle()
         let old = lifecycle.id

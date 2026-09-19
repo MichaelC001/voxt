@@ -23,6 +23,8 @@ Stage 6A adds existing dictionary learning/matcher/store, history serialization/
 
 Stage 6B includes current local-LLM request policy, source selection, resumable URLProtocol, installation/cache and catalog contracts. The three non-model GGUF tests are selected by method; installed GGUF inference is still isolated in `gguf`. Tooling validates both suite and method names to detect stale selectors.
 
+Stage 6C adds queued-injection and pasteboard-ownership tests, lifecycle output-generation cases, and the existing connectivity tester suite. Pasteboard tests use unique named boards, never the general clipboard. They do not post real keys or validate editor/focus behavior; manual acceptance must cover cancel/restart during paste, overlay dismissal, follow-up keys, window switching and concurrent user copies.
+
 The old `whisper` / `diagnostic` groups were removed because their dedicated Whisper test classes no longer exist. This does not remove MLX Whisper model support or migration coverage. Unknown groups fail rather than selecting nonexistent suites. The `all` / `full` groups avoid rerunning VAD suites already selected by core.
 
 See [test-suite organization](../VoxtTests/README.md) and the [phased refactoring record](RefactoringProgress.zh-CN.md).

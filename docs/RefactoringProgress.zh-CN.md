@@ -17,12 +17,13 @@
 | 5B | 热键监听安装对象与业务状态、MLX native-live 任务/use 释放 | 已实施，新增 15 个测试 | `5936e62` macOS CI 通过；设备/模型验收待执行 |
 | 5C | 录音身份/提交、模型加载退出、会议导入资源与最终化快照 | 已实施，新增 22 个测试 | `25776d2` macOS CI 通过；整体集成验收仍待执行 |
 | 6A | Dictionary/History/MeetingDetail 拆分、孤儿调用链与 UI 清理 | 已实施 | `c55101a` macOS CI 通过；UI 待验收 |
-| 6B | 模型/续传/GGUF 与远程配置职责、退役本地 LLM API 清理 | 已实施 | 等待本批 macOS CI |
-| 6C / 最终验收 | 剩余大文件、交付事务、进一步去重与性能/设备验证 | 待实施 | 仍有 15 个应用文件 >1,000 行，不标记全项目完成 |
+| 6B | 模型/续传/GGUF 与远程配置职责、退役本地 LLM API 清理 | 已实施 | `1b393a3` macOS CI 通过；模型/下载待人工验收 |
+| 6C | 文本交付代次/剪贴板所有权、历史/权限/连通性职责与孤儿链清理 | 已实施，净新增 20 个测试 | 等待本批 macOS CI；编辑器/UI 待验收 |
+| 6D / 最终验收 | 剩余大文件、进一步去重与性能/设备验证 | 待实施 | 仍有 9 个应用文件 >1,000 行，不标记全项目完成 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
-阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 仍需单独验证。
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 的 `1b393a3` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35448285265)。阶段 6C 仍需单独验证。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -300,7 +301,44 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 - CLI 测试现在还校验 `-only-testing` 的方法名存在，而非只检查 suite，避免改名后静默选择零测试；source-selection 测试补充隔离 defaults 的 teardown。
 - 应用 Swift 行数 **150,761 → 150,285，净减少 476 行**；>1,000 行文件 **18 → 15**。剩余重点仍是录音、模型管理器、热键、会议协调、远程连通性和设置大文件，以及 UI/编辑器交付事务与最终验收。
 
-本批 Linux 工具检查、受保护声明/运行时正文对比通过；新 Swift 测试和全部移动声明仍需本批 Mac CI。真实暂停/续传、网络切换、下载源回退、模型安装/取消/卸载和 GGUF/native 内存行为保留人工/模型验收要求。
+本批 Linux 工具检查、受保护声明/运行时正文对比通过；随后 `1b393a3` 已通过本批 macOS CI。真实暂停/续传、网络切换、下载源回退、模型安装/取消/卸载和 GGUF/native 内存行为保留人工/模型验收要求。
+
+## 阶段 6C：文本交付与设置/连通性边界
+
+### 删除依据与职责
+
+- 核查提交/转译/重写生产入口、测试及 selector/协议路径后，删除无入口的预览注入/二次替换调用链：旧 finalize/preview/replacement helper、专属事务类型/字段、AX range setter 和 async callback bridge。现行一次提交、AX 读取、词典学习、选中文本读取保持。
+- 删除无调用的结构化流式预览入口及 parser `preview` 包装、`extractRewriteAnswerPayload` 转发；四个旧预览测试改测实际 extractor/纯文本流式 normalizer，保留截断 JSON 与畸形 chunk 夹具覆盖。当前 conversation streaming、最终 payload 解析及仍被最终交付调用的空内容标题 helper 保留。
+- 连通性删除 5 个不可达 helper：HTTP GET、通用 WebSocket、旧 Aliyun HTTP 探测、重复默认端点和日志目标 getter。保留实际 provider 分发、端点安全校验、请求/返回解析及凭据边界。
+- 连通性拆为 ASR 请求、流式 ASR、LLM 和 WebSocket 传输/诊断文件。31 个保留函数正文比对不变；**未改超时、取消或网络资源策略**，也不宣称已经完成这些边界的运行时审计。
+- 历史列表/删除值类型归入 `HistorySettingsData`，Note 控件与带编辑状态的 row 分开；row 的 footer 仍为同文件 private。权限探测输入/结果与 nonisolated native helper 独立，视图保留私有状态、取消任务和持久化，不改原探测/授权策略。
+- 37 个权限函数与 24 个 History 类型按正文核对（仅必要可见性及等价本地化调用调整）；保留 AX 输入实现逐段比对不变。没有修改存储格式/迁移键、语言资源、模型参数、依赖 pin、签名或音频夹具。
+
+| 原文件 | 本批前 | 本批后 | 边界 |
+| --- | ---: | ---: | --- |
+| TextInputIO | 1,203 | 839 | 保留输入/AX 读取；输出转入 TextOutputDelivery，删除旧替换链 |
+| SessionTextIO | 776 | 630 | 清理旧链、合并答案注入、检查交付代次 |
+| VoxtApp | 1,003 | 994 | 删除旧替换事务状态，装配剪贴板 writer |
+| RemoteConnectivityTester | 1,284 | 57 | 验证/分发入口；协议 helper 分组 |
+| HistorySettingsComponents | 1,119 | 389 | 普通历史行/工具栏；Note 控件和 row 各自归位 |
+| HistorySettingsView | 1,072 | 966 | 保留列表状态与任务，提取值类型/工具栏 |
+| PermissionsSettingsView | 1,007 | 813 | 保留 UI/任务；浏览器探测值与 native checks 分离 |
+
+### 有意修正的交付行为
+
+- `TextInjectionTransaction` 在排队工作真正执行前检查有效性，并对重复执行、重复/重入 completion 做单次保护。自动交付完成回调也检查原 session，再更新 UI、历史、词典和结束流程，不再让旧回调修改新会话。
+- `RecordingSessionLifecycle.outputGeneration` 与回调 ID 分离：正常结束可继续已发出粘贴的后续按键；开始新会话、取消或关闭答案使旧代次失效。Auto Key 执行时还检查前台 PID。取消之后用户主动发起的新手动请求不被取消标记永久阻断。
+- 手动答案注入合并两份重复流程，固定文本、目标应用和历史 ID；入口 Task、隐藏后的延迟粘贴及完成回调均检查代次，避免跨会话恢复旧窗口或更新新历史。
+- `PasteboardTextWriter` 到实际写入时才读取原文本，按 token/changeCount 恢复；后续观察到的复制（即使字符串相同）不会被旧恢复覆盖。连续临时粘贴继承用户原始基线，不把前一次临时结果当成原剪贴板；保留结果模式废止旧恢复。
+- **边界限制**：按键发出不等于编辑器确认接收，前台 PID 也不是编辑器/窗口级 ACK；仍沿用纯文本剪贴板恢复，不恢复富文本/其他格式，changeCount 检查不是跨进程原子 CAS。真实焦点、权限、快速连按及剪贴板并发仍需 Mac 验收。
+
+### 测试与规模
+
+- 新增 `TextInjectionTransactionTests` 8 项、`PasteboardTextWriterTests` 8 项及生命周期代次 4 项；静态 XCTest 方法 **1,682 → 1,702**。四个旧 parser 用例转向当前生产入口，不为保留测试而保留退役 API。
+- 剪贴板测试使用独立命名 NSPasteboard 并释放，不读写 general clipboard；注入用受控回调，不发送真实键盘事件，也不是完整 AppDelegate/UI 端到端测试。
+- 聚焦组增加两组新 suite 和现有 `RemoteProviderConnectivityTesterTests`；原安全、权限、历史、词典与会话测试保留，CLI 继续校验 suite/方法 selector。
+- 应用 **483 个 Swift 文件、149,996 行**，本批净减少 **289 行**；>1,000 行文件 **15 → 9**。测试 **205 个文件、41,493 行**，均低于千行。
+- 剩余热点：MLXTranscriber（2,065）、HotkeyManager（1,858）、MeetingSessionCoordinator（1,821）、MLXModelManager（1,610）、HotkeySupport（1,438）、CustomLLMModelManager（1,429）、RemoteASRTranscriber（1,259）、RemoteProviderSheetState（1,149）、DictionarySuggestionStore（1,128）。不以文件缩小宣称性能改善或全项目重构完成。
 
 ## 验证与下一门禁
 
@@ -310,7 +348,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-阶段 6B 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
+阶段 6C 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
@@ -319,6 +357,6 @@ bash tools/run_local_regression_matrix.sh refactor
 xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
 ```
 
-人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈；会议远程启动配置；本地 ASR live/final/取消。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
+人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈、历史/Note 编辑；会议远程启动配置；本地 ASR live/final/取消；延迟粘贴时取消/重启、关闭答案、正常结束后的 Auto Key、切换应用/窗口和连续用户复制。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
 
 阶段 4 已补充 ASR/会议协议契约，阶段 5A–5C 收敛了上述核心所有者。阶段 6 继续整理剩余职责与集成验收；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。

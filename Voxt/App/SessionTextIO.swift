@@ -75,7 +75,7 @@ extension AppDelegate {
         )
 
         deliverCommittedOutput(context) { [weak self] didInject, didTriggerAutoKeyPress, outputDestinationContext in
-            guard let self else { return }
+            guard let self, self.recordingLifecycle.accepts(sessionID), !self.isApplicationTerminating else { return }
             self.finalizeCommittedOutputPostDelivery(
                 deliveredContext: context,
                 outputMode: sessionOutputMode,
@@ -85,112 +85,6 @@ extension AppDelegate {
             )
             onDeliveryCompleted?()
         }
-    }
-
-    func preparedDeliveryContextForCurrentSession(
-        originalText: String,
-        llmDurationSeconds: TimeInterval?
-    ) -> SessionFinalizeContext {
-        Self.preparedDeliveryContext(
-            originalText: originalText,
-            llmDurationSeconds: llmDurationSeconds,
-            sessionOutputMode: sessionOutputMode,
-            userMainLanguage: userMainLanguage,
-            matcher: dictionaryStore.makeMatcherIfEnabled(for: originalText, activeGroupID: activeDictionaryGroupID()),
-            usesConservativeEvidence: shouldUseConservativeDictionaryEvidenceForCurrentSession(),
-            automaticReplacementEnabled: UserDefaults.standard.bool(
-                forKey: AppPreferenceKey.dictionaryHighConfidenceCorrectionEnabled
-            )
-        )
-    }
-
-    func finalizePreviouslyDeliveredOutput(
-        _ text: String,
-        llmDurationSeconds: TimeInterval?,
-        didInject: Bool,
-        onDeliveryCompleted: (() -> Void)? = nil
-    ) {
-        let sessionID = activeRecordingSessionID
-        guard recordingLifecycle.claimOutput(for: sessionID) else {
-            VoxtLog.input("Skipping duplicate or cancelled finalize for previously delivered session output.")
-            return
-        }
-        let callbackDecision = Self.sessionCallbackHandlingDecision(
-            requestedSessionID: sessionID,
-            activeSessionID: activeRecordingSessionID,
-            isSessionCancellationRequested: isSessionCancellationRequested
-        )
-        guard callbackDecision == .accept else {
-            VoxtLog.inputWarning(
-                "Finalize previously delivered output abandoned after session invalidation. reason=\(callbackDecision.logDescription), sessionID=\(sessionID.uuidString)"
-            )
-            return
-        }
-
-        let context = preparedDeliveryContextForCurrentSession(
-            originalText: text,
-            llmDurationSeconds: llmDurationSeconds
-        )
-        cacheLatestInjectableOutputText(context.outputText)
-        logUnicodeReplacementCharactersIfNeeded(
-            stage: "finalizePreviouslyDelivered",
-            inputText: text,
-            outputText: context.outputText,
-            outputMode: sessionOutputMode
-        )
-        OnboardingSessionEvent.delivered(id: sessionID, text: context.outputText, succeeded: didInject).post()
-        finalizeCommittedOutputPostDelivery(
-            deliveredContext: context,
-            outputMode: sessionOutputMode,
-            didInject: didInject,
-            didTriggerAutoKeyPress: false,
-            outputDestinationContext: didInject ? sessionOutputDestinationContext : nil
-        )
-        onDeliveryCompleted?()
-    }
-
-    func tryDeliverPreviewOutputIfPossible(
-        _ text: String,
-        sessionID: UUID,
-        requestID: UUID?
-    ) async -> String? {
-        let context = preparedDeliveryContextForCurrentSession(
-            originalText: text,
-            llmDurationSeconds: nil
-        )
-        guard resolvedOutputDelivery(for: context) == .typeText else {
-            return nil
-        }
-        guard let transaction = makePendingOutputReplacementTransaction(
-            previewText: context.outputText,
-            sessionID: sessionID,
-            expectedBundleID: sessionTargetApplicationBundleID
-        ) else {
-            return nil
-        }
-
-        beginOverlayOutputDelivery()
-        let didInject = await withCheckedContinuation { continuation in
-            typeText(context.outputText) { injected in
-                continuation.resume(returning: injected)
-            }
-        }
-        endOverlayOutputDelivery()
-
-        guard didInject else { return nil }
-        sessionOutputDestinationContext = captureCurrentOutputDestinationContext()
-        guard shouldHandleCallbacks(for: sessionID),
-              requestID.map(isCurrentLLMRequest) ?? true
-        else {
-            return nil
-        }
-
-        pendingOutputReplacementTransaction = transaction
-        cacheLatestInjectableOutputText(context.outputText)
-        VoxtLog.input(
-            "Preview output injected. chars=\(context.outputText.count), sessionID=\(sessionID.uuidString)"
-        )
-        return context.outputText
     }
 
     private func logUnicodeReplacementCharactersIfNeeded(
@@ -213,20 +107,16 @@ extension AppDelegate {
         )
     }
 
-    func performPendingOutputReplacementIfPossible(
-        with text: String,
-        sessionID: UUID
-    ) async -> Bool {
-        guard let transaction = pendingOutputReplacementTransaction,
-              transaction.sessionID == sessionID else {
-            return false
+    private func beginOverlayOutputDelivery() {
+        overlayState.isRequesting = true
+        overlayState.isCompleting = false
+        if overlayState.displayMode != .answer {
+            overlayState.displayMode = .processing
         }
+    }
 
-        defer {
-            pendingOutputReplacementTransaction = nil
-        }
-
-        return await performPendingOutputReplacement(transaction, replacementText: text)
+    private func endOverlayOutputDelivery() {
+        overlayState.isRequesting = false
     }
 
     private func deliverCommittedOutput(
@@ -254,9 +144,12 @@ extension AppDelegate {
             let autoKeyPressHotkey = sessionOutputMode == .transcription
                 ? autoKeyPressHotkeyForCurrentAppBranchSession()
                 : nil
+            let outputGeneration = recordingLifecycle.outputGeneration
             beginOverlayOutputDelivery()
-            typeText(context.outputText) { [weak self] didInject in
-                guard let self else { return }
+            typeText(context.outputText, isValid: { [weak self] in
+                self?.recordingLifecycle.accepts(sessionID) == true
+            }) { [weak self] didInject in
+                guard let self, self.recordingLifecycle.accepts(sessionID), !self.isApplicationTerminating else { return }
                 self.sessionFinalOutputDeliveredAt = Date()
                 self.endOverlayOutputDelivery()
                 let outputDestinationContext = didInject
@@ -264,7 +157,7 @@ extension AppDelegate {
                     : nil
                 self.sessionOutputDestinationContext = outputDestinationContext
                 if didInject, let autoKeyPressHotkey {
-                    self.pressAutoKeyAfterTextInjection(autoKeyPressHotkey)
+                    self.pressAutoKeyAfterTextInjection(autoKeyPressHotkey, outputGeneration: outputGeneration)
                 }
                 OnboardingSessionEvent.delivered(id: sessionID, text: context.outputText, succeeded: didInject).post()
                 completion?(
@@ -540,27 +433,6 @@ extension AppDelegate {
         overlayWindow.show(state: overlayState, position: overlayPosition)
     }
 
-    func presentRewriteAnswerStreamingPreview(rawText: String) {
-        let previewPayload = RewriteAnswerPayloadParser.preview(from: rawText) ?? RewriteAnswerPayload(
-            title: AppLocalization.localizedString("AI Answer"),
-            content: rawText
-        )
-        guard !previewPayload.trimmedTitle.isEmpty || !previewPayload.trimmedContent.isEmpty else { return }
-
-        configureAnswerOverlayInjectionHandler()
-        let canInjectIntoFocusedInput =
-            overlayState.latestCompletedAnswerPayload != nil
-                ? resolvedCanInjectIntoFocusedInputForRewriteAnswer(logResult: false)
-                : false
-
-        overlayState.presentStreamingAnswer(
-            title: previewPayload.title,
-            content: previewPayload.content,
-            canInject: canInjectIntoFocusedInput
-        )
-        overlayWindow.show(state: overlayState, position: overlayPosition)
-    }
-
     func presentRewriteConversationStreamingPreview(content: String) {
         let normalizedContent = RewriteAnswerContentNormalizer.normalizePlainTextStreamingPreview(content)
         guard !normalizedContent.isEmpty else { return }
@@ -584,13 +456,15 @@ extension AppDelegate {
 
     func dismissAnswerOverlay() {
         guard overlayState.displayMode == .answer else { return }
+        recordingLifecycle.invalidateOutputDelivery()
         if isSessionActive {
             cancelActiveRecordingSession()
         }
         cancelPendingSelectedTextTranslationRefresh()
         releaseResidualRecordingResources(reason: "dismiss-answer-overlay")
+        let generation = recordingLifecycle.outputGeneration
         overlayWindow.hide { [weak self] in
-            guard let self else { return }
+            guard let self, self.recordingLifecycle.acceptsOutputGeneration(generation) else { return }
             self.overlayWindow.onRequestInject = nil
             self.overlayState.reset()
             self.answerOverlayInjectionMode = .standard
@@ -606,59 +480,40 @@ extension AppDelegate {
         guard overlayState.canInjectAnswer else { return }
         VoxtLog.input("Answer overlay inject requested. chars=\(trimmed.count), canInject=\(overlayState.canInjectAnswer)")
 
-        if answerOverlayInjectionMode == .selectedTextTranslation {
-            injectSelectedTextTranslationAnswerOverlayContent(trimmed)
-            return
-        }
-
-        injectStandardAnswerOverlayContent(trimmed)
+        injectAnswerOverlayContent(trimmed, mode: answerOverlayInjectionMode)
     }
 
-    private func injectStandardAnswerOverlayContent(_ text: String) {
+    private func injectAnswerOverlayContent(_ text: String, mode: AnswerOverlayInjectionMode) {
+        let generation = recordingLifecycle.outputGeneration
+        let target = sessionTextInjectionTarget
+        let historyEntryID = overlayState.latestHistoryEntryID
+        let isValid: @MainActor () -> Bool = { [weak self] in
+            guard let self, !self.isApplicationTerminating else { return false }
+            return self.recordingLifecycle.acceptsOutputGeneration(generation)
+        }
         VoxtLog.input("Answer overlay inject will hide overlay before paste. chars=\(text.count)")
         overlayWindow.onRequestInject = nil
         overlayWindow.hide(animated: false) { [weak self] in
-            guard let self else { return }
+            guard let self, isValid() else { return }
             self.overlayState.canInjectAnswer = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-                guard let self else { return }
-                self.typeText(text, restoreSessionTarget: true) { [weak self] didInject in
-                    guard let self else { return }
+                guard let self, isValid() else { return }
+                if mode == .selectedTextTranslation {
+                    let activationRestored = self.activateSelectedTextTranslationInjectionTargetIfNeeded(target)
+                    VoxtLog.input(
+                        "Selected text translation overlay inject target prepared. activationRestored=\(activationRestored)"
+                    )
+                }
+                self.typeText(
+                    text,
+                    restoreSessionTarget: mode == .standard,
+                    target: target,
+                    isValid: isValid
+                ) { [weak self] didInject in
+                    guard let self, isValid() else { return }
                     VoxtLog.input("Answer overlay inject completed. didInject=\(didInject)")
                     if didInject {
-                        self.updateLatestHistoryOutputDestinationAfterInjection()
-                        self.overlayState.reset()
-                        self.answerOverlayInjectionMode = .standard
-                        self.sessionTargetApplicationPID = nil
-                        self.sessionTargetApplicationBundleID = nil
-                        self.selectedTextTranslationHadWritableFocusedInput = false
-                    } else {
-                        self.configureAnswerOverlayInjectionHandler()
-                        self.overlayState.canInjectAnswer = true
-                        self.overlayWindow.show(state: self.overlayState, position: self.overlayPosition)
-                    }
-                }
-            }
-        }
-    }
-
-    private func injectSelectedTextTranslationAnswerOverlayContent(_ text: String) {
-        VoxtLog.input("Selected text translation overlay inject will hide overlay before paste. chars=\(text.count)")
-        overlayWindow.onRequestInject = nil
-        overlayWindow.hide(animated: false) { [weak self] in
-            guard let self else { return }
-            self.overlayState.canInjectAnswer = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-                guard let self else { return }
-                let activationRestored = self.activateSelectedTextTranslationInjectionTargetIfNeeded()
-                VoxtLog.input(
-                    "Selected text translation overlay inject target prepared. activationRestored=\(activationRestored)"
-                )
-                self.typeText(text, restoreSessionTarget: false) { [weak self] didInject in
-                    guard let self else { return }
-                    VoxtLog.input("Selected text translation overlay inject completed. didInject=\(didInject)")
-                    if didInject {
-                        self.updateLatestHistoryOutputDestinationAfterInjection()
+                        self.updateHistoryOutputDestinationAfterInjection(historyEntryID: historyEntryID)
                         self.overlayState.reset()
                         self.answerOverlayInjectionMode = .standard
                         self.sessionTargetApplicationPID = nil
@@ -675,16 +530,16 @@ extension AppDelegate {
     }
 
     @discardableResult
-    private func activateSelectedTextTranslationInjectionTargetIfNeeded() -> Bool {
+    private func activateSelectedTextTranslationInjectionTargetIfNeeded(_ target: TextInjectionTarget) -> Bool {
         let ownBundleID = Bundle.main.bundleIdentifier
         let frontmostApplication = NSWorkspace.shared.frontmostApplication
         let frontmostBundleID = frontmostApplication?.bundleIdentifier
         if frontmostBundleID != ownBundleID,
-           frontmostBundleID == sessionTargetApplicationBundleID {
+           frontmostBundleID == target.bundleIdentifier {
             return false
         }
 
-        if let targetPID = sessionTargetApplicationPID,
+        if let targetPID = target.processIdentifier,
            let targetApplication = NSRunningApplication(processIdentifier: targetPID),
            !targetApplication.isTerminated {
             VoxtLog.input(
@@ -693,7 +548,7 @@ extension AppDelegate {
             return targetApplication.activate(options: [])
         }
 
-        if let targetBundleID = sessionTargetApplicationBundleID,
+        if let targetBundleID = target.bundleIdentifier,
            let targetApplication = NSRunningApplication.runningApplications(withBundleIdentifier: targetBundleID)
             .first(where: { !$0.isTerminated }) {
             VoxtLog.input(
@@ -703,7 +558,7 @@ extension AppDelegate {
         }
 
         VoxtLog.input(
-            "Selected text translation overlay target restore skipped. frontmostBundleID=\(frontmostBundleID ?? "nil"), targetBundleID=\(sessionTargetApplicationBundleID ?? "nil"), targetPID=\(sessionTargetApplicationPID.map(String.init) ?? "nil")"
+            "Selected text translation overlay target restore skipped. frontmostBundleID=\(frontmostBundleID ?? "nil"), targetBundleID=\(target.bundleIdentifier ?? "nil"), targetPID=\(target.processIdentifier.map(String.init) ?? "nil")"
         )
         return false
     }
@@ -716,8 +571,8 @@ extension AppDelegate {
         showTranscriptionDetailWindow(for: historyEntryID)
     }
 
-    private func updateLatestHistoryOutputDestinationAfterInjection() {
-        guard let historyEntryID = overlayState.latestHistoryEntryID,
+    private func updateHistoryOutputDestinationAfterInjection(historyEntryID: UUID?) {
+        guard let historyEntryID,
               let outputDestinationContext = captureCurrentOutputDestinationContext()
         else {
             return
@@ -733,8 +588,11 @@ extension AppDelegate {
 
     private func configureAnswerOverlayInjectionHandler() {
         overlayWindow.onRequestInject = { [weak self] in
+            guard let self else { return }
+            let generation = self.recordingLifecycle.outputGeneration
             Task { @MainActor [weak self] in
-                self?.injectAnswerOverlayContent()
+                guard let self, self.recordingLifecycle.acceptsOutputGeneration(generation) else { return }
+                self.injectAnswerOverlayContent()
             }
         }
     }
@@ -752,10 +610,6 @@ extension AppDelegate {
             )
         }
         return canInjectIntoFocusedInput
-    }
-
-    func extractRewriteAnswerPayload(from text: String) -> RewriteAnswerPayload? {
-        RewriteAnswerPayloadParser.extract(from: text)
     }
 
     private func emptyRewriteAnswerPlaceholderTitle(from text: String) -> String? {

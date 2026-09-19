@@ -11,6 +11,7 @@ nonisolated struct RecordingSessionLifecycle {
     }
 
     private(set) var id = UUID()
+    private(set) var outputGeneration = UUID()
     private(set) var isCancelled = false
     private(set) var hasCommittedOutput = false
     private(set) var endingID: UUID?
@@ -26,10 +27,21 @@ nonisolated struct RecordingSessionLifecycle {
         id = UUID()
         isCancelled = true
         hasCommittedOutput = true
+        invalidateOutputDelivery()
     }
 
     mutating func invalidateCallbacks() {
         id = UUID()
+    }
+
+    mutating func invalidateOutputDelivery() {
+        outputGeneration = UUID()
+    }
+
+    /// A posted paste may need a follow-up key after normal session teardown.
+    /// Begin/cancel/dismiss invalidate it; callback invalidation alone does not.
+    func acceptsOutputGeneration(_ generation: UUID) -> Bool {
+        outputGeneration == generation
     }
 
     func accepts(_ sessionID: UUID) -> Bool {

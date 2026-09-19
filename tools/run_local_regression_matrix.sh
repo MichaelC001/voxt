@@ -165,6 +165,9 @@ run_refactor() {
     -only-testing:VoxtTests/MeetingFinalizationContextTests
     -only-testing:VoxtTests/MeetingFinalizationCheckpointStoreTests
     -only-testing:VoxtTests/RecordingSessionLifecycleTests
+    -only-testing:VoxtTests/TextInjectionTransactionTests
+    -only-testing:VoxtTests/PasteboardTextWriterTests
+    -only-testing:VoxtTests/RemoteProviderConnectivityTesterTests
     -only-testing:VoxtTests/MeetingCaptureTimelineTests
     -only-testing:VoxtTests/ModelDownloadStatusSnapshotTests
     -only-testing:VoxtTests/RemoteEndpointSecurityPolicyTests

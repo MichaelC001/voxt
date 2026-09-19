@@ -140,7 +140,6 @@ extension AppDelegate {
         localVADObservedSpeechInCurrentSession = false
         recordingLifecycle.begin()
         invalidateActiveLLMRequest()
-        pendingOutputReplacementTransaction = nil
         sessionOutputMode = outputMode
         enhancementContextSnapshot = nil
         sessionOutputDestinationContext = nil
@@ -267,7 +266,6 @@ extension AppDelegate {
         hotkeyManager.setCommonStopKeyEnabled(false)
         recordingLifecycle.cancel()
         invalidateActiveLLMRequest()
-        pendingOutputReplacementTransaction = nil
         sessionTargetApplicationPID = nil
         sessionTargetApplicationBundleID = nil
         sessionOutputDestinationContext = nil

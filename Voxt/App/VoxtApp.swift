@@ -99,15 +99,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         case saveAndOpenDetail
     }
 
-    struct PendingOutputReplacementTransaction: Equatable {
-        let sessionID: UUID
-        let bundleIdentifier: String?
-        let baselineText: String
-        let expectedTextAfterPreview: String
-        let previewText: String
-        let replacementRange: NSRange
-    }
-
     struct SessionLLMExecutionTiming: Equatable {
         let taskLabel: String
         let providerLabel: String
@@ -243,6 +234,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var pendingApplicationTerminationTask: Task<Void, Never>?
     let llmRequests = LLMRequestLifecycle()
     let recordingCaptureStartTasks = TrackedTaskStore()
+    let pasteboardTextWriter = PasteboardTextWriter()
     private(set) var isApplicationTerminating = false
     private var didCompleteApplicationTermination = false
     private var requestedApplicationExitStatus: Int32?
@@ -278,7 +270,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var browserAutomationDeniedUntilByBundleID: [String: Date] = [:]
     var pendingCompletedHistoryAudioArchiveURL: URL?
     var latestInjectableOutputText: String?
-    var pendingOutputReplacementTransaction: PendingOutputReplacementTransaction?
     var sessionTargetApplicationPID: pid_t?
     var sessionTargetApplicationBundleID: String?
     var pendingTranscriptionStartTask: Task<Void, Never>?

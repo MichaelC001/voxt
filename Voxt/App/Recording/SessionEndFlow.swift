@@ -15,7 +15,6 @@ extension AppDelegate {
         isSessionActive = false
         sessionOutputMode = .transcription
         isSelectedTextTranslationFlow = false
-        pendingOutputReplacementTransaction = nil
         if !shouldPreserveTranslationAnswerControls {
             sessionTargetApplicationPID = nil
             sessionTargetApplicationBundleID = nil
