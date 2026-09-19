@@ -64,24 +64,28 @@ final class ModelStackRetirementTests: XCTestCase {
         XCTAssertFalse(MLXModelCatalog.hasRegisteredCapability(for: "untrusted/qwen3-asr-checkpoint"))
     }
 
-    func testRetiredSelectionsArePersistedAsActiveModelsWithoutChangingPrompts() throws {
-        try withEphemeralDefaults { defaults in
-            var settings = FeatureSettingsStore.load(defaults: defaults)
-            settings.transcription.asrSelectionID = .init(rawValue: "mlx:mlx-community/whisper-base-mlx")
-            settings.transcription.llmSelectionID = .init(rawValue: "local-llm:mlx-community/Qwen3-4B-4bit")
-            settings.rewrite.llmSelectionID = .init(rawValue: "local-llm:mlx-community/gemma-2-2b-it-4bit")
-            settings.meeting.summaryModelSelectionID = .init(rawValue: "local-llm:mlx-community/Qwen3-8B-4bit")
-            settings.transcription.prompt = "Preserve my custom instructions."
-            FeatureSettingsStore.save(settings, defaults: defaults)
-            let loaded = FeatureSettingsStore.load(defaults: defaults)
-            XCTAssertEqual(loaded.transcription.asrSelectionID, .mlx("mlx-community/whisper-small-mlx"))
-            XCTAssertEqual(loaded.transcription.llmSelectionID, .localLLM("mlx-community/Qwen3.5-4B-OptiQ-4bit"))
-            XCTAssertEqual(loaded.rewrite.llmSelectionID, .localLLM("mlx-community/gemma-4-e2b-it-4bit"))
-            XCTAssertEqual(loaded.meeting.summaryModelSelectionID, .localLLM("mlx-community/Qwen3.5-9B-OptiQ-4bit"))
-            XCTAssertEqual(loaded.transcription.prompt, settings.transcription.prompt)
-            FeatureSettingsStore.migrateIfNeeded(defaults: defaults)
-            XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults).transcription.asrSelectionID, loaded.transcription.asrSelectionID)
+    func testRetiredSelectionsArePersistedAsActiveModelsWithoutChangingPrompts() {
+        let testName = "ModelStackRetirementTests.\(UUID().uuidString)"
+        let defaults = TestDoubles.makeUserDefaults(testName: testName)
+        defer {
+            defaults.removePersistentDomain(forName: "VoxtTests.\(testName)")
         }
+
+        var settings = FeatureSettingsStore.load(defaults: defaults)
+        settings.transcription.asrSelectionID = .init(rawValue: "mlx:mlx-community/whisper-base-mlx")
+        settings.transcription.llmSelectionID = .init(rawValue: "local-llm:mlx-community/Qwen3-4B-4bit")
+        settings.rewrite.llmSelectionID = .init(rawValue: "local-llm:mlx-community/gemma-2-2b-it-4bit")
+        settings.meeting.summaryModelSelectionID = .init(rawValue: "local-llm:mlx-community/Qwen3-8B-4bit")
+        settings.transcription.prompt = "Preserve my custom instructions."
+        FeatureSettingsStore.save(settings, defaults: defaults)
+        let loaded = FeatureSettingsStore.load(defaults: defaults)
+        XCTAssertEqual(loaded.transcription.asrSelectionID, .mlx("mlx-community/whisper-small-mlx"))
+        XCTAssertEqual(loaded.transcription.llmSelectionID, .localLLM("mlx-community/Qwen3.5-4B-OptiQ-4bit"))
+        XCTAssertEqual(loaded.rewrite.llmSelectionID, .localLLM("mlx-community/gemma-4-e2b-it-4bit"))
+        XCTAssertEqual(loaded.meeting.summaryModelSelectionID, .localLLM("mlx-community/Qwen3.5-9B-OptiQ-4bit"))
+        XCTAssertEqual(loaded.transcription.prompt, settings.transcription.prompt)
+        FeatureSettingsStore.migrateIfNeeded(defaults: defaults)
+        XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults).transcription.asrSelectionID, loaded.transcription.asrSelectionID)
     }
 
     func testRetiredTuningIsDroppedWithoutResettingSurvivingFamily() throws {
