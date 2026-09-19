@@ -63,6 +63,8 @@ class LocalRegressionMatrixTests(unittest.TestCase):
             self.assertIn(f"-only-testing:VoxtTests/{suite}", selectors)
         for suite in ("TrackedTaskStoreTests", "LLMRequestLifecycleTests", "MeetingLiveSessionRegistryTests", "MLXCorrectionPassCoordinatorTests", "MeetingCaptureTimelineTests", "MLXNativeLiveRuntimeTests", "HotkeyEventTapRunLoopTests", "HotkeyManagerLifetimeTests"):
             self.assertIn(f"-only-testing:VoxtTests/{suite}", selectors)
+        for suite in ("SharedModelLoadCoordinatorTests", "MeetingImportedFileAnalyzerTests", "MeetingFileTaskQueueTests", "MeetingFinalizationContextTests", "MeetingFinalizationCheckpointStoreTests", "RecordingSessionLifecycleTests"):
+            self.assertIn(f"-only-testing:VoxtTests/{suite}", selectors)
         for command in commands:
             self.assertEqual(command[0], "test")
             self.assertIn(str(ROOT / "Voxt.xcodeproj"), command)

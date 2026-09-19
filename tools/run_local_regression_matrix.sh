@@ -159,6 +159,12 @@ run_refactor() {
     -only-testing:VoxtTests/MLXCorrectionPassCoordinatorTests
     -only-testing:VoxtTests/MLXNativeLiveRuntimeTests
     -only-testing:VoxtTests/HotkeyEventTapRunLoopTests
+    -only-testing:VoxtTests/SharedModelLoadCoordinatorTests
+    -only-testing:VoxtTests/MeetingImportedFileAnalyzerTests
+    -only-testing:VoxtTests/MeetingFileTaskQueueTests
+    -only-testing:VoxtTests/MeetingFinalizationContextTests
+    -only-testing:VoxtTests/MeetingFinalizationCheckpointStoreTests
+    -only-testing:VoxtTests/RecordingSessionLifecycleTests
     -only-testing:VoxtTests/MeetingCaptureTimelineTests
     -only-testing:VoxtTests/ModelDownloadStatusSnapshotTests
     -only-testing:VoxtTests/RemoteEndpointSecurityPolicyTests

@@ -9,124 +9,6 @@ import MLXAudioCore
 import MLXAudioSTT
 import HuggingFace
 
-private struct SharedModelLoadValue: @unchecked Sendable {
-    let value: Any
-}
-
-private struct SharedModelLoadEntry {
-    let generation: UUID
-    let task: Task<SharedModelLoadValue, Error>
-    var waiterIDs: Set<UUID>
-}
-
-struct SharedModelLoadTask: Sendable {
-    fileprivate let task: Task<SharedModelLoadValue, Error>
-
-    func waitForCompletion() async {
-        _ = try? await task.value
-    }
-}
-
-@MainActor
-private final class SharedModelLoadStorage {
-    private var entries: [String: SharedModelLoadEntry] = [:]
-
-    var hasPendingLoad: Bool { !entries.isEmpty }
-
-    func value<Value: Sendable>(
-        for key: String,
-        start: @escaping @Sendable () async throws -> Value
-    ) async throws -> SharedModelLoadValue {
-        let waiterID = UUID()
-        let generation: UUID
-        let task: Task<SharedModelLoadValue, Error>
-        if var entry = entries[key] {
-            entry.waiterIDs.insert(waiterID)
-            entries[key] = entry
-            generation = entry.generation
-            task = entry.task
-        } else {
-            generation = UUID()
-            task = Task {
-                SharedModelLoadValue(value: try await start())
-            }
-            entries[key] = SharedModelLoadEntry(
-                generation: generation,
-                task: task,
-                waiterIDs: [waiterID]
-            )
-        }
-
-        let coordinator = self
-        return try await withTaskCancellationHandler {
-            defer { finishWaiter(waiterID, key: key, generation: generation) }
-            let value = try await task.value
-            try Task.checkCancellation()
-            guard entries[key]?.generation == generation else {
-                throw CancellationError()
-            }
-            return value
-        } onCancel: {
-            Task { @MainActor in
-                coordinator.cancelWaiter(waiterID, key: key, generation: generation)
-            }
-        }
-    }
-
-    @discardableResult
-    func cancelAll() -> [SharedModelLoadTask] {
-        let tasks = entries.values.map { SharedModelLoadTask(task: $0.task) }
-        entries.removeAll()
-        for task in tasks {
-            task.task.cancel()
-        }
-        return tasks
-    }
-
-    private func cancelWaiter(_ waiterID: UUID, key: String, generation: UUID) {
-        guard var entry = entries[key],
-              entry.generation == generation,
-              entry.waiterIDs.remove(waiterID) != nil
-        else { return }
-
-        if entry.waiterIDs.isEmpty {
-            entries[key] = nil
-            entry.task.cancel()
-        } else {
-            entries[key] = entry
-        }
-    }
-
-    private func finishWaiter(_ waiterID: UUID, key: String, generation: UUID) {
-        guard var entry = entries[key],
-              entry.generation == generation,
-              entry.waiterIDs.remove(waiterID) != nil
-        else { return }
-
-        entries[key] = entry.waiterIDs.isEmpty ? nil : entry
-    }
-}
-
-@MainActor
-struct SharedModelLoadCoordinator<Value: Sendable> {
-    private let storage = SharedModelLoadStorage()
-
-    var hasPendingLoad: Bool { storage.hasPendingLoad }
-
-    func value(
-        for key: String,
-        start: @escaping @Sendable () async throws -> Value
-    ) async throws -> Value {
-        let loadedValue = try await storage.value(for: key, start: start)
-        return loadedValue.value as! Value
-    }
-
-    @discardableResult
-    func cancelAll() -> [SharedModelLoadTask] {
-        storage.cancelAll()
-    }
-}
-
 struct MLXLoadedModelBox: @unchecked Sendable {
     nonisolated(unsafe) let model: any STTGenerationModel
 }
@@ -293,7 +175,7 @@ class MLXModelManager: ObservableObject {
     private var sizeTask: Task<Void, Never>?
     private var prefetchTask: Task<Void, Never>?
     private var idleUnloadTask: Task<Void, Never>?
-    private var applicationTerminationModelLoadTasks: [SharedModelLoadTask] = []
+    private var shutdownTask: Task<Void, Never>?
     private let downloadSizeTolerance: Double = 0.9
     private var activeUseCount = 0
     private var deletingRepos: Set<String> = []
@@ -337,6 +219,7 @@ class MLXModelManager: ObservableObject {
     var hasLoadedModel: Bool { loadedModel != nil }
     var hasActiveUse: Bool { activeUseCount > 0 }
     var hasPendingModelLoad: Bool { modelLoadCoordinator.hasPendingLoad }
+    var hasOutstandingModelLoad: Bool { modelLoadCoordinator.hasOutstandingLoad }
 
     func refreshMemoryOptimizationPolicy() {
         guard loadedModel != nil else {
@@ -874,9 +757,7 @@ class MLXModelManager: ObservableObject {
     }
 
     func cancelPendingModelLoadForApplicationTermination() {
-        applicationTerminationModelLoadTasks.append(
-            contentsOf: invalidatePendingModelLoad(reason: "application-terminating")
-        )
+        invalidatePendingModelLoad(reason: "application-terminating")
     }
 
     func loadModel() async throws -> any STTGenerationModel {
@@ -947,25 +828,21 @@ class MLXModelManager: ObservableObject {
     }
 
     func shutdownForApplicationTermination() async {
-        guard !isShuttingDownForApplicationTermination else {
-            let loadTasks = applicationTerminationModelLoadTasks
-            for task in loadTasks {
-                await task.waitForCompletion()
-            }
-            await waitForActiveUsesToFinish()
-            return
-        }
+        if let shutdownTask { await shutdownTask.value; return }
         isShuttingDownForApplicationTermination = true
+        let task = Task { @MainActor [self] in await performApplicationTerminationShutdown() }
+        shutdownTask = task
+        await task.value
+    }
+
+    private func performApplicationTerminationShutdown() async {
         installationCache.invalidateAll()
 
         let downloadTasks = Array(downloadTasksByRepo.values)
         for repo in Array(downloadTasksByRepo.keys) {
             pauseDownload(repo: repo)
         }
-        applicationTerminationModelLoadTasks.append(
-            contentsOf: invalidatePendingModelLoad(reason: "application-terminating")
-        )
-        let loadTasks = applicationTerminationModelLoadTasks
+        let loadTasks = invalidatePendingModelLoad(reason: "application-terminating")
         let pendingSizeTask = sizeTask
         sizeTask?.cancel()
         sizeTask = nil
@@ -980,7 +857,6 @@ class MLXModelManager: ObservableObject {
         for task in loadTasks {
             await task.waitForCompletion()
         }
-        applicationTerminationModelLoadTasks.removeAll()
         await pendingSizeTask?.value
         await pendingPrefetchTask?.value
         await waitForActiveUsesToFinish()

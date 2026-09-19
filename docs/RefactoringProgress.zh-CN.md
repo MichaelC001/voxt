@@ -14,13 +14,13 @@
 | 3 | 大测试套件、目录归位、回归入口维护 | 已实施 | CI 通过；人工待验收 |
 | 4 | Remote ASR / 会议 provider 会话契约与去重 | 已实施，新增 36 个定向测试 | `fd38d43` macOS CI 通过；真实 provider 人工待验收 |
 | 5A | 请求/启动任务、会议 session-token 与清理屏障、MLX 校正任务所有权 | 已实施，新增 20 个测试 | `b771be1` macOS CI 通过；设备/模型验收待执行 |
-| 5B | 热键监听安装对象与业务状态、MLX native-live 任务/use 释放 | 已实施，新增 15 个测试 | 等待本批 macOS CI |
-| 5C | 完整录音状态、模型管理器、会议导入/最终化的剩余生命周期 | 待实施 | 不把 5A/5B 的局部收敛当成完整验收 |
+| 5B | 热键监听安装对象与业务状态、MLX native-live 任务/use 释放 | 已实施，新增 15 个测试 | `5936e62` macOS CI 通过；设备/模型验收待执行 |
+| 5C | 录音身份/提交、模型加载退出、会议导入资源与最终化快照 | 已实施，新增 22 个测试 | 等待本批 macOS CI；整体集成验收仍待执行 |
 | 6 | Dictionary/History/MeetingDetail 等剩余大文件与最终验收 | 待实施 | 分域推进；完整构建、测试和人工回归 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
-阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)。阶段 5B 仍需单独验证。
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 仍需单独验证。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -192,7 +192,43 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 
 新增 `HotkeyManagerLifetimeTests`（4）、`HotkeyEventTapRunLoopTests`（4）、`MLXNativeLiveRuntimeTests`（7），共 15 项；纳入 `refactor`，静态 XCTest 方法数为 1,656。run-loop 测试创建专用线程和普通 CF source，不安装系统 event tap、不请求权限；runtime 测试使用 fake stream，不加载模型。真实事件监听、权限恢复、睡眠唤醒和模型内存行为仍须人工/模型验收。
 
-阶段 5C 继续处理 AppDelegate 其余会话状态、模型管理器和会议导入/最终化；阶段 6 的剩余大文件与最终回归尚未实施。
+上述内容是 5B 的完成边界。5C 对录音身份、模型加载和会议导入/最终化的后续处理见下一节；阶段 6 的剩余大文件与最终回归尚未实施。
+
+## 阶段 5C：录音身份、模型加载退出和会议导入/最终化
+
+### 录音与结束流程
+
+- `RecordingSessionLifecycle` 统一 session ID、取消、单次输出认领、正在结束及已结束标记；录音/选中翻译/失败复位/应用退出使用明确的 begin/cancel/invalidate 转移，不再分散写五个字段。
+- 取消立即使旧输出无效，但保留取消前 ID 的清理资格；新会话开始后旧结束请求不能再清理新会话。旧 complete-end 回调也不能清掉新 ending ID。
+- `SessionEndFlow` 删除固定顺序上的 protocol + 5 个 stage 包装，按原顺序直接执行隐藏界面、恢复音量、结束音、复位和残余捕获清理；171 → 98 行。
+- 原静态 end-decision helper 在迁移后只剩测试引用，已删除；3 个已有 end-flow 测试改测真正的生命周期转移，保留原断言意图，未为删行而删除测试。
+- 输出认领不再让已取消会话进入交付流程。实际文本注入、历史/词典快照和 UI 状态仍在原组件内；这不是宣称全部 AppDelegate 状态或外部编辑器事务已经解耦。
+
+### 模型加载与关机
+
+- `SharedModelLoadCoordinator<Value>` 归入 `Core/Models/`，去掉 `Any` 模型值和 `as! Value`，只对退出等待句柄做类型擦除。
+- 分开“仍可共享给 waiter 的当前 load”和“取消后尚未退出的 load”。`cancelAll` 保留后者，后续应用关机仍能等待，不再依赖只覆盖特定调用路径的额外 termination 数组。
+- 过期 generation 即使晚到的是错误而非结果，也转为 CancellationError，避免写坏替代 load 的模型状态。
+- ASR / Custom LLM 的深度空闲回收检查改用 outstanding load，旧 cancelled native loader 退出前不再当作空闲。原 `hasPendingModelLoad` 保留当前 waiter 语义。
+- 两个 manager 的重复 shutdown 调用共用完整退出 task，不只等待 active count 后提前返回。加载/下载/active use 全部退出后才释放缓存。`MLXModelManager.swift` 1,967 → 1,843 行。
+- 不强制串行所有模型加载、不修改模型参数/目录，也不把 Swift load task 完成当作底层 Metal quiescence 证明。
+
+### 文件导入与会议最终化
+
+- `MeetingImportedFileAnalyzer` 在等待旧会议 cleanup **之前**就登记任务，关闭无法取消的空窗。cancel 捕获当次 pipeline/task；迟到取消不会命中新导入，调用方取消会传递到实际任务。
+- `MeetingImportedFilePipeline` 独立拥有导入 transcriber、标准化音频路径和 model use，不再复用/修改 live coordinator 的 transcriber / active engine 字段。只有成功结果保留音频；失败或清理中取消会删除临时结果，清理可重复执行。
+- 导入在清理结束前保持 busy；owner 析构也会取消该次任务及 pipeline。文件队列的延迟取消同样复核 task ID 和 cancelling 状态。
+- `MeetingFinalizationContext` 固定停止时的 session ID、capture mode、引擎/模型、时长和 visible snapshot；三次 recovery checkpoint 与最终结果复用同一元数据，移除三份重复构造。
+- finalization task 在 checkpoint 收尾完成前持续占用会议生命周期；重复 stop 返回同一 task，不能在旧任务尚未退出时开始新会议再被旧 task 清引用。
+- `MeetingSessionCoordinator.swift` 1,996 → 1,821 行；文件导入代码移到独立资源所有者，不是仅把 coordinator 的 private 状态改成 internal 后拆 extension。
+
+### 覆盖和未完成项
+
+新增：`SharedModelLoadCoordinatorTests`（6）、`MeetingImportedFileAnalyzerTests`（7）、`RecordingSessionLifecycleTests`（6）、`MeetingFinalizationContextTests`（3），共 22 项；静态 XCTest 方法数 1,678。聚焦组同时补入已有文件队列和 recovery checkpoint 测试。
+
+测试用受控 task barrier / fake pipeline 覆盖取消窗口、并发拒绝、清理中取消、旧任务隔离、checkpoint 元数据和单次结束。真实文件解码、模型/设备生命周期、并发 shutdown 的完整硬件路径仍依赖 Mac 集成验收。
+
+阶段 5 的这组核心边界已实施，不能推导出所有异步路径已逐行审计或全部大类已拆完。剩余 UI/编辑器事务快照、模型下载状态、大文件、孤儿代码/测试去重和性能基准继续列入阶段 6，库内部 native 退出限制保留为明确待验收项。
 
 ## 验证与下一门禁
 
@@ -202,7 +238,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-阶段 5B 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
+阶段 5C 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
@@ -213,4 +249,4 @@ xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macO
 
 人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈；会议远程启动配置；本地 ASR live/final/取消。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
 
-阶段 4 已补充 ASR/会议协议契约，阶段 5A/5B 收敛了上述局部所有者。阶段 5C 继续处理其余生命周期；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。
+阶段 4 已补充 ASR/会议协议契约，阶段 5A–5C 收敛了上述核心所有者。阶段 6 继续整理剩余职责与集成验收；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。

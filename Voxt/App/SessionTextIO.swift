@@ -25,12 +25,11 @@ extension AppDelegate {
         llmDurationSeconds: TimeInterval?,
         onDeliveryCompleted: (() -> Void)? = nil
     ) {
-        if didCommitSessionOutput {
-            VoxtLog.input("Skipping duplicate commit for current session output.")
+        let sessionID = activeRecordingSessionID
+        guard recordingLifecycle.claimOutput(for: sessionID) else {
+            VoxtLog.input("Skipping duplicate or cancelled commit for current session output.")
             return
         }
-        didCommitSessionOutput = true
-        let sessionID = activeRecordingSessionID
         let sessionOutputMode = sessionOutputMode
         let userMainLanguage = userMainLanguage
         let callbackDecision = Self.sessionCallbackHandlingDecision(
@@ -111,13 +110,11 @@ extension AppDelegate {
         didInject: Bool,
         onDeliveryCompleted: (() -> Void)? = nil
     ) {
-        if didCommitSessionOutput {
-            VoxtLog.input("Skipping duplicate finalize for previously delivered session output.")
+        let sessionID = activeRecordingSessionID
+        guard recordingLifecycle.claimOutput(for: sessionID) else {
+            VoxtLog.input("Skipping duplicate or cancelled finalize for previously delivered session output.")
             return
         }
-        didCommitSessionOutput = true
-
-        let sessionID = activeRecordingSessionID
         let callbackDecision = Self.sessionCallbackHandlingDecision(
             requestedSessionID: sessionID,
             activeSessionID: activeRecordingSessionID,

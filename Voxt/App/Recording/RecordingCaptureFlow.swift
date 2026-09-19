@@ -206,12 +206,8 @@ extension AppDelegate {
         }
         discardPendingCompletedHistoryAudio()
         isSessionActive = false
-        isSessionCancellationRequested = false
-        didCommitSessionOutput = false
-        activeRecordingSessionID = UUID()
+        recordingLifecycle.begin()
         invalidateActiveLLMRequest()
-        currentEndingSessionID = nil
-        lastCompletedSessionEndSessionID = nil
         sessionOutputMode = .transcription
         recordingRequestedAt = nil
         recordingStartedAt = nil

@@ -80,8 +80,7 @@ final class MeetingSessionCoordinator {
     private let realtimeTranslationHandler: @MainActor (String, TranslationTargetLanguage) -> MeetingTranslationOperation
     private var isStarting = false
     private var isReconfiguringCaptureMode = false
-    private var isImportAnalyzing = false
-    private var importedFileAnalysisTask: Task<MeetingSessionResult, Error>?
+    private let importedFileAnalyzer = MeetingImportedFileAnalyzer()
     private var pendingCaptureFailureMessage: String?
 
     init(
@@ -105,7 +104,7 @@ final class MeetingSessionCoordinator {
     }
 
     var isActive: Bool {
-        isStarting || overlayState.isPresented || overlayState.isRecording || overlayState.isPaused || activeLocalEngine != nil || isStopping || isImportAnalyzing
+        isStarting || overlayState.isPresented || overlayState.isRecording || overlayState.isPaused || activeLocalEngine != nil || isStopping || stopFinalizationTask != nil || importedFileAnalyzer.isRunning
     }
 
     var isStartingUp: Bool {
@@ -113,7 +112,7 @@ final class MeetingSessionCoordinator {
     }
 
     var isAnalyzingImportedFile: Bool {
-        isImportAnalyzing
+        importedFileAnalyzer.isRunning
     }
 
     func releaseIdleVADResources() async {
@@ -127,169 +126,18 @@ final class MeetingSessionCoordinator {
         at sourceURL: URL,
         progress: @escaping @MainActor @Sendable (MeetingFileAnalysisProgress) -> Void
     ) async throws -> MeetingSessionResult {
-        guard !isActive else {
-            throw MeetingFileAnalysisError.sessionAlreadyActive
-        }
-        isImportAnalyzing = true
-        await cleanupTask?.value
-        do { try Task.checkCancellation() } catch {
-            isImportAnalyzing = false
-            throw error
-        }
-        progress(MeetingFileAnalysisProgress(stage: .preparing))
-
-        let analysisTask = Task(priority: .utility) { @MainActor [weak self] () throws -> MeetingSessionResult in
-            guard let self else { throw CancellationError() }
-            do {
-                let result = try await self.performImportedFileAnalysis(
-                    at: sourceURL,
-                    progress: progress
-                )
-                await self.finishImportedFileAnalysis()
-                return result
-            } catch {
-                await self.finishImportedFileAnalysis()
-                throw error
-            }
-        }
-        importedFileAnalysisTask = analysisTask
-
-        return try await withTaskCancellationHandler {
-            try await analysisTask.value
-        } onCancel: {
-            analysisTask.cancel()
-        }
-    }
-
-    private func performImportedFileAnalysis(
-        at sourceURL: URL,
-        progress: @escaping @MainActor @Sendable (MeetingFileAnalysisProgress) -> Void
-    ) async throws -> MeetingSessionResult {
-        var preparedAudio: MeetingImportedAudioFile?
-        do {
-            let preparationTask = Task.detached(priority: .utility) {
-                try await MeetingImportedAudioFile.prepare(from: sourceURL) { fraction in
-                    await progress(
-                        MeetingFileAnalysisProgress(
-                            stage: .preparing,
-                            stageFraction: fraction
-                        )
-                    )
-                }
-            }
-            let importedAudio = try await withTaskCancellationHandler {
-                try await preparationTask.value
-            } onCancel: {
-                preparationTask.cancel()
-            }
-            preparedAudio = importedAudio
-            try Task.checkCancellation()
-
-            progress(
-                MeetingFileAnalysisProgress(
-                    stage: .preparing,
-                    stageFraction: 1,
-                    mediaDurationSeconds: importedAudio.durationSeconds
-                )
-            )
-
-            let engineContext = resolvedEngineContext()
-            activeEngineContext = engineContext
-            progress(MeetingFileAnalysisProgress(stage: .transcribing))
-            let importedTranscriber = try await makeTranscriber(
-                for: engineContext,
-                strictInferenceWorkClass: .fileASR
-            )
-            transcriber = importedTranscriber
-            try Task.checkCancellation()
-
-            let transcriptSegments = try await MeetingFinalTranscriptionPass.transcribe(
-                descriptors: importedAudio.assetDescriptors,
-                loadAsset: { descriptor in
-                    importedAudio.loadAsset(descriptor)
-                },
-                transcriber: importedTranscriber,
-                requiresCompleteTranscription: true,
-                processedDurationProgress: { fraction, processedDuration in
-                    await progress(
-                        MeetingFileAnalysisProgress(
-                            stage: .transcribing,
-                            stageFraction: fraction,
-                            mediaDurationSeconds: importedAudio.durationSeconds,
-                            processedMediaDurationSeconds: processedDuration
-                        )
-                    )
-                }
-            )
-            try Task.checkCancellation()
-            guard !MeetingTranscriptFormatter.meaningfulSegments(for: transcriptSegments).isEmpty else {
-                throw MeetingFileAnalysisError.noTranscript
-            }
-
-            progress(MeetingFileAnalysisProgress(stage: .identifyingSpeakers))
-            let finalSegments: [MeetingTranscriptSegment]
-            do {
-                finalSegments = try await MeetingLocalInferenceCoordinator.shared.withPermit(.speakerAnalysis) {
-                    await MeetingSpeakerAnalysisPipeline.analyzedSegments(
-                        from: transcriptSegments,
-                        descriptors: importedAudio.assetDescriptors,
-                        loadAsset: { descriptor in
-                            importedAudio.loadAsset(descriptor)
-                        },
-                        continuousAudioURL: importedAudio.standardizedAudioURL,
-                        options: MeetingSpeakerDiarizationOptions.fromPreferences(),
-                        progress: { fraction in
-                            await progress(
-                                MeetingFileAnalysisProgress(
-                                    stage: .identifyingSpeakers,
-                                    stageFraction: fraction
-                                )
-                            )
-                        }
-                    )
-                }
-            } catch {
-                VoxtLog.meetingWarning(
-                    "Imported meeting speaker analysis skipped by device safety policy: \(error.localizedDescription)"
-                )
-                finalSegments = MeetingTranscriptPostProcessor.process(transcriptSegments)
-            }
-            try Task.checkCancellation()
-
-            progress(MeetingFileAnalysisProgress(stage: .saving))
-            let result = MeetingSessionResult(
-                captureMode: .meeting,
-                transcriptionEngine: engineContext.engine,
-                transcriptionModelDescription: engineContext.historyModelDescription,
-                segments: finalSegments,
-                visibleSnapshotSegments: finalSegments,
-                audioDurationSeconds: importedAudio.durationSeconds,
-                archivedAudioURL: importedAudio.standardizedAudioURL
-            )
-            return result
-        } catch {
-            if let preparedAudio {
-                try? FileManager.default.removeItem(at: preparedAudio.standardizedAudioURL)
-            }
-            throw error
-        }
+        guard !isActive else { throw MeetingFileAnalysisError.sessionAlreadyActive }
+        let pipeline = MeetingImportedFilePipeline(
+            modelManager: mlxModelManager,
+            engineContext: resolvedEngineContext()
+        )
+        return try await importedFileAnalyzer.analyze(
+            at: sourceURL, after: cleanupTask, using: pipeline, progress: progress
+        )
     }
 
     func cancelImportedFileAnalysis() async {
-        guard isImportAnalyzing, let analysisTask = importedFileAnalysisTask else { return }
-        analysisTask.cancel()
-        await transcriber?.cancelPendingWork()
-        _ = await analysisTask.result
-    }
-
-    private func finishImportedFileAnalysis() async {
-        await transcriber?.cancelPendingWork()
-        transcriber = nil
-        liveSessionFactory = nil
-        activeEngineContext = nil
-        releaseActiveLocalEngine()
-        isImportAnalyzing = false
-        importedFileAnalysisTask = nil
+        await importedFileAnalyzer.cancel()?.value
     }
 
     func prepareForStart() {
@@ -341,7 +189,7 @@ final class MeetingSessionCoordinator {
                 "Meeting start configuration. source=\(engineContext.historyModelDescription), mode=\(String(describing: engineContext.resolvedMode))",
                 verbose: true
             )
-            let transcriber = try await makeTranscriber(for: engineContext)
+            let transcriber = try makeTranscriber(for: engineContext)
             guard revision == sessionRevision else { return nil }
             try Task.checkCancellation()
             self.transcriber = transcriber
@@ -413,15 +261,9 @@ final class MeetingSessionCoordinator {
 
     @discardableResult
     func stop(shouldFlushPendingAudio: Bool = true) -> Task<Void, Never>? {
-        if isImportAnalyzing {
-            return Task { @MainActor [weak self] in
-                await self?.cancelImportedFileAnalysis()
-            }
-        }
+        if importedFileAnalyzer.isRunning { return importedFileAnalyzer.cancel() }
+        if let stopFinalizationTask { return stopFinalizationTask }
         guard isActive else { return nil }
-        if isStopping {
-            return stopFinalizationTask
-        }
         isStopping = true
         let visibleSnapshotSegments = finalizedSegments(from: overlayState.segments)
         overlayState.isRecording = false
@@ -433,7 +275,16 @@ final class MeetingSessionCoordinator {
         finalizeCurrentRecordingSlice()
         stopCaptures()
         Task { await MeetingLocalInferenceCoordinator.shared.setRecordingActive(false) }
-        let finalizationSessionID = UUID()
+        let engineContext = activeEngineContext ?? resolvedEngineContext()
+        let context = MeetingFinalizationContext(
+            sessionID: UUID(),
+            captureMode: overlayState.captureMode,
+            engine: engineContext.engine,
+            modelDescription: engineContext.historyModelDescription,
+            mlxModelRepo: engineContext.mlxModelRepo ?? mlxModelManager.currentModelRepo,
+            duration: max(accumulatedRecordingDuration, 0),
+            visibleSegments: visibleSnapshotSegments
+        )
 
         let finalizationTask = Task { [weak self] in
             guard let self else { return }
@@ -450,33 +301,26 @@ final class MeetingSessionCoordinator {
                 self.clearPendingTranslationState()
             }
 
-            let duration = max(self.accumulatedRecordingDuration, 0)
-            let captureMode = await MainActor.run { self.overlayState.captureMode }
+            let duration = context.duration
+            let captureMode = context.captureMode
             let archivedAudioURL = shouldFlushPendingAudio ? (try? await self.persistMeetingAudioArchive()) : nil
             let finalSegmentsBeforeSpeakerAnalysis = await MainActor.run {
                 self.finalizedSegments(from: self.overlayState.segments)
             }
             if shouldFlushPendingAudio {
                 await MeetingFinalizationCheckpointStore.shared.save(
-                    MeetingFinalizationCheckpoint(
-                        sessionID: finalizationSessionID,
-                        updatedAt: Date(),
+                    context.checkpoint(
                         stage: .captured,
-                        captureMode: captureMode,
-                        transcriptionEngineRawValue: (self.activeEngineContext?.engine ?? self.resolvedTranscriptionEngine()).rawValue,
-                        transcriptionModelDescription: self.activeEngineContext?.historyModelDescription ?? self.fallbackHistoryModelDescription(),
                         segments: finalSegmentsBeforeSpeakerAnalysis,
-                        visibleSnapshotSegments: visibleSnapshotSegments,
-                        audioDurationSeconds: duration,
-                        archivedAudioPath: archivedAudioURL?.path
+                        archivedAudioURL: archivedAudioURL
                     )
                 )
             }
             let finalTranscriptionDescriptors = shouldFlushPendingAudio ? await self.audioArchive.finalTranscriptionAssetDescriptors() : []
             let speakerAnalysisDescriptors = shouldFlushPendingAudio ? await self.audioArchive.analysisAssetDescriptors(for: captureMode) : []
             let finalVADPolicy = MeetingFinalSpeechValidator.vadPolicy(
-                transcriptionEngine: self.activeEngineContext?.engine ?? self.resolvedTranscriptionEngine(),
-                mlxModelRepo: self.activeEngineContext?.mlxModelRepo ?? self.mlxModelManager.currentModelRepo
+                transcriptionEngine: context.engine,
+                mlxModelRepo: context.mlxModelRepo
             )
             let finalTranscriptSegments = await self.optimizedFinalTranscriptSegments(
                 fallbackSegments: finalSegmentsBeforeSpeakerAnalysis,
@@ -496,17 +340,10 @@ final class MeetingSessionCoordinator {
             )
             if shouldFlushPendingAudio {
                 await MeetingFinalizationCheckpointStore.shared.save(
-                    MeetingFinalizationCheckpoint(
-                        sessionID: finalizationSessionID,
-                        updatedAt: Date(),
+                    context.checkpoint(
                         stage: .finalTranscript,
-                        captureMode: captureMode,
-                        transcriptionEngineRawValue: (self.activeEngineContext?.engine ?? self.resolvedTranscriptionEngine()).rawValue,
-                        transcriptionModelDescription: self.activeEngineContext?.historyModelDescription ?? self.fallbackHistoryModelDescription(),
                         segments: speechValidatedFinalTranscriptSegments,
-                        visibleSnapshotSegments: visibleSnapshotSegments,
-                        audioDurationSeconds: duration,
-                        archivedAudioPath: archivedAudioURL?.path
+                        archivedAudioURL: archivedAudioURL
                     )
                 )
             }
@@ -547,25 +384,18 @@ final class MeetingSessionCoordinator {
             }
             if shouldFlushPendingAudio {
                 await MeetingFinalizationCheckpointStore.shared.save(
-                    MeetingFinalizationCheckpoint(
-                        sessionID: finalizationSessionID,
-                        updatedAt: Date(),
+                    context.checkpoint(
                         stage: .speakerAnalysis,
-                        captureMode: captureMode,
-                        transcriptionEngineRawValue: (self.activeEngineContext?.engine ?? self.resolvedTranscriptionEngine()).rawValue,
-                        transcriptionModelDescription: self.activeEngineContext?.historyModelDescription ?? self.fallbackHistoryModelDescription(),
                         segments: sortedFinalSegments,
-                        visibleSnapshotSegments: visibleSnapshotSegments,
-                        audioDurationSeconds: duration,
-                        archivedAudioPath: archivedAudioURL?.path
+                        archivedAudioURL: archivedAudioURL
                     )
                 )
             }
             let result = MeetingSessionResult(
-                recoverySessionID: shouldFlushPendingAudio ? finalizationSessionID : nil,
+                recoverySessionID: shouldFlushPendingAudio ? context.sessionID : nil,
                 captureMode: captureMode,
-                transcriptionEngine: self.activeEngineContext?.engine ?? self.resolvedTranscriptionEngine(),
-                transcriptionModelDescription: self.activeEngineContext?.historyModelDescription ?? self.fallbackHistoryModelDescription(),
+                transcriptionEngine: context.engine,
+                transcriptionModelDescription: context.modelDescription,
                 segments: sortedFinalSegments,
                 visibleSnapshotSegments: speechValidatedVisibleSnapshotSegments.sorted { lhs, rhs in
                     if lhs.startSeconds == rhs.startSeconds {
@@ -623,7 +453,7 @@ final class MeetingSessionCoordinator {
             self.overlayState.reset()
             let didSafelyHandleResult = self.onSessionFinished?(result) ?? false
             if shouldFlushPendingAudio, didSafelyHandleResult {
-                await MeetingFinalizationCheckpointStore.shared.clear(sessionID: finalizationSessionID)
+                await MeetingFinalizationCheckpointStore.shared.clear(sessionID: context.sessionID)
             }
             self.stopFinalizationTask = nil
         }
@@ -1725,9 +1555,8 @@ final class MeetingSessionCoordinator {
     }
 
     private func makeTranscriber(
-        for context: MeetingASREngineContext,
-        strictInferenceWorkClass: MeetingLocalInferenceWorkClass = .finalASR
-    ) async throws -> any MeetingSegmentTranscribing {
+        for context: MeetingASREngineContext
+    ) throws -> any MeetingSegmentTranscribing {
         liveSessionFactory = nil
         switch context.engine {
         case .mlxAudio:
@@ -1738,7 +1567,7 @@ final class MeetingSessionCoordinator {
             }
             return MeetingMLXSegmentTranscriber(
                 modelManager: mlxModelManager,
-                strictInferenceWorkClass: strictInferenceWorkClass
+                strictInferenceWorkClass: .finalASR
             )
         case .remote:
             if context.resolvedMode.usesLiveSessions {
@@ -1841,10 +1670,6 @@ final class MeetingSessionCoordinator {
             break
         }
         self.activeLocalEngine = nil
-    }
-
-    private func fallbackHistoryModelDescription() -> String {
-        resolvedEngineContext().historyModelDescription
     }
 
     private func resolvedMeetingMainLanguage() -> UserMainLanguageOption {

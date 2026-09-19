@@ -77,6 +77,8 @@ These suites and existing ASR/meeting support tests are included in the `refacto
 
 Stage 5B adds `HotkeyManagerLifetimeTests` (4), `HotkeyEventTapRunLoopTests` (4) and `MLXNativeLiveRuntimeTests` (7): stale queued actions, independent thread retirement, stream replacement/reentrant cleanup and model-use release. These 15 cases are in `refactor`. They exercise Voxt-owned tasks and CF sources, not real system taps or internal model workers.
 
+Stage 5C adds `SharedModelLoadCoordinatorTests` (6), `MeetingImportedFileAnalyzerTests` (7), `RecordingSessionLifecycleTests` (6), and `MeetingFinalizationContextTests` (3): 22 cases for retained cancelled loads, import cancellation/cleanup windows, stale session output/end and stable checkpoint metadata. Three existing `SessionEndFlowTests` now exercise the real lifecycle transitions instead of a test-only static helper. The focused group includes the existing file queue and checkpoint persistence suites as well.
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.

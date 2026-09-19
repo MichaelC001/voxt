@@ -43,41 +43,22 @@ final class SessionEndFlowTests: XCTestCase {
     }
 
     func testSessionEndExecutionDecisionAllowsFreshSession() {
-        let sessionID = UUID()
-
-        XCTAssertEqual(
-            AppDelegate.sessionEndExecutionDecision(
-                requestedSessionID: sessionID,
-                currentEndingSessionID: nil,
-                lastCompletedSessionEndSessionID: nil
-            ),
-            .execute
-        )
+        var lifecycle = RecordingSessionLifecycle()
+        XCTAssertEqual(lifecycle.beginEnding(lifecycle.id), .execute)
     }
 
     func testSessionEndExecutionDecisionRejectsDuplicateInFlightSession() {
-        let sessionID = UUID()
-
-        XCTAssertEqual(
-            AppDelegate.sessionEndExecutionDecision(
-                requestedSessionID: sessionID,
-                currentEndingSessionID: sessionID,
-                lastCompletedSessionEndSessionID: nil
-            ),
-            .skipDuplicateInFlight
-        )
+        var lifecycle = RecordingSessionLifecycle()
+        let sessionID = lifecycle.id
+        XCTAssertEqual(lifecycle.beginEnding(sessionID), .execute)
+        XCTAssertEqual(lifecycle.beginEnding(sessionID), .skipDuplicateInFlight)
     }
 
     func testSessionEndExecutionDecisionRejectsAlreadyCompletedSession() {
-        let sessionID = UUID()
-
-        XCTAssertEqual(
-            AppDelegate.sessionEndExecutionDecision(
-                requestedSessionID: sessionID,
-                currentEndingSessionID: nil,
-                lastCompletedSessionEndSessionID: sessionID
-            ),
-            .skipAlreadyCompleted
-        )
+        var lifecycle = RecordingSessionLifecycle()
+        let sessionID = lifecycle.id
+        XCTAssertEqual(lifecycle.beginEnding(sessionID), .execute)
+        lifecycle.completeEnding(sessionID)
+        XCTAssertEqual(lifecycle.beginEnding(sessionID), .skipAlreadyCompleted)
     }
 }

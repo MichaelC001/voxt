@@ -184,8 +184,8 @@ extension AppDelegate {
             hasActiveLLMInference: customLLMManager.hasActiveInference,
             isTranscriberRecording: mlxTranscriber?.isRecording == true,
             isTranscriberFinalizing: mlxTranscriber?.isFinalizingTranscription == true,
-            hasPendingASRLoad: mlxModelManager.hasPendingModelLoad,
-            hasPendingLLMLoad: customLLMManager.hasPendingModelLoad
+            hasPendingASRLoad: mlxModelManager.hasOutstandingModelLoad,
+            hasPendingLLMLoad: customLLMManager.hasOutstandingModelLoad
         )
     }
 

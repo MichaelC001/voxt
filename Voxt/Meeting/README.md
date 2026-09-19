@@ -14,6 +14,8 @@ Meeting-mode runtime for live capture, transcription, diarization, translation, 
 
 `MeetingSessionCoordinator` owns a cleanup barrier: old transcriber/session handles are captured before suspension, audio work and schedulers finish before archive/VAD reset and model-use release, and a new recording or import waits for that cleanup. Capture epochs invalidate old source callbacks immediately. Full device/start/stop acceptance remains required.
 
+Imports have a separate task owner and per-operation resource pipeline under `Processing/`. They no longer use the live coordinator's transcriber/model-use fields. Live finalization uses immutable checkpoint metadata and retains its stop-task barrier through result handling and checkpoint cleanup.
+
 ## Remote live sessions
 
 `MeetingRemoteProviderLiveSession.swift` now contains the factory only. Base, Doubao, Aliyun Fun and Aliyun Qwen implementations have dedicated files. `BaseMeetingRemoteLiveSession` owns buffering, drain, deadline and exactly-once terminal cleanup; provider classes retain their wire-specific send/receive behavior.

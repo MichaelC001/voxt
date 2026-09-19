@@ -270,11 +270,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var sessionOutputMode: SessionOutputMode = .transcription
     var isSelectedTextTranslationFlow = false
     var answerOverlayInjectionMode: AnswerOverlayInjectionMode = .standard
-    var didCommitSessionOutput = false
-    var activeRecordingSessionID = UUID()
-    var currentEndingSessionID: UUID?
-    var lastCompletedSessionEndSessionID: UUID?
-    var isSessionCancellationRequested = false
+    var recordingLifecycle = RecordingSessionLifecycle()
+    var didCommitSessionOutput: Bool { recordingLifecycle.hasCommittedOutput }
+    var activeRecordingSessionID: UUID { recordingLifecycle.id }
+    var currentEndingSessionID: UUID? { recordingLifecycle.endingID }
+    var isSessionCancellationRequested: Bool { recordingLifecycle.isCancelled }
     var browserAutomationDeniedUntilByBundleID: [String: Date] = [:]
     var pendingCompletedHistoryAudioArchiveURL: URL?
     var latestInjectableOutputText: String?
@@ -789,8 +789,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let pendingMeetingStartup = pendingMeetingStartupTask
         pendingTranscriptionStart?.cancel()
         pendingMeetingStartup?.cancel()
-        isSessionCancellationRequested = true
-        activeRecordingSessionID = UUID()
+        recordingLifecycle.cancel()
 
         let tasksToCancel = applicationTasksForTermination()
         for task in tasksToCancel {

@@ -183,6 +183,7 @@ class CustomLLMModelManager: ObservableObject {
     private var activeInferenceCount = 0
     private var activeInferenceWaiters: [CheckedContinuation<Void, Never>] = []
     private var isShuttingDownForApplicationTermination = false
+    private var shutdownTask: Task<Void, Never>?
     var onModelUnloaded: (() -> Void)?
     private var resolvedIdleUnloadDelay: Duration {
         .seconds(AppPreferenceKey.resolvedLocalModelIdleUnloadDelaySeconds())
@@ -224,6 +225,7 @@ class CustomLLMModelManager: ObservableObject {
     var currentModelRepo: String { modelRepo }
     var hasLoadedInferenceModel: Bool { inferenceContainer != nil }
     var hasPendingModelLoad: Bool { inferenceLoadCoordinator.hasPendingLoad }
+    var hasOutstandingModelLoad: Bool { inferenceLoadCoordinator.hasOutstandingLoad }
     var hasActiveInference: Bool { activeInferenceCount > 0 }
 
     func refreshMemoryOptimizationPolicy() {
@@ -1903,11 +1905,14 @@ class CustomLLMModelManager: ObservableObject {
     }
 
     func shutdownForApplicationTermination() async {
-        guard !isShuttingDownForApplicationTermination else {
-            await waitForActiveInferencesToFinish()
-            return
-        }
+        if let shutdownTask { await shutdownTask.value; return }
         isShuttingDownForApplicationTermination = true
+        let task = Task { @MainActor [self] in await performApplicationTerminationShutdown() }
+        shutdownTask = task
+        await task.value
+    }
+
+    private func performApplicationTerminationShutdown() async {
         installationCache.invalidateAll()
 
         let downloadTasks = Array(downloadTasksByRepo.values)
