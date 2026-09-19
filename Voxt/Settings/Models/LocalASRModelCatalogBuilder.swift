@@ -40,7 +40,6 @@ extension ModelCatalogBuilder {
             let repo = MLXModelManager.canonicalModelRepo(model.id)
             let selectionID = FeatureModelSelectionID.mlx(repo)
             let installSnapshot = mlxInstallSnapshot(repo)
-            let isAvailable = MLXModelManager.isAvailableModelRepo(repo)
             let decoration = catalogDecoration(
                 base: [localizedModelCatalog("Local")] + mlxCatalogTags(for: repo),
                 installed: installSnapshot.isInstalled,
@@ -63,27 +62,8 @@ extension ModelCatalogBuilder {
                 usageLocations: decoration.usageLocations,
                 badgeText: installSnapshot.badgeText ?? ModelCatalogBadgeSupport.recommendedBadgeText(forMLXRepo: repo),
                 primaryAction: catalogPrimaryAction(installSnapshot),
-                secondaryActions: localASRSecondaryActions(
-                    for: installSnapshot,
-                    isAvailable: isAvailable
-                )
+                secondaryActions: catalogSecondaryActions(installSnapshot)
             )
-        }
-    }
-
-    private func localASRSecondaryActions(
-        for snapshot: LocalModelInstallSnapshot,
-        isAvailable: Bool
-    ) -> [ModelTableAction] {
-        if isAvailable {
-            return catalogSecondaryActions(snapshot)
-        }
-
-        switch snapshot.state {
-        case .downloading, .paused:
-            return catalogSecondaryActions(snapshot)
-        case .installable, .cancelling, .installed, .uninstalling:
-            return []
         }
     }
 

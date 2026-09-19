@@ -395,28 +395,28 @@ final class MLXModelManagerTests: XCTestCase {
         )
         XCTAssertEqual(
             MLXModelManager.canonicalModelRepo("mlx-community/GLM-ASR-Nano-4bit"),
-            "mlx-community/GLM-ASR-Nano-2512-4bit"
+            MLXModelCatalog.defaultModelRepo
         )
         XCTAssertEqual(
             MLXModelManager.canonicalModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602"),
-            "mlx-community/Voxtral-Mini-4B-Realtime-2602-fp16"
+            MLXModelCatalog.defaultModelRepo
         )
         XCTAssertEqual(
             MLXModelManager.canonicalModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602-6bit"),
-            "mlx-community/Voxtral-Mini-4B-Realtime-6bit"
+            MLXModelCatalog.defaultModelRepo
         )
         XCTAssertEqual(
             MLXModelManager.canonicalModelRepo("mlx-community/FireRedASR2"),
-            "mlx-community/FireRedASR2-AED-mlx"
+            MLXModelCatalog.defaultModelRepo
         )
     }
 
-    func testRealtimeCapableModelRepoTreatsAllVoxtralQuantizationsAsRealtime() {
-        XCTAssertTrue(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602"))
-        XCTAssertTrue(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit"))
-        XCTAssertTrue(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602-6bit"))
-        XCTAssertTrue(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-6bit"))
-        XCTAssertTrue(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602-fp16"))
+    func testRetiredVoxtralUsesDefaultCapabilities() {
+        XCTAssertFalse(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602"))
+        XCTAssertFalse(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit"))
+        XCTAssertFalse(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602-6bit"))
+        XCTAssertFalse(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-6bit"))
+        XCTAssertFalse(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602-fp16"))
         XCTAssertTrue(MLXModelManager.isRealtimeCapableModelRepo("beshkenadze/cohere-transcribe-03-2026-mlx-fp16"))
         XCTAssertTrue(MLXModelManager.isRealtimeCapableModelRepo("OpenMOSS-Team/MOSS-Transcribe-Diarize"))
         XCTAssertTrue(MLXModelManager.isRealtimeCapableModelRepo("mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit"))
@@ -442,18 +442,10 @@ final class MLXModelManagerTests: XCTestCase {
         )
         XCTAssertEqual(
             MLXModelManager.liveMode(for: "mlx-community/Voxtral-Mini-4B-Realtime-6bit"),
-            .nativeVoxtralLive
+            .nativeQwenLive
         )
     }
 
-    func testTranscriptionBehaviorUsesFinalizationOnlyModeForFireRed() {
-        let behavior = MLXModelManager.transcriptionBehavior(for: "mlx-community/FireRedASR2")
-
-        XCTAssertEqual(behavior.correctionMode, .finalizationOnly)
-        XCTAssertFalse(behavior.runsIntermediateCorrections)
-        XCTAssertFalse(behavior.allowsQuickStopPass)
-        XCTAssertTrue(behavior.preloadsOnRecordingStart)
-    }
 
     func testTranscriptionBehaviorUsesIncrementalModeForDefaultModels() {
         let behavior = MLXModelManager.transcriptionBehavior(for: "mlx-community/Qwen3-ASR-0.6B-4bit")
@@ -464,20 +456,6 @@ final class MLXModelManagerTests: XCTestCase {
         XCTAssertTrue(behavior.preloadsOnRecordingStart)
     }
 
-    func testIntermediateCorrectionDecisionSkipsFinalizationOnlyBehavior() {
-        let behavior = MLXModelManager.transcriptionBehavior(for: "mlx-community/FireRedASR2")
-
-        XCTAssertNil(
-            MLXTranscriptionPlanning.intermediateCorrectionDecision(
-                sampleCount: 16000 * 8,
-                sampleRate: 16000,
-                nextCorrectionAtSeconds: 6,
-                behavior: behavior,
-                firstCorrectionMinimumSeconds: 3.5,
-                contextWindowSeconds: 18
-            )
-        )
-    }
 
     func testIntermediateCorrectionDecisionReturnsContextWindowForIncrementalBehavior() {
         let behavior = MLXModelManager.transcriptionBehavior(for: "mlx-community/Qwen3-ASR-0.6B-4bit")
@@ -496,20 +474,6 @@ final class MLXModelManagerTests: XCTestCase {
         XCTAssertEqual(decision?.contextSampleCount, 16000 * 18)
     }
 
-    func testFinalizationPlanDisablesQuickPassForFireRed() {
-        let behavior = MLXModelManager.transcriptionBehavior(for: "mlx-community/FireRedASR2")
-        let plan = MLXTranscriptionPlanning.finalizationPlan(
-            sampleCount: 16000 * 30,
-            sampleRate: 16000,
-            behavior: behavior,
-            quickPassMinimumDurationSeconds: 14,
-            quickPassContextWindowSeconds: 30
-        )
-
-        XCTAssertEqual(plan.durationSeconds, 30, accuracy: 0.0001)
-        XCTAssertFalse(plan.shouldRunQuickPass)
-        XCTAssertNil(plan.quickPassSampleCount)
-    }
 
     func testFinalizationPlanUsesQuickPassForLongIncrementalAudio() {
         let behavior = MLXModelManager.transcriptionBehavior(for: "mlx-community/Qwen3-ASR-0.6B-4bit")
@@ -547,34 +511,14 @@ final class MLXModelManagerTests: XCTestCase {
         XCTAssertFalse(modelIDs.contains("mlx-community/granite-4.0-1b-speech-5bit"))
     }
 
-    func testSupportedModelsKeepHiddenASRCompatibilityRepos() {
-        let modelIDs = Set(MLXModelManager.supportedModels.map(\.id))
 
-        XCTAssertTrue(modelIDs.contains("mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit"))
-        XCTAssertTrue(modelIDs.contains("mlx-community/Voxtral-Mini-4B-Realtime-6bit"))
-        XCTAssertTrue(modelIDs.contains("mlx-community/Voxtral-Mini-4B-Realtime-2602-fp16"))
-        XCTAssertTrue(modelIDs.contains("Mediform/canary-1b-v2-mlx-q8"))
-        XCTAssertTrue(modelIDs.contains("mlx-community/parakeet-tdt-0.6b-v2"))
-        XCTAssertTrue(modelIDs.contains("mlx-community/FireRedASR2-AED-mlx"))
-        XCTAssertTrue(modelIDs.contains("mlx-community/granite-4.0-1b-speech-5bit"))
-        XCTAssertTrue(modelIDs.contains("mlx-community/GLM-ASR-Nano-2512-4bit"))
-        XCTAssertTrue(modelIDs.contains("mlx-community/Qwen3-ASR-0.6B-bf16"))
-        XCTAssertTrue(modelIDs.contains("UsefulSensors/moonshine-tiny"))
-        XCTAssertTrue(modelIDs.contains("facebook/wav2vec2-base-960h"))
-        XCTAssertTrue(modelIDs.contains("facebook/mms-1b-fl102"))
-        XCTAssertEqual(
-            MLXModelCatalog.displayTitle(for: "Mediform/canary-1b-v2-mlx-q8"),
-            "Canary"
-        )
-    }
-
-    func testHiddenASRModelsDisplayWhenIncludedByLocalState() {
+    func testRetiredASRModelsDoNotReappearWhenInstalled() {
         let hiddenRepo = "mlx-community/GLM-ASR-Nano-2512-4bit"
 
         XCTAssertFalse(
             MLXModelCatalog.displayModels(includingInstalled: []).contains { $0.id == hiddenRepo }
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             MLXModelCatalog.displayModels(includingInstalled: [hiddenRepo]).contains { $0.id == hiddenRepo }
         )
     }
@@ -673,9 +617,6 @@ final class MLXModelManagerTests: XCTestCase {
     }
 
 
-
-
-
     func testCustomLLMGenerationSettingsDefaultToThinkingOff() {
         XCTAssertEqual(CustomLLMGenerationSettingsStore.defaultSettings.thinking.mode, .off)
         XCTAssertEqual(CustomLLMGenerationSettingsStore.resolvedSettings(from: nil).thinking.mode, .off)
@@ -757,9 +698,6 @@ final class MLXModelManagerTests: XCTestCase {
         XCTAssertEqual(restored.extraBodyJSON, "")
         XCTAssertEqual(restored.extraOptionsJSON, "")
     }
-
-
-
 
 
     func testCustomLLMGenerationSettingsStoreCanonicalizesRepoKeys() {
@@ -909,7 +847,6 @@ final class MLXModelManagerTests: XCTestCase {
     }
 
 
-
     func testCustomLLMCompiledPlanPreservesOutputTokenBudgetHint() {
         let attachment = LLMInputAttachment.image(
             LLMImageAttachment(
@@ -989,6 +926,50 @@ final class MLXModelManagerTests: XCTestCase {
         XCTAssertEqual(CustomLLMOutputSanitizer.normalizeResultText("<think>\n\n</think>\n\nHello"), "Hello")
     }
 
+    func testAuxiliarySileroArtifactIsManagedWithoutBecomingAnASRModel() async throws {
+        try await withIsolatedModelStorageRoot { root in
+            let repo = SileroVADModelSupport.repo
+            try seedValidMLXModelDirectory(repo: repo, root: root)
+            let manager = MLXModelManager(modelRepo: repo)
+            XCTAssertTrue(MLXModelManager.isManagedArtifactRepo(repo))
+            XCTAssertFalse(MLXModelCatalog.availableModels.contains { $0.id == repo })
+            let snapshot = try await manager.refreshInstallation(repo: repo)
+            XCTAssertTrue(snapshot.isInstalled)
+            let directory = try await manager.ensureModelDirectory(repo: repo)
+            XCTAssertEqual(directory, snapshot.directory)
+        }
+    }
+
+    func testModelSwitchPreservesOutstandingActiveUseLease() async {
+        await withIsolatedModelStorageRoot { _ in
+            let manager = MLXModelManager(modelRepo: MLXModelManager.defaultModelRepo)
+            manager.beginActiveUse()
+            manager.updateModel(repo: "mlx-community/parakeet-tdt-0.6b-v3")
+            XCTAssertTrue(manager.hasActiveUse)
+            manager.endActiveUse()
+            XCTAssertFalse(manager.hasActiveUse)
+        }
+    }
+
+    func testStorageRootChangeRejectsOldModelLoad() async throws {
+        try await withIsolatedModelStorageRoot { root in
+            let loader = ControlledMLXModelLoader()
+            let manager = MLXModelManager(modelRepo: MLXModelManager.defaultModelRepo, modelLoadingOverride: { _ in
+                await loader.load()
+            })
+            let loading = Task { try await manager.loadModel() }
+            await loader.waitUntilStarted()
+            ModelStorageDirectoryManager.setAuthorizedRootURLForTesting(root.appendingPathComponent("new-root"))
+            manager.refreshStorageRoot()
+            await loader.finish()
+            do {
+                _ = try await loading.value
+                XCTFail("Old-root model must not become the new-root cache")
+            } catch is CancellationError {} catch { XCTFail("Unexpected error: \(error)") }
+            XCTAssertFalse(manager.hasLoadedModel)
+        }
+    }
+
     func testStateForUnknownRepoDefaultsToNotDownloaded() async {
         await withIsolatedModelStorageRoot { _ in
             let manager = MLXModelManager(modelRepo: MLXModelManager.defaultModelRepo)
@@ -1007,6 +988,7 @@ final class MLXModelManagerTests: XCTestCase {
             try seedValidMLXModelDirectory(repo: otherRepo, root: root)
 
             let manager = MLXModelManager(modelRepo: MLXModelManager.defaultModelRepo)
+            _ = try await manager.refreshInstallation(repo: otherRepo)
             XCTAssertEqual(manager.state(for: otherRepo), .downloaded)
             XCTAssertFalse(manager.isDownloading(repo: otherRepo))
         }
@@ -1034,7 +1016,7 @@ final class MLXModelManagerTests: XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: staleDir.path))
 
             let manager = MLXModelManager(modelRepo: MLXModelManager.defaultModelRepo)
-            manager.cancelDownload(repo: staleRepo)
+            await manager.cancelDownloadAndWait(repo: staleRepo)
 
             XCTAssertFalse(FileManager.default.fileExists(atPath: staleDir.path))
         }
@@ -1053,12 +1035,14 @@ final class MLXModelManagerTests: XCTestCase {
             try seedValidMLXModelDirectory(repo: otherRepo, root: root)
 
             let manager = MLXModelManager(modelRepo: otherRepo)
+            _ = try await manager.refreshInstallation(repo: otherRepo)
             XCTAssertEqual(manager.state(for: otherRepo), .downloaded)
 
             manager.updateModel(repo: MLXModelManager.defaultModelRepo)
+            _ = try await manager.refreshInstallation(repo: otherRepo)
             XCTAssertEqual(manager.state(for: otherRepo), .downloaded)
 
-            manager.deleteModel(repo: otherRepo)
+            await manager.deleteModel(repo: otherRepo)
 
             XCTAssertEqual(manager.state(for: otherRepo), .notDownloaded)
             XCTAssertNil(manager.pausedStatusMessage(for: otherRepo))
@@ -1077,7 +1061,7 @@ final class MLXModelManagerTests: XCTestCase {
             defer { try? FileManager.default.removeItem(at: sourceDirectory.deletingLastPathComponent()) }
 
             let manager = MLXModelManager(modelRepo: repo)
-            let loadDirectory = try manager.writableLoadDirectoryIfNeeded(
+            let loadDirectory = try await manager.writableLoadDirectoryIfNeeded(
                 for: repo,
                 sourceDirectory: sourceDirectory,
                 lowercasedRepo: repo.lowercased()
@@ -1112,7 +1096,7 @@ final class MLXModelManagerTests: XCTestCase {
             try Data("partial".utf8).write(to: partialDirectory.appendingPathComponent("download.state"))
 
             let manager = MLXModelManager(modelRepo: repo)
-            _ = try manager.writableLoadDirectoryIfNeeded(
+            _ = try await manager.writableLoadDirectoryIfNeeded(
                 for: repo,
                 sourceDirectory: sourceDirectory,
                 lowercasedRepo: repo.lowercased()
@@ -1133,14 +1117,14 @@ final class MLXModelManagerTests: XCTestCase {
             try? FileManager.default.removeItem(at: sourceDirectory.appendingPathComponent("tokenizer.json"))
 
             let manager = MLXModelManager(modelRepo: repo)
-            let loadDirectory = try manager.writableLoadDirectoryIfNeeded(
+            let loadDirectory = try await manager.writableLoadDirectoryIfNeeded(
                 for: repo,
                 sourceDirectory: sourceDirectory,
                 lowercasedRepo: repo.lowercased()
             )
             XCTAssertTrue(FileManager.default.fileExists(atPath: loadDirectory.path))
 
-            manager.deleteModel(repo: repo)
+            await manager.deleteModel(repo: repo)
 
             XCTAssertFalse(FileManager.default.fileExists(atPath: sourceDirectory.path))
             XCTAssertFalse(FileManager.default.fileExists(atPath: loadDirectory.path))
@@ -1157,9 +1141,11 @@ final class MLXModelManagerTests: XCTestCase {
             try seedValidMLXModelDirectory(repo: otherRepo, root: originalRoot)
 
             let manager = MLXModelManager(modelRepo: otherRepo)
+            _ = try await manager.refreshInstallation(repo: otherRepo)
             XCTAssertEqual(manager.state(for: otherRepo), .downloaded)
 
             manager.updateModel(repo: MLXModelManager.defaultModelRepo)
+            _ = try await manager.refreshInstallation(repo: otherRepo)
             XCTAssertEqual(manager.state(for: otherRepo), .downloaded)
 
             let newRoot = FileManager.default.temporaryDirectory
@@ -1182,13 +1168,14 @@ final class MLXModelManagerTests: XCTestCase {
             }
 
             manager.refreshStorageRoot()
+            _ = try await manager.refreshInstallation(repo: otherRepo)
 
             XCTAssertEqual(manager.state(for: otherRepo), .notDownloaded)
             XCTAssertNil(manager.pausedStatusMessage(for: otherRepo))
         }
     }
 
-    private func withIsolatedModelStorageRoot<T>(_ body: (URL) throws -> T) rethrows -> T {
+    private func withIsolatedModelStorageRoot<T>(_ body: (URL) async throws -> T) async rethrows -> T {
         let defaults = UserDefaults.standard
         let previousPath = defaults.string(forKey: AppPreferenceKey.modelStorageRootPath)
         let previousBookmark = defaults.data(forKey: AppPreferenceKey.modelStorageRootBookmark)
@@ -1212,7 +1199,7 @@ final class MLXModelManagerTests: XCTestCase {
             ModelStorageDirectoryManager.resetForTesting()
             try? FileManager.default.removeItem(at: root)
         }
-        return try body(root)
+        return try await body(root)
     }
 
     private func seedValidMLXModelDirectory(repo: String, root: URL) throws {

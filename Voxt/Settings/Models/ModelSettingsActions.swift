@@ -20,14 +20,6 @@ enum MLXConfigurationSummarySupport {
                 return AppLocalization.format("%@ · %@", tuning.preset.title, hasContext)
             }
             return hasContext
-        case .graniteSpeech:
-            let hasPrompt = tuning.granitePromptBias.isEmpty
-                ? AppLocalization.localizedString("Prompt Off")
-                : AppLocalization.localizedString("Prompt On")
-            if usesRecognitionPreset {
-                return AppLocalization.format("%@ · %@", tuning.preset.title, hasPrompt)
-            }
-            return hasPrompt
         case .senseVoice:
             return AppLocalization.localizedString(tuning.senseVoiceUseITN ? "ITN On" : "ITN Off")
         case .mossTranscribeDiarize:
@@ -46,19 +38,7 @@ enum MLXConfigurationSummarySupport {
             )
         case .nemotronASR:
             return tuning.nemotronStreamLatency.title
-        case .voxtralRealtime:
-            return tuning.voxtralTranscriptionDelay.title
-        case .canary:
-            return AppLocalization.format(
-                "%@ · Temp %.2f",
-                tuning.canaryTaskMode.title,
-                tuning.canaryTemperature
-            )
-        case .moonshine:
-            return AppLocalization.format("Max Output: %@ · Temp %.2f", String(tuning.moonshineMaxTokens), tuning.moonshineTemperature)
-        case .mmsCTC:
-            return AppLocalization.format("Adapter: %@", tuning.mmsLanguageCode)
-        case .wav2vec2CTC, .parakeet, .lasrCTC:
+        case .parakeet:
             return AppLocalization.localizedString("Checkpoint Defaults")
         case .generic:
             return tuning.preset.title
@@ -150,8 +130,7 @@ extension ModelSettingsView {
             return modelTableRow(
                 id: model.id,
                 title: model.title,
-                snapshot: snapshot,
-                allowsUseAndInstall: MLXModelManager.isAvailableModelRepo(model.id)
+                snapshot: snapshot
             )
         }
     }
@@ -217,8 +196,8 @@ extension ModelSettingsView {
         }
     }
 
-    func deleteModel(_ repo: String) -> Result<Void, Error> {
-        let result = mlxModelManager.deleteModel(repo: repo)
+    func deleteModel(_ repo: String) async -> Result<Void, Error> {
+        let result = await mlxModelManager.deleteModel(repo: repo)
         if MLXModelManager.canonicalModelRepo(repo) == MLXModelManager.canonicalModelRepo(modelRepo) {
             mlxModelManager.checkExistingModel()
         }
@@ -260,8 +239,8 @@ extension ModelSettingsView {
         }
     }
 
-    func deleteCustomLLM(_ repo: String) -> Result<Void, Error> {
-        let result = customLLMManager.deleteModel(repo: repo)
+    func deleteCustomLLM(_ repo: String) async -> Result<Void, Error> {
+        let result = await customLLMManager.deleteModel(repo: repo)
         if repo == customLLMRepo {
             customLLMManager.checkExistingModel()
         }
@@ -290,11 +269,11 @@ extension ModelSettingsView {
             let result: Result<Void, Error>
             switch target {
             case .mlx(let repo):
-                result = deleteModel(repo)
+                result = await deleteModel(repo)
             case .customLLM(let repo):
-                result = deleteCustomLLM(repo)
+                result = await deleteCustomLLM(repo)
             case .ggufTranslation(let modelID):
-                result = deleteGGUFTranslationModel(modelID)
+                result = await deleteGGUFTranslationModel(modelID)
             }
             switch result {
             case .success:
@@ -381,8 +360,8 @@ extension ModelSettingsView {
         refreshCatalogSnapshot()
     }
 
-    func deleteGGUFTranslationModel(_ modelID: GGUFTranslationModelID) -> Result<Void, Error> {
-        let result = ggufTranslationModelManager.deleteModel(id: modelID)
+    func deleteGGUFTranslationModel(_ modelID: GGUFTranslationModelID) async -> Result<Void, Error> {
+        let result = await ggufTranslationModelManager.deleteModel(id: modelID)
         refreshCatalogSnapshot()
         return result
     }
@@ -525,7 +504,7 @@ extension ModelSettingsView {
         } else if case .loading = mlxModelManager.state {
             // Avoid resetting while model is being loaded.
         } else {
-            mlxModelManager.checkExistingModel()
+            mlxModelManager.checkExistingModel(refresh: true)
         }
 
         if !customLLMManager.activeDownloadRepos.isEmpty {
@@ -533,7 +512,7 @@ extension ModelSettingsView {
         } else if case .paused = customLLMManager.state {
             // Preserve paused state while download cancellation settles.
         } else {
-            customLLMManager.checkExistingModel()
+            customLLMManager.checkExistingModel(refresh: true)
         }
     }
 

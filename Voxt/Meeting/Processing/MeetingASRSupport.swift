@@ -115,8 +115,7 @@ enum MeetingASRSupport {
         switch liveMode {
         case .nativeQwenLive, .nativeStreamingLive, .nativeNemotronLive:
             return .liveLocal(mode: liveMode)
-        case .batchPreview, .nativeVoxtralLive:
-            // nativeVoxtralLive belongs to hidden support and intentionally keeps its old path.
+        case .batchPreview:
             return .chunk(profile: .quality)
         }
     }

@@ -272,7 +272,9 @@ enum CustomLLMGenerationSettingsStore {
     static func storageValue(forByRepo settingsByRepo: [String: LLMGenerationSettings]) -> String {
         var sanitizedByRepo = [String: LLMGenerationSettings]()
         for (repo, settings) in settingsByRepo {
+            guard CustomLLMModelCatalog.preservesGenerationSettings(for: repo) else { continue }
             let canonicalRepo = CustomLLMModelManager.canonicalModelRepo(repo)
+            guard repo == canonicalRepo || settingsByRepo[canonicalRepo] == nil else { continue }
             sanitizedByRepo[canonicalRepo] = sanitized(settings)
         }
         guard let data = try? JSONEncoder().encode(sanitizedByRepo),
@@ -339,7 +341,10 @@ enum CustomLLMGenerationSettingsStore {
 
         var sanitizedByRepo = [String: LLMGenerationSettings]()
         for (repo, settings) in decoded {
+            // Retired-model tuning must not overwrite the replacement model's settings.
+            guard CustomLLMModelCatalog.preservesGenerationSettings(for: repo) else { continue }
             let canonicalRepo = CustomLLMModelManager.canonicalModelRepo(repo)
+            guard repo == canonicalRepo || decoded[canonicalRepo] == nil else { continue }
             sanitizedByRepo[canonicalRepo] = sanitized(settings)
         }
         return sanitizedByRepo

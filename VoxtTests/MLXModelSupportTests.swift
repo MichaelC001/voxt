@@ -12,7 +12,7 @@ final class MLXModelSupportTests: XCTestCase {
         )
         XCTAssertEqual(
             MLXModelCatalog.canonicalModelRepo("mlx-community/FireRedASR2"),
-            "mlx-community/FireRedASR2-AED-mlx"
+            MLXModelCatalog.defaultModelRepo
         )
         XCTAssertEqual(
             MLXModelCatalog.canonicalModelRepo("mlx-community/Qwen3-ASR-0.6B-4bit"),
@@ -21,10 +21,10 @@ final class MLXModelSupportTests: XCTestCase {
     }
 
     func testRealtimeCapabilityUsesCanonicalizedRepo() {
-        XCTAssertTrue(
+        XCTAssertFalse(
             MLXModelCatalog.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-2602")
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             MLXModelCatalog.isRealtimeCapableModelRepo("mlx-community/Voxtral-Mini-4B-Realtime-6bit")
         )
         XCTAssertFalse(
@@ -55,7 +55,7 @@ final class MLXModelSupportTests: XCTestCase {
         )
         XCTAssertEqual(
             MLXModelCatalog.liveMode(for: "mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit"),
-            .nativeVoxtralLive
+            .nativeQwenLive
         )
     }
 
@@ -88,17 +88,17 @@ final class MLXModelSupportTests: XCTestCase {
         XCTAssertFalse(parakeetV3.supportsLanguage(code: "zh"))
 
         let legacyParakeet = MLXModelCatalog.capability(for: "mlx-community/parakeet-tdt-0.6b-v2")
-        XCTAssertEqual(legacyParakeet.supportedLanguageCodes, ["en"])
+        XCTAssertEqual(legacyParakeet, parakeetV3)
 
         let nemotron = MLXModelCatalog.capability(for: "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit")
         XCTAssertTrue(nemotron.supportsLanguage(code: "zh"))
         XCTAssertTrue(nemotron.supportsLanguage(code: "ja"))
         XCTAssertFalse(nemotron.supportsLanguage(code: "el"))
 
-        let voxtral = MLXModelCatalog.capability(for: "mlx-community/Voxtral-Mini-4B-Realtime-6bit")
-        XCTAssertEqual(voxtral.supportedLanguageCodes.count, 13)
-        XCTAssertTrue(voxtral.supportsLanguage(code: "zh"))
-        XCTAssertFalse(voxtral.supportsLanguage(code: "yue"))
+        XCTAssertEqual(
+            MLXModelCatalog.capability(for: "mlx-community/Voxtral-Mini-4B-Realtime-6bit"),
+            qwen
+        )
     }
 
     func testEveryCatalogModelHasAnExplicitCapability() {
@@ -134,10 +134,6 @@ final class MLXModelSupportTests: XCTestCase {
         XCTAssertFalse(whisper.configurationCapabilities.contains(.recognitionPreset))
         XCTAssertNil(whisper.kvCachePolicy)
 
-        let canary = MLXModelCatalog.capability(for: "Mediform/canary-1b-v2-mlx-q8")
-        XCTAssertEqual(canary.timingGranularity, .none)
-        XCTAssertFalse(canary.outputCapabilities.contains(.timestamps))
-
         let senseVoice = MLXModelCatalog.capability(for: "mlx-community/SenseVoiceSmall")
         XCTAssertTrue(senseVoice.configurationCapabilities.contains(.senseVoiceITN))
         XCTAssertTrue(senseVoice.outputCapabilities.contains(.emotion))
@@ -151,11 +147,6 @@ final class MLXModelSupportTests: XCTestCase {
         let standardRepos = [
             "mlx-community/whisper-large-v3-turbo",
             "mlx-community/parakeet-tdt-0.6b-v3",
-            "mlx-community/granite-4.0-1b-speech-5bit",
-            "mlx-community/GLM-ASR-Nano-2512-4bit",
-            "mlx-community/FireRedASR2-AED-mlx",
-            "Mediform/canary-1b-v2-mlx-q8",
-            "UsefulSensors/moonshine-tiny",
         ]
         for repo in standardRepos {
             let policy = MLXModelCatalog.capability(for: repo).vadPolicy
@@ -166,9 +157,6 @@ final class MLXModelSupportTests: XCTestCase {
 
     func testRecognitionPresetFamiliesLiftFinalChunkDuration() {
         let presetRepos = [
-            "mlx-community/granite-4.0-1b-speech-5bit",
-            "mlx-community/GLM-ASR-Nano-2512-4bit",
-            "mlx-community/FireRedASR2-AED-mlx",
             "beshkenadze/cohere-transcribe-03-2026-mlx-fp16",
         ]
         for repo in presetRepos {
@@ -184,7 +172,6 @@ final class MLXModelSupportTests: XCTestCase {
         let managedRepos = [
             "beshkenadze/cohere-transcribe-03-2026-mlx-fp16",
             "mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit",
-            "mlx-community/Voxtral-Mini-4B-Realtime-6bit",
         ]
         for repo in managedRepos {
             let policy = MLXModelCatalog.capability(for: repo).vadPolicy
@@ -214,14 +201,6 @@ final class MLXModelSupportTests: XCTestCase {
         )
     }
 
-    func testMMSAdapterCatalogMatchesFL102Checkpoint() {
-        XCTAssertEqual(MMSLanguageAdapterOption.all.count, 102)
-        XCTAssertTrue(MMSLanguageAdapterOption.all.contains(where: { $0.id == "eng" && $0.appLanguageCode == "en" }))
-        XCTAssertTrue(MMSLanguageAdapterOption.all.contains(where: { $0.id == "cmn-script_simplified" && $0.appLanguageCode == "zh" }))
-        XCTAssertTrue(MMSLanguageAdapterOption.all.contains(where: { $0.id == "yue-script_traditional" && $0.appLanguageCode == "yue" }))
-        XCTAssertTrue(MLXModelCatalog.supportsLanguage("ja", for: "facebook/mms-1b-fl102"))
-        XCTAssertFalse(MLXModelCatalog.supportsLanguage("bo", for: "facebook/mms-1b-fl102"))
-    }
 
     func testFallbackRemoteSizeSupportsLegacyAndCuratedRepos() {
         XCTAssertEqual(
@@ -242,11 +221,11 @@ final class MLXModelSupportTests: XCTestCase {
     func testWhisperMigrationMapsLegacyModelIDsToMLXRepos() {
         XCTAssertEqual(
             MLXWhisperMigrationSupport.repo(forLegacyWhisperModelID: "tiny"),
-            "mlx-community/whisper-tiny-mlx"
+            "mlx-community/whisper-small-mlx"
         )
         XCTAssertEqual(
             MLXWhisperMigrationSupport.repo(forLegacyWhisperModelID: "base"),
-            "mlx-community/whisper-base-mlx"
+            "mlx-community/whisper-small-mlx"
         )
         XCTAssertEqual(
             MLXWhisperMigrationSupport.repo(forLegacyWhisperModelID: "medium"),
@@ -257,61 +236,5 @@ final class MLXModelSupportTests: XCTestCase {
         )
     }
 
-    func testTinyAndBaseWhisperReposAreHiddenUnlessInstalled() {
-        let defaultDisplayRepos = Set(MLXModelCatalog.displayModels(includingInstalled: []).map(\.id))
 
-        XCTAssertFalse(defaultDisplayRepos.contains("mlx-community/whisper-tiny-mlx"))
-        XCTAssertFalse(defaultDisplayRepos.contains("mlx-community/whisper-base-mlx"))
-
-        let displayReposIncludingInstalled = Set(
-            MLXModelCatalog.displayModels(includingInstalled: ["mlx-community/whisper-base-mlx"]).map(\.id)
-        )
-
-        XCTAssertTrue(displayReposIncludingInstalled.contains("mlx-community/whisper-base-mlx"))
-    }
-
-    func testVoxtralReposAreHiddenUnlessInstalled() {
-        let repos = [
-            "mlx-community/Voxtral-Mini-4B-Realtime-2602-4bit",
-            "mlx-community/Voxtral-Mini-4B-Realtime-6bit",
-            "mlx-community/Voxtral-Mini-4B-Realtime-2602-fp16",
-        ]
-        let defaultDisplayRepos = Set(MLXModelCatalog.displayModels(includingInstalled: []).map(\.id))
-
-        for repo in repos {
-            XCTAssertFalse(defaultDisplayRepos.contains(repo))
-        }
-
-        let installedRepo = "mlx-community/Voxtral-Mini-4B-Realtime-6bit"
-        let displayReposIncludingInstalled = Set(
-            MLXModelCatalog.displayModels(includingInstalled: [installedRepo]).map(\.id)
-        )
-
-        XCTAssertTrue(displayReposIncludingInstalled.contains(installedRepo))
-        XCTAssertEqual(MLXModelCatalog.liveMode(for: installedRepo), .nativeVoxtralLive)
-    }
-
-    func testCanaryRepoIsHiddenUnlessInstalled() {
-        let repo = "Mediform/canary-1b-v2-mlx-q8"
-
-        XCTAssertFalse(
-            MLXModelCatalog.displayModels(includingInstalled: []).contains { $0.id == repo }
-        )
-        XCTAssertTrue(
-            MLXModelCatalog.displayModels(includingInstalled: [repo]).contains { $0.id == repo }
-        )
-        XCTAssertEqual(MLXModelCatalog.capability(for: repo).family, .canary)
-    }
-
-    func testGraniteRepoIsHiddenUnlessInstalled() {
-        let repo = "mlx-community/granite-4.0-1b-speech-5bit"
-
-        XCTAssertFalse(
-            MLXModelCatalog.displayModels(includingInstalled: []).contains { $0.id == repo }
-        )
-        XCTAssertTrue(
-            MLXModelCatalog.displayModels(includingInstalled: [repo]).contains { $0.id == repo }
-        )
-        XCTAssertEqual(MLXModelCatalog.capability(for: repo).family, .graniteSpeech)
-    }
 }

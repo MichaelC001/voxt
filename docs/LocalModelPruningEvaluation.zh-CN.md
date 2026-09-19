@@ -2,6 +2,8 @@
 
 日期：2026-06-18
 
+> 历史评估，不再作为当前实现清单。本分支已改为删除隐藏模型运行时，不再采用下文“隐藏兼容优先”的策略。当前方案见 [模型栈现代化方案](ModelStackModernizationPlan.zh-CN.md)，实际完成项与待验证事项见 [实施记录](ModelStackModernizationImplementation.zh-CN.md)。
+
 本评估基于当前代码中的本地模型清单：
 
 - ASR：`Voxt/Transcription/MLXModelSupport.swift`

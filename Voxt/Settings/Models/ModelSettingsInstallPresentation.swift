@@ -10,6 +10,7 @@ enum LocalModelInstallTarget: Hashable {
 }
 
 enum LocalModelInstallState: Equatable {
+    case checking
     case installable(isEnabled: Bool)
     case downloading
     case paused
@@ -57,6 +58,8 @@ enum ModelSettingsInstallActionResolver {
         perform: @escaping (LocalModelInstallTarget, LocalModelInstallActionKind) -> Void
     ) -> [ModelTableAction] {
         switch snapshot.state {
+        case .checking:
+            return [tableAction(for: .init(kind: .inactive, title: localized("Loading…"), isEnabled: false, showsProgress: true), target: snapshot.target, perform: perform)]
         case .uninstalling:
             return [tableAction(for: .init(kind: .inactive, title: localized("Uninstalling…"), isEnabled: false), target: snapshot.target, perform: perform)]
         case .downloading:
@@ -116,6 +119,8 @@ enum ModelSettingsInstallActionResolver {
     ) -> ModelTableAction? {
         let descriptor: LocalModelInstallActionDescriptor
         switch snapshot.state {
+        case .checking:
+            descriptor = .init(kind: .inactive, title: localized("Loading…"), isEnabled: false, showsProgress: true)
         case .uninstalling:
             descriptor = .init(kind: .inactive, title: localized("Uninstalling…"), isEnabled: false)
         case .downloading:
@@ -150,7 +155,7 @@ enum ModelSettingsInstallActionResolver {
             if snapshot.canOpenLocation {
                 descriptors.append(.init(kind: .openLocation, title: localized("Open Location")))
             }
-        case .installable, .cancelling, .uninstalling:
+        case .checking, .installable, .cancelling, .uninstalling:
             break
         }
 

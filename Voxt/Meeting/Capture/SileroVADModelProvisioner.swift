@@ -23,6 +23,9 @@ final class SileroVADModelProvisioner {
 
     private let modelManager = MLXModelManager(modelRepo: SileroVADModelSupport.repo)
     private var inFlightTask: Task<URL, Error>?
+    private var inFlightID = UUID()
+    private var storageRevision = UUID()
+    private var storageRoots: [URL] = []
     private var prefetchTask: Task<Void, Never>?
     private var isShuttingDownForApplicationTermination = false
 
@@ -50,24 +53,45 @@ final class SileroVADModelProvisioner {
 
     func ensureModelDirectory() async throws -> URL {
         guard !isShuttingDownForApplicationTermination else { throw CancellationError() }
-        if let directory = MeetingVADModelStorage.modelDirectory(requireValid: true) {
-            return directory
+        let roots = [ModelStorageDirectoryManager.resolvedWriteRootURL()]
+            + ModelStorageDirectoryManager.resolvedReadableRootURLs()
+        if roots != storageRoots {
+            storageRoots = roots
+            storageRevision = UUID()
+            inFlightTask?.cancel()
+            inFlightTask = nil
+            inFlightID = UUID()
+            modelManager.refreshStorageRoot()
         }
+        let revision = storageRevision
+        let cachedDirectory = await MeetingVADModelStorage.validatedModelDirectory()
+        try Task.checkCancellation()
+        guard revision == storageRevision else { throw CancellationError() }
+        if let cachedDirectory { return cachedDirectory }
         if let inFlightTask {
-            return try await inFlightTask.value
+            let directory = try await inFlightTask.value
+            try Task.checkCancellation()
+            guard revision == storageRevision else { throw CancellationError() }
+            return directory
         }
 
         let repo = SileroVADModelSupport.repo
         let task = Task { @MainActor [modelManager] in
             let directory = try await modelManager.ensureModelDirectory(repo: repo)
             try Task.checkCancellation()
-            _ = try SileroVADModelSupport.loadModel(from: directory)
+            try await Task.detached(priority: .userInitiated) {
+                _ = try SileroVADModelSupport.loadModel(from: directory)
+            }.value
             return directory
         }
+        let taskID = UUID()
+        inFlightID = taskID
         inFlightTask = task
-        defer { inFlightTask = nil }
+        defer { if inFlightID == taskID { inFlightTask = nil } }
 
         let directory = try await task.value
+        try Task.checkCancellation()
+        guard revision == storageRevision else { throw CancellationError() }
         VoxtLog.modelInfo("Automatic Silero VAD download complete. repo=\(repo)")
         return directory
     }

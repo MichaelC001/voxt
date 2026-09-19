@@ -65,10 +65,7 @@ enum OnboardingPreferenceManager {
         guard let rawValue = defaults.string(forKey: AppPreferenceKey.onboardingLastStepID) else {
             return nil
         }
-        if rawValue == "microphone" {
-            return .permissions
-        }
-        return OnboardingGuideStep(rawValue: rawValue)
+        return OnboardingGuideStep.restored(from: rawValue)
     }
 
     static func hasExistingUserData(

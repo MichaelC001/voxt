@@ -274,52 +274,6 @@ nonisolated struct MLXMeetingNativeStreamingConfiguration: Sendable {
     let mossVisibleOutputMode: MossASROutputMode?
 }
 
-private final class MLXVoxtralNativeStreamingSession: MLXNativeStreamingSession, @unchecked Sendable {
-    let events: AsyncStream<TranscriptionEvent>
-
-    private let session: VoxtralRealtimeStreamSession
-    private let continuation: AsyncStream<TranscriptionEvent>.Continuation
-    private var isFinished = false
-
-    init(
-        model: VoxtralRealtimeModel,
-        generationParameters: STTGenerateParameters = STTGenerateParameters(),
-        transcriptionDelayMilliseconds: Int
-    ) {
-        self.session = model.makeStreamSession(
-            temperature: generationParameters.temperature,
-            maxTokens: generationParameters.maxTokens,
-            transcriptionDelayMs: transcriptionDelayMilliseconds
-        )
-        var continuation: AsyncStream<TranscriptionEvent>.Continuation!
-        self.events = AsyncStream { continuation = $0 }
-        self.continuation = continuation
-    }
-
-    func feedAudio(samples: [Float]) {
-        guard !isFinished, !samples.isEmpty else { return }
-        emit(session.step(samples))
-    }
-
-    func stop() {
-        guard !isFinished else { return }
-        emit(session.finish())
-        isFinished = true
-        continuation.yield(.ended(STTOutput(text: session.text)))
-        continuation.finish()
-    }
-
-    func cancel() {
-        isFinished = true
-        continuation.finish()
-    }
-
-    private func emit(_ delta: VoxtralRealtimeStreamSession.Delta) {
-        guard !delta.text.isEmpty else { return }
-        continuation.yield(.displayUpdate(confirmedText: session.text, provisionalText: ""))
-    }
-}
-
 private enum MLXStructuredTranscriptionError: LocalizedError {
     case senseVoiceLongFormVADUnavailable(String)
     case senseVoiceLongFormNoSpeechSegments(Double)
@@ -487,28 +441,6 @@ enum MLXTranscriptionPlanning {
             samples: voiceActivityFilteredSamples,
             source: .voiceActivityFiltered
         )
-    }
-
-    /// Final maxTokens for families that otherwise pin a static tuning budget.
-    /// Intermediate / quick passes keep tuning values; only offline Final uses duration.
-    nonisolated static func postStopFinalMaxTokens(
-        family: MLXModelFamily,
-        audioDurationSeconds: Double?,
-        tuningMaxTokens: Int
-    ) -> Int {
-        switch family {
-        case .canary, .moonshine:
-            guard let audioDurationSeconds else { return max(tuningMaxTokens, 256) }
-            return max(postStopFinalMaxTokens(audioDurationSeconds: audioDurationSeconds), tuningMaxTokens)
-        case .cohereTranscribe:
-            // Native modelManaged path: keep user/tuning budget; do not auto-rewrite.
-            return tuningMaxTokens
-        default:
-            if let audioDurationSeconds {
-                return postStopFinalMaxTokens(audioDurationSeconds: audioDurationSeconds)
-            }
-            return 8192
-        }
     }
 
     /// Caps offline Final decode budget by audio length while keeping headroom for
@@ -766,7 +698,7 @@ enum MLXTranscriptionPlanning {
         switch liveMode {
         case .batchPreview:
             return false
-        case .nativeQwenLive, .nativeStreamingLive, .nativeNemotronLive, .nativeVoxtralLive:
+        case .nativeQwenLive, .nativeStreamingLive, .nativeNemotronLive:
             return true
         }
     }
@@ -932,26 +864,6 @@ enum MLXTranscriptionPlanning {
             return .interruptInFlightPass
         }
         return .waitForInFlightPass
-    }
-
-    nonisolated static func automaticBiases(
-        for family: MLXModelFamily,
-        multilingualContext: String?
-    ) -> (qwenContextBias: String?, granitePromptBias: String?) {
-        guard let multilingualContext, !multilingualContext.isEmpty else {
-            return (nil, nil)
-        }
-
-        switch family {
-        case .qwen3ASR, .graniteSpeech:
-            // Local streaming MLX models may echo prompt/context guidance back into the
-            // partial transcript UI, so multilingual guidance stays in the language hint only.
-            return (nil, nil)
-        case .whisper, .senseVoice, .cohereTranscribe, .nemotronASR, .voxtralRealtime,
-             .mossTranscribeDiarize, .canary, .moonshine,
-             .wav2vec2CTC, .mmsCTC, .parakeet, .lasrCTC, .generic:
-            return (nil, nil)
-        }
     }
 
     /// MOSS Hotwords stay on Final only. Live/intermediate windows are short and prompt-biased,
@@ -1169,7 +1081,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         let languageHint: String?
         let timingGranularity: MLXASRTimingGranularity
         let qwenContextBias: String
-        let granitePromptBias: String?
         let senseVoiceUseITN: Bool
         let cohereLongFormStrategy: CohereLongFormStrategy
         let mossPrompt: String?
@@ -1511,8 +1422,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 startNativeStreamingLiveSession(revision: revision)
             } else if activeLiveMode == .nativeNemotronLive {
                 startNativeNemotronLiveSession(revision: revision)
-            } else if activeLiveMode == .nativeVoxtralLive {
-                startNativeVoxtralLiveSession(revision: revision)
             } else if activeSessionBehavior.runsIntermediateCorrections {
                 correctionLoopTask = Task { [weak self] in
                     await self?.runIntermediateCorrectionLoop(revision: revision)
@@ -2376,7 +2285,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 qwenUsesAutomaticLanguageProtocol: false,
                 mossVisibleOutputMode: nil
             )
-        case .batchPreview, .nativeVoxtralLive:
+        case .batchPreview:
             throw NSError(
                 domain: "Voxt.Meeting.NativeMLX",
                 code: -4,
@@ -2583,67 +2492,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 temperature: 0.0,
                 maxTokensPerPass: 1024
             )
-        )
-        installNativeLiveSession(session, revision: revision, modelPinned: true)
-    }
-
-    private func startNativeVoxtralLiveSession(revision: Int) {
-        liveSessionSetupTask?.cancel()
-        liveSessionSetupTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            let startedAt = Date()
-            var shouldReleaseModel = false
-            defer {
-                if shouldReleaseModel {
-                    self.modelManager.endActiveUse()
-                }
-            }
-
-            do {
-                self.modelManager.beginActiveUse()
-                shouldReleaseModel = true
-                let loadedModel = try await self.modelManager.loadModel()
-                guard !Task.isCancelled,
-                      revision == self.sessionRevision,
-                      self.isRecording,
-                      self.activeLiveMode == .nativeVoxtralLive
-                else { return }
-                guard let voxtralModel = loadedModel as? VoxtralRealtimeModel else {
-                    VoxtLog.asrWarning(
-                        "MLX native Voxtral live requested for non-Voxtral model. repo=\(self.modelManager.currentModelRepo)"
-                    )
-                    return
-                }
-
-                self.installNativeVoxtralLiveSession(voxtralModel, revision: revision)
-                self.isModelInitializing = false
-                shouldReleaseModel = false
-                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                VoxtLog.asr(
-                    "MLX native Voxtral live session ready. repo=\(self.modelManager.currentModelRepo), elapsedMs=\(elapsedMs)",
-                    verbose: true
-                )
-            } catch {
-                guard !Task.isCancelled else { return }
-                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                self.isModelInitializing = false
-                VoxtLog.asrWarning(
-                    "MLX native Voxtral live session setup failed. repo=\(self.modelManager.currentModelRepo), elapsedMs=\(elapsedMs), error=\(error.localizedDescription)"
-                )
-            }
-        }
-    }
-
-    private func installNativeVoxtralLiveSession(_ model: VoxtralRealtimeModel, revision: Int) {
-        releaseNativeLiveSession(cancelSession: true)
-        let tuningSettings = resolvedLocalTuningSettings()
-        let session = MLXVoxtralNativeStreamingSession(
-            model: model,
-            generationParameters: STTGenerateParameters(
-                maxTokens: 1024,
-                temperature: 0.0
-            ),
-            transcriptionDelayMilliseconds: tuningSettings.voxtralTranscriptionDelay.rawValue
         )
         installNativeLiveSession(session, revision: revision, modelPinned: true)
     }
@@ -3106,10 +2954,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         )
         let capability = MLXModelCatalog.capability(for: modelManager.currentModelRepo)
         let family = capability.family
-        let automaticBiases = MLXTranscriptionPlanning.automaticBiases(
-            for: family,
-            multilingualContext: hintPayload.multilingualContext
-        )
         let dictionaryTerms = resolvedDictionaryTermsTemplateValue()
         var chunkDuration: Float
         var minChunkDuration: Float
@@ -3136,20 +2980,9 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         }
 
         var languageHint = hintPayload.language
-        var targetLanguage: String?
         switch family {
-        case .graniteSpeech, .mossTranscribeDiarize, .moonshine, .wav2vec2CTC, .parakeet, .lasrCTC:
+        case .mossTranscribeDiarize, .parakeet:
             languageHint = nil
-        case .mmsCTC:
-            languageHint = tuningSettings.mmsLanguageCode
-        case .canary:
-            let taskLanguages = CanaryLanguageSupport.resolvedTaskLanguages(
-                mode: tuningSettings.canaryTaskMode,
-                sourceLanguage: languageHint,
-                translationLanguage: tuningSettings.canaryTranslationLanguage
-            )
-            languageHint = taskLanguages.source
-            targetLanguage = taskLanguages.target
         default:
             break
         }
@@ -3178,30 +3011,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             maxTokens = tuningSettings.cohereMaxTokens
             temperature = Float(tuningSettings.cohereTemperature)
             usePunctuation = tuningSettings.cohereUsePunctuation
-        case .canary:
-            if stage == .postStopFinal {
-                maxTokens = MLXTranscriptionPlanning.postStopFinalMaxTokens(
-                    family: family,
-                    audioDurationSeconds: audioDurationSeconds,
-                    tuningMaxTokens: tuningSettings.canaryMaxTokens
-                )
-            } else {
-                maxTokens = tuningSettings.canaryMaxTokens
-            }
-            temperature = Float(tuningSettings.canaryTemperature)
-            usePunctuation = tuningSettings.canaryUsePunctuation
-        case .moonshine:
-            if stage == .postStopFinal {
-                maxTokens = MLXTranscriptionPlanning.postStopFinalMaxTokens(
-                    family: family,
-                    audioDurationSeconds: audioDurationSeconds,
-                    tuningMaxTokens: tuningSettings.moonshineMaxTokens
-                )
-            } else {
-                maxTokens = tuningSettings.moonshineMaxTokens
-            }
-            temperature = Float(tuningSettings.moonshineTemperature)
-            usePunctuation = nil
         default:
             maxTokens = stageMaxTokens
             temperature = family == .whisper ? Float(tuningSettings.whisperTemperature) : 0.0
@@ -3227,7 +3036,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 topK: 0,
                 verbose: false,
                 language: languageHint,
-                targetLanguage: targetLanguage,
                 usePunctuation: usePunctuation,
                 chunkDuration: chunkDuration,
                 minChunkDuration: minChunkDuration,
@@ -3237,17 +3045,10 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             ),
             languageHint: languageHint,
             timingGranularity: capability.timingGranularity,
-            qwenContextBias: mergedBiasText(
-                resolvedBiasTemplate(
-                    tuningSettings.qwenContextBias,
-                    userLanguageCodes: userLanguageCodes,
-                    dictionaryTerms: dictionaryTerms
-                ),
-                autoBias: automaticBiases.qwenContextBias
-            ),
-            granitePromptBias: mergedOptionalBiasText(
-                resolvedBiasTemplate(tuningSettings.granitePromptBias, userLanguageCodes: userLanguageCodes),
-                autoBias: automaticBiases.granitePromptBias
+            qwenContextBias: resolvedBiasTemplate(
+                tuningSettings.qwenContextBias,
+                userLanguageCodes: userLanguageCodes,
+                dictionaryTerms: dictionaryTerms
             ),
             senseVoiceUseITN: tuningSettings.senseVoiceUseITN,
             cohereLongFormStrategy: tuningSettings.cohereLongFormStrategy,
@@ -3305,35 +3106,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         }
     }
 
-    private func mergedBiasText(_ userBias: String, autoBias: String?) -> String {
-        let trimmedUserBias = userBias.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedAutoBias = autoBias?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-        switch (trimmedUserBias.isEmpty, trimmedAutoBias.isEmpty) {
-        case (true, true):
-            return ""
-        case (false, true):
-            return trimmedUserBias
-        case (true, false):
-            return trimmedAutoBias
-        case (false, false):
-            return "\(trimmedAutoBias)\n\(trimmedUserBias)"
-        }
-    }
-
-    private func mergedOptionalBiasText(_ userBias: String, autoBias: String?) -> String? {
-        let merged = mergedBiasText(userBias, autoBias: autoBias)
-        return merged.isEmpty ? nil : merged
-    }
-
-    private func resolvedBiasTemplate(_ template: String, userLanguageCodes: [String]) -> String {
-        ASRHintResolver.resolveTemplateVariables(
-            in: template,
-            userLanguageCodes: userLanguageCodes
-        )
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private func resolvedBiasTemplate(
         _ template: String,
         userLanguageCodes: [String],
@@ -3377,15 +3149,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         inferenceConfiguration: ResolvedInferenceConfiguration
     ) async throws -> MLXDetachedInferenceResult {
         try Task.checkCancellation()
-        if inferenceConfiguration.family == .mmsCTC {
-            _ = try MMSLanguageAdapterOption.validatedAdapterCode(
-                inferenceConfiguration.languageHint ?? ""
-            )
-        }
-        if let wav2Vec2Model = model as? Wav2Vec2CTCModel,
-           let language = inferenceConfiguration.languageHint {
-            try wav2Vec2Model.selectLanguage(language)
-        }
         let longFormVADModel = try await resolvedLongFormVADModelIfNeeded(
             model: model,
             audioSamples: audioSamples,
@@ -3440,7 +3203,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         }
         if model is CohereTranscribeModel {
             guard inferenceConfiguration.cohereLongFormStrategy == .voiceActivity else { return nil }
-        } else if !(model is SenseVoiceModel) && !(model is VoxtralRealtimeModel) {
+        } else if !(model is SenseVoiceModel) {
             return nil
         }
         if let senseVoiceVADModel {
@@ -3488,14 +3251,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 kvGroupSize: generationParameters.kvGroupSize,
                 quantizedKVStart: generationParameters.quantizedKVStart
             )
-        } else if let graniteModel = model as? GraniteSpeechModel {
-            stream = graniteModel.generateStream(
-                audio: audioArray,
-                maxTokens: generationParameters.maxTokens,
-                temperature: generationParameters.temperature,
-                prompt: inferenceConfiguration.granitePromptBias,
-                language: nil
-            )
         } else if let senseVoiceModel = model as? SenseVoiceModel {
             let result = try runSenseVoiceInferenceDetached(
                 model: senseVoiceModel,
@@ -3527,23 +3282,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         } else if let cohereModel = model as? CohereTranscribeModel,
                   let longFormVADModel {
             let output = try cohereModel.generateWithVAD(
-                audio: audioArray,
-                generationParameters: generationParameters,
-                vad: (
-                    model: longFormVADModel,
-                    config: longFormSpeechSegmentConfig(
-                        chunkMaximumDurationSeconds: chunkMaximumDurationSeconds,
-                        vadThreshold: vadThreshold,
-                        vadMinSpeechDurationMs: vadMinSpeechDurationMs,
-                        vadMinSilenceDurationMs: vadMinSilenceDurationMs,
-                        vadSpeechPadMs: vadSpeechPadMs
-                    )
-                )
-            )
-            return MLXDetachedInferenceResult(rawText: output.text, senseVoiceMetadata: nil, structuredSegments: [])
-        } else if let voxtralModel = model as? VoxtralRealtimeModel,
-                  let longFormVADModel {
-            let output = try voxtralModel.generateWithVAD(
                 audio: audioArray,
                 generationParameters: generationParameters,
                 vad: (

@@ -50,7 +50,7 @@ enum MeetingSpeakerAnalysisPipeline {
         do {
             var turns: [MeetingSpeakerTurn] = []
             logDebug(
-                "Meeting speaker analysis started. segments=\(segments.count), assets=\(assets.count), sensitivity=\(options.sensitivity.rawValue), speakerCountHint=\(options.speakerCountHint.rawValue)",
+                "Meeting speaker analysis started. segments=\(segments.count), assets=\(assets.count), sensitivity=\(options.sensitivity.rawValue)",
                 options: options
             )
             for asset in assets where asset.durationSeconds >= options.minimumAudioDurationSeconds {
@@ -86,7 +86,7 @@ enum MeetingSpeakerAnalysisPipeline {
                 $0.durationSeconds >= options.minimumAudioDurationSeconds
             }
             logDebug(
-                "Meeting speaker analysis started. segments=\(segments.count), assets=\(descriptors.count), sensitivity=\(options.sensitivity.rawValue), speakerCountHint=\(options.speakerCountHint.rawValue)",
+                "Meeting speaker analysis started. segments=\(segments.count), assets=\(descriptors.count), sensitivity=\(options.sensitivity.rawValue)",
                 options: options
             )
             if eligibleDescriptors.isEmpty {

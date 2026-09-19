@@ -1,6 +1,7 @@
 // MeetingDetailViewModelTests.swift
 // Provides Meeting Detail View Model Tests for Voxt test coverage.
 
+import Combine
 import XCTest
 @testable import Voxt
 
@@ -906,6 +907,31 @@ final class MeetingDetailViewModelTests: XCTestCase {
         XCTAssertEqual(translatedSources, ["old text", "new text"])
         XCTAssertEqual(viewModel.segments.first?.translatedText, "translated: new text")
         XCTAssertFalse(viewModel.segments.first?.isTranslationPending ?? true)
+        XCTAssertEqual(viewModel.displayedSegments, viewModel.segments)
+        XCTAssertEqual(viewModel.speakerGroups.first?.segments, viewModel.segments)
+        XCTAssertEqual(viewModel.speakerGroups.first?.wordCount, 2)
+    }
+
+    func testTranslationCompletionRefreshesSearchMembership() async {
+        let viewModel = makeHistoryViewModel(
+            initialSettings: .init(autoGenerate: false, promptTemplate: nil, modelSelectionID: "custom-llm:test"),
+            modelOptions: [],
+            segments: [.init(speaker: .them, startSeconds: 0, endSeconds: 2, text: "original words")],
+            translationHandler: { _, _ in
+                MeetingTranslationOperation(executionScope: .externalRequest) { "translated result" }
+            }
+        )
+        viewModel.setSearchQuery("translated")
+        XCTAssertTrue(viewModel.displayedSegments.isEmpty)
+        let published = expectation(description: "translated text matches search")
+        let subscription = viewModel.$displayedSegments
+            .first(where: { $0.first?.translatedText == "translated result" })
+            .sink { _ in published.fulfill() }
+        defer { subscription.cancel() }
+        viewModel.translationDraftLanguageRaw = TranslationTargetLanguage.english.rawValue
+        viewModel.confirmTranslationLanguageSelection()
+        await fulfillment(of: [published], timeout: 1)
+        XCTAssertEqual(viewModel.speakerGroups.first?.segments.first?.translatedText, "translated result")
     }
 
     func testManualTranscriptEditClearsTranslationAndMarksSummaryStale() {

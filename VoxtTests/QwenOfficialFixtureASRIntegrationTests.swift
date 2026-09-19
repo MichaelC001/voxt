@@ -24,14 +24,9 @@ final class QwenOfficialFixtureASRIntegrationTests: XCTestCase {
         return url
     }
 
-    private func resolvedModelRepoAndHubURL() throws -> (repo: String, hubURL: URL) {
+    private func resolvedModelRepoAndHubURL() async throws -> (repo: String, hubURL: URL) {
         let defaults = UserDefaults.standard
-        defaults.set("/Users/guanwei/x/models", forKey: AppPreferenceKey.modelStorageRootPath)
-        defaults.removeObject(forKey: AppPreferenceKey.modelStorageRootBookmark)
-        ModelStorageDirectoryManager.setAuthorizedRootURLForTesting(
-            URL(fileURLWithPath: "/Users/guanwei/x/models", isDirectory: true)
-        )
-        addTeardownBlock { ModelStorageDirectoryManager.resetForTesting() }
+        ModelTestGate.configureStorageRoot(for: self)
         let hubURL = defaults.bool(forKey: AppPreferenceKey.useHfMirror)
             ? MLXModelManager.mirrorHubBaseURL
             : MLXModelManager.defaultHubBaseURL
@@ -40,6 +35,7 @@ final class QwenOfficialFixtureASRIntegrationTests: XCTestCase {
             defaults.string(forKey: AppPreferenceKey.mlxModelRepo) ?? MLXModelManager.defaultModelRepo
         )
         let probeManager = MLXModelManager(modelRepo: preferredRepo, hubBaseURL: hubURL)
+        try await ModelTestGate.waitForASRInstallations(probeManager)
         if probeManager.isModelDownloaded(repo: preferredRepo),
            MLXModelManager.isMultilingualModelRepo(preferredRepo) {
             return (preferredRepo, hubURL)
@@ -57,8 +53,8 @@ final class QwenOfficialFixtureASRIntegrationTests: XCTestCase {
         return (fallbackRepo, hubURL)
     }
 
-    private func makeTranscriber() throws -> MLXTranscriber {
-        let resolved = try resolvedModelRepoAndHubURL()
+    private func makeTranscriber() async throws -> MLXTranscriber {
+        let resolved = try await resolvedModelRepoAndHubURL()
         return MLXTranscriber(
             modelManager: MLXModelManager(modelRepo: resolved.repo, hubBaseURL: resolved.hubURL)
         )
@@ -78,7 +74,7 @@ final class QwenOfficialFixtureASRIntegrationTests: XCTestCase {
 
     func testOfficialEnglishFixtureContainsExpectedTranscriptAnchors() async throws {
         try requireModelTestsEnabled()
-        let transcriber = try makeTranscriber()
+        let transcriber = try await makeTranscriber()
         let text = try await transcriber.transcribeAudioFile(
             fixtureURL(named: "qwen_audio_short_en.wav")
         )
@@ -96,7 +92,7 @@ final class QwenOfficialFixtureASRIntegrationTests: XCTestCase {
 
     func testOfficialChongqingChineseFixtureContainsExpectedTranscriptAnchors() async throws {
         try requireModelTestsEnabled()
-        let transcriber = try makeTranscriber()
+        let transcriber = try await makeTranscriber()
         let text = try await transcriber.transcribeAudioFile(
             fixtureURL(named: "qwen_audio_short_zh_chongqing.wav")
         )
@@ -114,7 +110,7 @@ final class QwenOfficialFixtureASRIntegrationTests: XCTestCase {
 
     func testOfficialShortChineseEmotionFixturesPreserveCoreUtterance() async throws {
         try requireModelTestsEnabled()
-        let transcriber = try makeTranscriber()
+        let transcriber = try await makeTranscriber()
 
         for fileName in ["qwen_audio_short_zh_relaxed.wav", "qwen_audio_short_zh_negative.wav"] {
             let text = try await transcriber.transcribeAudioFile(fixtureURL(named: fileName))

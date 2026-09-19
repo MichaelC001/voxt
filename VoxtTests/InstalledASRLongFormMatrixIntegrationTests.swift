@@ -58,20 +58,16 @@ final class InstalledASRLongFormMatrixIntegrationTests: XCTestCase {
 
     private func configuredHubURL() -> URL {
         let defaults = UserDefaults.standard
-        defaults.set("/Users/guanwei/x/models", forKey: AppPreferenceKey.modelStorageRootPath)
-        defaults.removeObject(forKey: AppPreferenceKey.modelStorageRootBookmark)
-        ModelStorageDirectoryManager.setAuthorizedRootURLForTesting(
-            URL(fileURLWithPath: "/Users/guanwei/x/models", isDirectory: true)
-        )
-        addTeardownBlock { ModelStorageDirectoryManager.resetForTesting() }
+        ModelTestGate.configureStorageRoot(for: self)
         return defaults.bool(forKey: AppPreferenceKey.useHfMirror)
             ? MLXModelManager.mirrorHubBaseURL
             : MLXModelManager.defaultHubBaseURL
     }
 
-    private func installedMultilingualMLXRepos() -> [String] {
+    private func installedMultilingualMLXRepos() async throws -> [String] {
         let hubURL = configuredHubURL()
         let probeManager = MLXModelManager(modelRepo: MLXModelManager.defaultModelRepo, hubBaseURL: hubURL)
+        try await ModelTestGate.waitForASRInstallations(probeManager)
         return MLXModelManager.availableModels
             .map(\.id)
             .map(MLXModelManager.canonicalModelRepo(_:))
@@ -86,7 +82,7 @@ final class InstalledASRLongFormMatrixIntegrationTests: XCTestCase {
             throw XCTSkip("No long-form clips are available for installed-model matrix testing.")
         }
 
-        let repos = installedMultilingualMLXRepos()
+        let repos = try await installedMultilingualMLXRepos()
         guard !repos.isEmpty else {
             throw XCTSkip("No downloaded multilingual MLX ASR models are available for installed-model matrix testing.")
         }

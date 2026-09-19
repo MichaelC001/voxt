@@ -453,7 +453,7 @@ extension AppDelegate {
     ) throws -> AutomaticDictionaryLearningModel {
         if optionID.hasPrefix("local:") {
             let repo = String(optionID.dropFirst("local:".count))
-            guard customLLMManager.isModelDownloaded(repo: repo) else {
+            guard customLLMManager.canAttemptInference(repo: repo) else {
                 throw NSError(
                     domain: "Voxt.AutomaticDictionaryLearning",
                     code: -4,

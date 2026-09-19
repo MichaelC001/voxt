@@ -164,7 +164,7 @@ FEATURE_SETTINGS_JSON="$(cat <<'JSON'
     "realtimeTargetLanguageRawValue": "",
     "hideOverlayFromScreenSharing": false,
     "chunkingModeRawValue": "quality",
-    "speakerDiarizationModelRawValue": "offlineVBx",
+    "speakerDiarizationModelRawValue": "sortformerV2",
     "finalTranscriptOptimizationEnabled": true
   }
 }

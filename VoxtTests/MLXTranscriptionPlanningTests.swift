@@ -277,45 +277,6 @@ final class MLXTranscriptionPlanningTests: XCTestCase {
         XCTAssertEqual(MLXTranscriptionPlanning.postStopFinalMaxTokens(audioDurationSeconds: 600), 8192)
     }
 
-    func testPostStopFinalMaxTokensForCanaryAndMoonshineUsesDurationBudget() {
-        let dynamic = MLXTranscriptionPlanning.postStopFinalMaxTokens(audioDurationSeconds: 60)
-        XCTAssertEqual(
-            MLXTranscriptionPlanning.postStopFinalMaxTokens(
-                family: .canary,
-                audioDurationSeconds: 60,
-                tuningMaxTokens: 200
-            ),
-            dynamic
-        )
-        XCTAssertEqual(
-            MLXTranscriptionPlanning.postStopFinalMaxTokens(
-                family: .moonshine,
-                audioDurationSeconds: 60,
-                tuningMaxTokens: 200
-            ),
-            dynamic
-        )
-        // User-raised tuning remains a floor.
-        XCTAssertEqual(
-            MLXTranscriptionPlanning.postStopFinalMaxTokens(
-                family: .canary,
-                audioDurationSeconds: 1,
-                tuningMaxTokens: 512
-            ),
-            512
-        )
-    }
-
-    func testPostStopFinalMaxTokensKeepsCohereTuningBudget() {
-        XCTAssertEqual(
-            MLXTranscriptionPlanning.postStopFinalMaxTokens(
-                family: .cohereTranscribe,
-                audioDurationSeconds: 60,
-                tuningMaxTokens: 1024
-            ),
-            1024
-        )
-    }
 
     func testFinalizationSamplesModelManagedKeepsFullAudio() {
         let selection = MLXTranscriptionPlanning.finalizationSamples(

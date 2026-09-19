@@ -100,6 +100,7 @@ actor MeetingLocalInferenceCoordinator {
     private var activeToken: UUID?
     private var waiters: [Waiter] = []
     private var cancelledWaiterIDs = Set<UUID>()
+    private var admittingWaiterIDs = Set<UUID>()
     private var sequence: Int64 = 0
     private var recordingActive = false
     private var memoryPressureConstrained = false
@@ -168,10 +169,13 @@ actor MeetingLocalInferenceCoordinator {
         }
 
         let waiterID = UUID()
+        admittingWaiterIDs.insert(waiterID)
         let submittedAt = clock.now
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                if Task.isCancelled || cancelledWaiterIDs.remove(waiterID) != nil {
+                admittingWaiterIDs.remove(waiterID)
+                let cancelledBeforeAdmission = cancelledWaiterIDs.remove(waiterID) != nil
+                if Task.isCancelled || cancelledBeforeAdmission {
                     statistics.cancelledCount += 1
                     continuation.resume(throwing: CancellationError())
                     return
@@ -204,7 +208,9 @@ actor MeetingLocalInferenceCoordinator {
             let waiter = waiters.remove(at: index)
             statistics.cancelledCount += 1
             waiter.continuation.resume(throwing: CancellationError())
-        } else {
+        } else if admittingWaiterIDs.contains(id) {
+            // Only retain a cancellation that can still race admission. A delayed
+            // cancellation for an already granted/completed waiter needs no tombstone.
             cancelledWaiterIDs.insert(id)
         }
     }

@@ -160,6 +160,7 @@ jobs:
       CHANNEL: ${{ needs.preflight.outputs.channel }}
       RELEASE_BUILD_NUMBER: ${{ needs.preflight.outputs.release_build_number }}
       UPDATE_APPCAST: ${{ needs.preflight.outputs.update_appcast }}
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
       DEVELOPER_ID_APP_CERT_P12: ${{ secrets.DEVELOPER_ID_APP_CERT_P12 }}
       DEVELOPER_ID_APP_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_APP_CERT_PASSWORD }}
       DEVELOPER_ID_INSTALLER_CERT_P12: ${{ secrets.DEVELOPER_ID_INSTALLER_CERT_P12 }}
@@ -178,6 +179,16 @@ jobs:
       SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Configure consistent build and MLX JIT toolchain
+        run: source tools/configure_xcode.sh --select-system
+
+      - name: Install Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
+      - name: Audit committed dependency graph
+        run: |
+          python3 tools/audit_model_stack.py --resolved Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
       - name: Resolve Xcode compilation cache key
         id: compilation_cache_key
@@ -366,9 +377,26 @@ jobs:
             -skipPackagePluginValidation \
             build \
             CURRENT_PROJECT_VERSION="$RELEASE_BUILD_NUMBER" \
+            LD_GENERATE_MAP_FILE=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
+
+      - name: Audit model runtime artifacts
+        run: |
+          set -euo pipefail
+          MAP_ARGS=()
+          while IFS= read -r -d '' map; do
+            MAP_ARGS+=(--link-map "$map")
+          done < <(find build/DerivedData/Build -name '*LinkMap*.txt' -print0)
+          if [ ${#MAP_ARGS[@]} -eq 0 ]; then
+            echo "::error::Missing link maps for static runtime audit"
+            exit 1
+          fi
+          python3 tools/audit_model_stack.py \
+            --app build/DerivedData/Build/Products/Release/Voxt.app \
+            "${MAP_ARGS[@]}"
+          du -sk build/DerivedData/Build/Products/Release/Voxt.app
 
       - name: Validate Xcode compilation cache
         run: |

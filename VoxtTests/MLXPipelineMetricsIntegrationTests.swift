@@ -40,14 +40,9 @@ final class MLXPipelineMetricsIntegrationTests: XCTestCase {
         ]
     }
 
-    private func resolvedModelRepoAndHubURL() throws -> (repo: String, hubURL: URL) {
+    private func resolvedModelRepoAndHubURL() async throws -> (repo: String, hubURL: URL) {
         let defaults = UserDefaults.standard
-        defaults.set("/Users/guanwei/x/models", forKey: AppPreferenceKey.modelStorageRootPath)
-        defaults.removeObject(forKey: AppPreferenceKey.modelStorageRootBookmark)
-        ModelStorageDirectoryManager.setAuthorizedRootURLForTesting(
-            URL(fileURLWithPath: "/Users/guanwei/x/models", isDirectory: true)
-        )
-        addTeardownBlock { ModelStorageDirectoryManager.resetForTesting() }
+        ModelTestGate.configureStorageRoot(for: self)
         let hubURL = defaults.bool(forKey: AppPreferenceKey.useHfMirror)
             ? MLXModelManager.mirrorHubBaseURL
             : MLXModelManager.defaultHubBaseURL
@@ -56,6 +51,7 @@ final class MLXPipelineMetricsIntegrationTests: XCTestCase {
             defaults.string(forKey: AppPreferenceKey.mlxModelRepo) ?? MLXModelManager.defaultModelRepo
         )
         let probeManager = MLXModelManager(modelRepo: preferredRepo, hubBaseURL: hubURL)
+        try await ModelTestGate.waitForASRInstallations(probeManager)
         if probeManager.isModelDownloaded(repo: preferredRepo),
            MLXModelManager.isMultilingualModelRepo(preferredRepo) {
             return (preferredRepo, hubURL)
@@ -178,7 +174,7 @@ final class MLXPipelineMetricsIntegrationTests: XCTestCase {
 
     func testFinalOnlyOfficialLongFixtureMetricsStayWithinExpectedEnvelope() async throws {
         try requireModelTestsEnabled()
-        let resolved = try resolvedModelRepoAndHubURL()
+        let resolved = try await resolvedModelRepoAndHubURL()
         let transcriber = makeTranscriber(repo: resolved.repo, hubURL: resolved.hubURL)
         let diagnosticsList = try await officialLongFixtureURLs().asyncMap {
             try await transcriber.debugReplayFinalOnlyAudioFileWithTrace($0, stepSeconds: 4.0)
@@ -210,7 +206,7 @@ final class MLXPipelineMetricsIntegrationTests: XCTestCase {
 
     func testRealtimeOfficialLongFixtureMetricsStayWithinExpectedEnvelope() async throws {
         try requireModelTestsEnabled()
-        let resolved = try resolvedModelRepoAndHubURL()
+        let resolved = try await resolvedModelRepoAndHubURL()
         let transcriber = makeTranscriber(repo: resolved.repo, hubURL: resolved.hubURL)
         let diagnosticsList = try await officialLongFixtureURLs().asyncMap {
             try await transcriber.debugReplayRealtimeAudioFileWithTrace($0, stepSeconds: 4.0)

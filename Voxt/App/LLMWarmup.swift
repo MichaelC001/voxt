@@ -68,23 +68,6 @@ extension AppDelegate {
         cancelLLMWarmupTasks(except: [])
     }
 
-    private func customLLMWarmupReposForIdle() -> Set<String> {
-        let availability = FeatureSettingsStore.availability()
-        var repos = Set<String>()
-
-        if let enhancementRepo = resolvedTranscriptionEnhancementLocalRepo() {
-            repos.insert(enhancementRepo)
-        }
-        if availability.translationEnabled, translationModelProvider == .customLLM {
-            repos.insert(translationCustomLLMRepo)
-        }
-        if availability.rewriteEnabled, rewriteModelProvider == .customLLM {
-            repos.insert(rewriteCustomLLMRepo)
-        }
-
-        return repos.filter { customLLMManager.isModelDownloaded(repo: $0) }
-    }
-
     private func customLLMWarmupReposForSession(outputMode: SessionOutputMode) -> Set<String> {
         let availability = FeatureSettingsStore.availability()
         var repos = Set<String>()
@@ -110,7 +93,7 @@ extension AppDelegate {
             }
         }
 
-        return repos.filter { customLLMManager.isModelDownloaded(repo: $0) }
+        return repos.filter { customLLMManager.canAttemptInference(repo: $0) }
     }
 
     private struct RemoteWarmupContext {
@@ -179,7 +162,7 @@ extension AppDelegate {
 
     private func startCustomLLMWarmupIfNeeded(repo: String, reason: String) {
         let canonicalRepo = CustomLLMModelManager.canonicalModelRepo(repo)
-        guard customLLMManager.isModelDownloaded(repo: canonicalRepo) else { return }
+        guard customLLMManager.canAttemptInference(repo: canonicalRepo) else { return }
         guard llmWarmupTasksByRepo[canonicalRepo] == nil else { return }
         guard !customLLMManager.isModelLoaded(repo: canonicalRepo) else { return }
 

@@ -205,6 +205,7 @@ extension AppDelegate {
     }
 
     func resetSessionAfterFailedStart() {
+        OnboardingSessionEvent.ended(id: activeRecordingSessionID, message: overlayState.statusMessage).post()
         cancelSessionControlTasks()
         systemAudioMuteController.restoreSystemAudioIfNeeded()
         if transcriptionEngine == .remote {

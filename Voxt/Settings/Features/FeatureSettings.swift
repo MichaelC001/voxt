@@ -29,7 +29,7 @@ struct FeatureModelSelectionID: RawRepresentable, Codable, Hashable, Sendable, I
     }
 
     static func localLLM(_ repo: String) -> Self {
-        Self(rawValue: "local-llm:\(repo)")
+        Self(rawValue: "local-llm:\(CustomLLMModelCatalog.canonicalModelRepo(repo))")
     }
 
     static func localGGUFTranslation(_ modelID: GGUFTranslationModelID) -> Self {
@@ -509,7 +509,7 @@ struct MeetingFeatureSettings: Codable, Hashable, Sendable {
         hideOverlayFromScreenSharing: Bool,
         chunkingModeRawValue: String = MeetingChunkingMode.quality.rawValue,
         sileroVADSensitivityRawValue: String = MeetingSileroVADSensitivity.balanced.rawValue,
-        speakerDiarizationModelRawValue: String = MeetingDiarizationMode.offlineVBx.rawValue,
+        speakerDiarizationModelRawValue: String = MeetingDiarizationMode.sortformerV2.rawValue,
         finalTranscriptOptimizationEnabled: Bool = MeetingFeatureSettings.defaultFinalTranscriptOptimizationEnabled
     ) {
         self.asrSelectionID = asrSelectionID
@@ -535,7 +535,7 @@ struct MeetingFeatureSettings: Codable, Hashable, Sendable {
     }
 
     var speakerDiarizationModel: MeetingDiarizationMode {
-        MeetingDiarizationMode(rawValue: speakerDiarizationModelRawValue) ?? .offlineVBx
+        MeetingDiarizationMode(rawValue: speakerDiarizationModelRawValue) ?? .sortformerV2
     }
 
     var sileroVADSensitivity: MeetingSileroVADSensitivity {
@@ -571,7 +571,7 @@ struct MeetingFeatureSettings: Codable, Hashable, Sendable {
             sileroVADSensitivityRawValue: try container.decodeIfPresent(String.self, forKey: .sileroVADSensitivityRawValue)
                 ?? MeetingSileroVADSensitivity.balanced.rawValue,
             speakerDiarizationModelRawValue: try container.decodeIfPresent(String.self, forKey: .speakerDiarizationModelRawValue)
-                ?? MeetingDiarizationMode.offlineVBx.rawValue,
+                ?? MeetingDiarizationMode.sortformerV2.rawValue,
             finalTranscriptOptimizationEnabled: try container.decodeIfPresent(Bool.self, forKey: .finalTranscriptOptimizationEnabled)
                 ?? MeetingFeatureSettings.defaultFinalTranscriptOptimizationEnabled
         )

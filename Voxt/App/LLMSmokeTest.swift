@@ -68,7 +68,7 @@ extension AppDelegate {
             guard let self else { return }
             let startedAt = Date()
             do {
-                guard self.customLLMManager.isModelDownloaded(repo: repo) else {
+                guard self.customLLMManager.canAttemptInference(repo: repo) else {
                     throw NSError(
                         domain: "Voxt.LLMSmoke",
                         code: 404,

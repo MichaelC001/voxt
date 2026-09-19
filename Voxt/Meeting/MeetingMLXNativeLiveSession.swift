@@ -20,101 +20,6 @@ struct MeetingMLXNativeLiveSessionFactory: MeetingLiveSessionFactory {
     }
 }
 
-private actor MeetingMLXNativeFeedScheduler {
-    private static let sampleRate = 16_000.0
-    private static let maximumPendingSamples = Int(sampleRate * 10)
-
-    private let session: any MLXNativeStreamingSession
-    private var pendingSamples: [Float] = []
-    private var pendingOffset = 0
-    private var drainTask: Task<Void, Never>?
-    private var isStopping = false
-
-    init(session: any MLXNativeStreamingSession) {
-        self.session = session
-    }
-
-    func submit(samples: [Float], sampleRate: Double) -> Bool {
-        guard !samples.isEmpty, !isStopping else { return true }
-        let prepared = ASRVoiceActivitySampleRateConverter.resample(
-            samples: samples,
-            from: sampleRate,
-            to: Self.sampleRate
-        )
-        guard !prepared.isEmpty else { return true }
-        let pendingCount = pendingSamples.count - pendingOffset
-        guard pendingCount + prepared.count <= Self.maximumPendingSamples else {
-            return false
-        }
-        pendingSamples.append(contentsOf: prepared)
-        startDrainIfNeeded()
-        return true
-    }
-
-    func finish() async {
-        isStopping = true
-        while let drainTask {
-            await drainTask.value
-        }
-        await feedRemainingSamples()
-        session.stop()
-    }
-
-    func cancel() {
-        isStopping = true
-        pendingSamples.removeAll(keepingCapacity: false)
-        pendingOffset = 0
-        drainTask?.cancel()
-        session.cancel()
-    }
-
-    private func startDrainIfNeeded() {
-        guard drainTask == nil else { return }
-        drainTask = Task { [weak self] in
-            await self?.drain()
-        }
-    }
-
-    private func drain() async {
-        defer {
-            drainTask = nil
-            compact(force: true)
-            if pendingOffset < pendingSamples.count, !isStopping {
-                startDrainIfNeeded()
-            }
-        }
-        while !Task.isCancelled, pendingOffset < pendingSamples.count {
-            let end = min(pendingOffset + Int(Self.sampleRate / 5), pendingSamples.count)
-            let chunk = Array(pendingSamples[pendingOffset..<end])
-            try? await MeetingLocalInferenceCoordinator.shared.withPermit(.liveASRFeed) { [session] in
-                session.feedAudio(samples: chunk)
-            }
-            pendingOffset = end
-            compact(force: false)
-        }
-    }
-
-    private func feedRemainingSamples() async {
-        guard pendingOffset < pendingSamples.count else { return }
-        let remaining = Array(pendingSamples[pendingOffset...])
-        try? await MeetingLocalInferenceCoordinator.shared.withPermit(.liveASRFeed) { [session] in
-            session.feedAudio(samples: remaining)
-        }
-        pendingSamples.removeAll(keepingCapacity: false)
-        pendingOffset = 0
-    }
-
-    private func compact(force: Bool) {
-        guard pendingOffset > 0,
-              force || (pendingOffset >= 16_000 && pendingOffset * 2 >= pendingSamples.count)
-        else {
-            return
-        }
-        pendingSamples.removeFirst(pendingOffset)
-        pendingOffset = 0
-    }
-}
-
 @MainActor
 private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession {
     private static let silenceFinalizeSeconds: TimeInterval = 0.75
@@ -137,7 +42,6 @@ private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession 
     private var latestCumulativeText = ""
     private var latestVisibleSegmentText = ""
     private var silenceDurationSeconds: TimeInterval = 0
-    private var hasLoggedFeedOverload = false
     private var isCancelled = false
     private var defersSilenceFinalization = false
     private var didEmitStructuredEndedSegments = false
@@ -167,13 +71,6 @@ private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession 
         state = .connecting
 
         let configuration = try await streamingTranscriber.makeMeetingNativeStreamingConfiguration()
-        guard configuration.liveMode != .nativeVoxtralLive else {
-            throw NSError(
-                domain: "Voxt.Meeting.NativeMLX",
-                code: -10,
-                userInfo: [NSLocalizedDescriptionKey: "Hidden support models are excluded from meeting optimization."]
-            )
-        }
         self.configuration = configuration
         defersSilenceFinalization = MeetingNativeLiveSegmentationPolicy.shouldDeferSilenceFinalization(
             timingGranularity: MLXModelCatalog.capability(for: modelManager.currentModelRepo).timingGranularity
@@ -187,7 +84,13 @@ private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession 
             for await event in session.events {
                 guard !Task.isCancelled, let self else { return }
                 self.handle(event)
+                switch event {
+                case .ended, .failed: return
+                default: break
+                }
             }
+            guard !Task.isCancelled, let self, !self.isCancelled else { return }
+            await self.failAndCancel(message: "The live stream closed without a final result. Recorded audio is preserved.")
         }
         VoxtLog.meeting(
             "Meeting native MLX streaming session started. repo=\(modelManager.currentModelRepo), speaker=\(speaker.rawValue), offset=\(String(format: "%.2f", timelineOffsetSeconds))",
@@ -210,11 +113,10 @@ private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession 
 
         if let feedScheduler {
             let accepted = await feedScheduler.submit(samples: samples, sampleRate: sampleRate)
-            if !accepted, !hasLoggedFeedOverload {
-                hasLoggedFeedOverload = true
-                VoxtLog.meetingWarning(
-                    "Meeting native MLX feed reached its 10-second safety bound. speaker=\(speaker.rawValue), repo=\(modelManager.currentModelRepo)"
-                )
+            if !accepted {
+                let message = await feedScheduler.failureMessage ?? "Live audio delivery stopped. Recorded audio is preserved."
+                await failAndCancel(message: message)
+                return
             }
         }
 
@@ -238,16 +140,45 @@ private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession 
     }
 
     func finish() async {
-        guard state != .stopping else { return }
+        guard state != .stopping, state != .failed, !isCancelled else { return }
         state = .stopping
-        await feedScheduler?.finish()
-        if let eventTask {
-            await eventTask.value
+        // A broken provider must not hold meeting finalization forever. Cancelling
+        // the consumer also wakes an AsyncStream awaiting a missing terminal event.
+        let watchdog = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(120)) } catch { return }
+            await self?.failAndCancel(message: "Live transcription timed out. Recorded audio is preserved for final processing.")
         }
-        if !didEmitStructuredEndedSegments {
-            finalizeVisibleSegment(at: timelineOffsetSeconds + totalAudioSeconds)
+        defer { watchdog.cancel() }
+        do {
+            try await feedScheduler?.finish()
+            if let eventTask {
+                let scheduler = feedScheduler
+                await withTaskCancellationHandler {
+                    await eventTask.value
+                } onCancel: {
+                    eventTask.cancel()
+                    Task { await scheduler?.cancel() }
+                }
+            }
+            try Task.checkCancellation()
+            guard !isCancelled, state != .failed else { return }
+            if !didEmitStructuredEndedSegments {
+                finalizeVisibleSegment(at: timelineOffsetSeconds + totalAudioSeconds)
+            }
+            eventHandler?(.finished(speaker: speaker))
+            release()
+        } catch {
+            await failAndCancel(message: error.localizedDescription)
         }
-        eventHandler?(.finished(speaker: speaker))
+    }
+
+    private func failAndCancel(message: String) async {
+        guard !isCancelled else { return }
+        isCancelled = true
+        state = .failed
+        await feedScheduler?.cancel()
+        eventTask?.cancel()
+        eventHandler?(.failed(speaker: speaker, message: message))
         release()
     }
 
@@ -281,7 +212,9 @@ private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession 
             finalizeVisibleSegment(at: timelineOffsetSeconds + totalAudioSeconds)
         case .failed(let failure):
             state = .failed
-            eventHandler?(.failed(speaker: speaker, message: failure.localizedDescription))
+            Task { @MainActor [self] in
+                await failAndCancel(message: failure.localizedDescription)
+            }
         case .stats:
             break
         }

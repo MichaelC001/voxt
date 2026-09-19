@@ -42,9 +42,9 @@ final class MeetingASRSupportTests: XCTestCase {
         let context = MeetingASRSupport.resolveContext(
             transcriptionEngine: TranscriptionEngine.resolved(rawValue: "whisperKit"),
             mlxModelState: .ready,
-            mlxCurrentModelRepo: "mlx-community/Voxtral-Mini-4B-Realtime-2602-fp16",
+            mlxCurrentModelRepo: "mlx-community/whisper-large-v3-turbo",
             mlxIsCurrentModelLoaded: true,
-            mlxDisplayTitle: { _ in "Voxtral 4B" },
+            mlxDisplayTitle: { _ in "Whisper Large v3 Turbo" },
             remoteProvider: .openAIWhisper,
             remoteConfiguration: .init(providerID: RemoteASRProvider.openAIWhisper.rawValue, model: "whisper-1", endpoint: "", apiKey: "")
         )
@@ -54,17 +54,17 @@ final class MeetingASRSupportTests: XCTestCase {
         XCTAssertFalse(context.needsModelInitialization)
         XCTAssertEqual(
             context.historyModelDescription,
-            "Voxtral 4B (mlx-community/Voxtral-Mini-4B-Realtime-2602-fp16)"
+            "Whisper Large v3 Turbo (mlx-community/whisper-large-v3-turbo)"
         )
     }
 
-    func testHiddenMLXRealtimeModelDoesNotEnterOptimizedLivePath() {
+    func testBatchWhisperModelUsesChunkPath() {
         let context = MeetingASRSupport.resolveContext(
             transcriptionEngine: .mlxAudio,
             mlxModelState: .ready,
-            mlxCurrentModelRepo: "mlx-community/Voxtral-Mini-4B-Realtime-2602-fp16",
+            mlxCurrentModelRepo: "mlx-community/whisper-large-v3-turbo",
             mlxIsCurrentModelLoaded: true,
-            mlxDisplayTitle: { _ in "Voxtral 4B" },
+            mlxDisplayTitle: { _ in "Whisper Large v3 Turbo" },
             remoteProvider: .openAIWhisper,
             remoteConfiguration: .init(providerID: RemoteASRProvider.openAIWhisper.rawValue, model: "whisper-1", endpoint: "", apiKey: "")
         )
@@ -175,7 +175,6 @@ final class MeetingASRSupportTests: XCTestCase {
         )
         XCTAssertEqual(gate.silenceDuration, 0)
     }
-
 
 
     func testOpenAIPseudoRealtimeUsesRealtimeProfile() {

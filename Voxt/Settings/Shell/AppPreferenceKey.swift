@@ -99,8 +99,6 @@ enum AppPreferenceKey {
     static let meetingChunkingMode = "meetingChunkingMode"
     nonisolated static let meetingSileroVADSensitivity = "meetingSileroVADSensitivity"
     nonisolated static let meetingServerVADMode = "meetingServerVADMode"
-    nonisolated static let meetingSpeakerDiarizationSensitivity = "meetingSpeakerDiarizationSensitivity"
-    nonisolated static let meetingSpeakerDiarizationDebugEnabled = "meetingSpeakerDiarizationDebugEnabled"
     nonisolated static let meetingSpeakerDiarizationModel = "meetingSpeakerDiarizationModel"
     nonisolated static let meetingRealtimeDiarizationMode = "meetingRealtimeDiarizationMode"
     static let meetingFinalTranscriptOptimizationEnabled = "meetingFinalTranscriptOptimizationEnabled"

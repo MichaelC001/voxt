@@ -87,8 +87,17 @@ extension AppDelegate {
             )
         }
 
+        let selectedLocalRepo: String?
+        if case .localLLM(let repo) = meetingFeatureSettings.summaryModelSelectionID.textSelection {
+            selectedLocalRepo = CustomLLMModelManager.canonicalModelRepo(repo)
+        } else {
+            selectedLocalRepo = nil
+        }
         let downloadedCustomOptions: [MeetingSummaryModelOption] = CustomLLMModelManager.displayModels(including: customLLMManager.currentModelRepo).compactMap { model -> MeetingSummaryModelOption? in
-            guard customLLMManager.isModelDownloaded(repo: model.id) else {
+            // Keep the user's configured local model during its initial scan;
+            // do not silently switch to another provider while status is unknown.
+            guard customLLMManager.isModelDownloaded(repo: model.id)
+                || (model.id == selectedLocalRepo && customLLMManager.isCheckingInstallation(repo: model.id)) else {
                 return nil
             }
             return MeetingSummaryModelOption(
@@ -540,7 +549,7 @@ extension AppDelegate {
         }
 
         if let repo = value(in: selectionID, forPrefix: "custom-llm:") {
-            guard customLLMManager.isModelDownloaded(repo: repo) else { return nil }
+            guard customLLMManager.canAttemptInference(repo: repo) else { return nil }
             return .customLLM(repo: repo)
         }
 

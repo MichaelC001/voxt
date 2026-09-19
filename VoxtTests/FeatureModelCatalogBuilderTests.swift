@@ -263,15 +263,12 @@ final class FeatureModelCatalogBuilderTests: XCTestCase {
         XCTAssertFalse(entry.displayTags.contains(AppLocalization.localizedString("Multilingual")))
     }
 
-    func testCanaryCapabilityDoesNotClaimChinesePrimaryLanguageSupport() {
-        let repo = "Mediform/canary-1b-v2-mlx-q8"
+    func testParakeetCapabilityDoesNotClaimChinesePrimaryLanguageSupport() {
+        let repo = "mlx-community/parakeet-tdt-0.6b-v3"
 
         XCTAssertFalse(MLXModelCatalog.supportsLanguage("zh", for: repo))
         XCTAssertTrue(MLXModelCatalog.supportsLanguage("de", for: repo))
     }
-
-
-
 
 
     func testLLMSelectorUsesCuratedRatingAndTags() throws {
@@ -290,7 +287,7 @@ final class FeatureModelCatalogBuilderTests: XCTestCase {
         XCTAssertFalse(entry.displayTags.contains(AppLocalization.localizedString("Fast")))
     }
 
-    func testLLMSelectorIncludesHiddenLocalLLMFeatureSelection() throws {
+    func testLLMSelectorMigratesRetiredLocalLLMFeatureSelection() throws {
         let repo = "mlx-community/gemma-2-2b-it-4bit"
         let builder = makeBuilder(
             featureSettings: makeFeatureSettings(translationModel: .localLLM(repo))
@@ -306,9 +303,6 @@ final class FeatureModelCatalogBuilderTests: XCTestCase {
         XCTAssertEqual(entry.title, CustomLLMModelCatalog.displayTitle(for: repo))
         XCTAssertTrue(entry.usageLocations.contains(AppLocalization.localizedString("Translation")))
     }
-
-
-
 
 
     func testMLXSelectorUsesCuratedRatingAndTags() throws {
@@ -341,14 +335,6 @@ final class FeatureModelCatalogBuilderTests: XCTestCase {
         XCTAssertTrue(entry.displayTags.contains(AppLocalization.localizedString("Realtime")))
     }
 
-    func testInstalledHiddenMLXWhisperModelRemainsSelectableInSelector() throws {
-        let repo = "mlx-community/whisper-base-mlx"
-        let availability = FeatureModelCatalogBuilder.mlxSelectorAvailability(isInstalled: true)
-
-        XCTAssertFalse(MLXModelManager.isAvailableModelRepo(repo))
-        XCTAssertTrue(availability.isSelectable)
-        XCTAssertNil(availability.disabledReason)
-    }
 
     func testLegacyWhisperSelectionSummaryUsesMigratedMLXWhisperModel() throws {
         let modelID = "medium"
@@ -415,7 +401,7 @@ final class FeatureModelCatalogBuilderTests: XCTestCase {
         XCTAssertEqual(aliyun.badgeText, recommended)
     }
 
-    func testSelectorGroupedFamiliesShowRecommendedBadgesForWhisperQwenASRAndGemma() throws {
+    func testSelectorGroupedFamiliesShowRecommendedBadgesForWhisperQwenASRAndQwenLLM() throws {
         let builder = makeBuilder(
             featureSettings: makeFeatureSettings(
                 transcriptionASR: .mlx("mlx-community/whisper-large-v3-turbo"),
@@ -445,9 +431,9 @@ final class FeatureModelCatalogBuilderTests: XCTestCase {
                 return group
             }.first
         )
-        let gemmaGroup = try XCTUnwrap(
+        let qwenLLMGroup = try XCTUnwrap(
             llmGroups.compactMap { item -> FeatureModelSelectorGroupSection? in
-                guard case .group(let group) = item, group.title == "Gemma" else { return nil }
+                guard case .group(let group) = item, group.title == "Qwen" else { return nil }
                 return group
             }.first
         )
@@ -455,7 +441,7 @@ final class FeatureModelCatalogBuilderTests: XCTestCase {
         XCTAssertEqual(whisperGroup.badgeText, recommended)
         XCTAssertEqual(whisperGroup.entries.map(\.groupedVariantTitle), ["Large v3 Turbo", "Large v3", "Small"])
         XCTAssertEqual(qwenGroup.badgeText, recommended)
-        XCTAssertEqual(gemmaGroup.badgeText, recommended)
+        XCTAssertEqual(qwenLLMGroup.badgeText, recommended)
     }
 
     private func makeBuilder(

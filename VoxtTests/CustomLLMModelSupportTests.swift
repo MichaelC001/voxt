@@ -33,15 +33,15 @@ final class CustomLLMModelSupportTests: XCTestCase {
         XCTAssertFalse(CustomLLMModelCatalog.isSupportedModelRepo("unsupported/repo"))
         XCTAssertEqual(
             CustomLLMModelCatalog.displayTitle(for: "mlx-community/Qwen3-4B-4bit"),
-            "Qwen3 4B (4bit)"
+            "Qwen3.5 4B OptiQ (4bit)"
         )
         XCTAssertEqual(
             CustomLLMModelCatalog.canonicalModelRepo("Qwen/Qwen3-8B-4bit"),
-            "mlx-community/Qwen3-8B-4bit"
+            "mlx-community/Qwen3.5-9B-OptiQ-4bit"
         )
         XCTAssertEqual(
             CustomLLMModelCatalog.canonicalModelRepo("mlx-community/Qwen3.5-0.8B-4bit-OptiQ"),
-            "mlx-community/Qwen3.5-0.8B-OptiQ-4bit"
+            "mlx-community/Qwen3.5-2B-4bit"
         )
         XCTAssertEqual(
             CustomLLMModelCatalog.displayTitle(for: "custom/repo"),
@@ -81,13 +81,13 @@ final class CustomLLMModelSupportTests: XCTestCase {
     }
 
 
-    func testHiddenLLMModelsDisplayOnlyWhenIncludedByLocalState() {
+    func testRetiredLLMModelsNeverReappearFromLocalState() {
         let hiddenRepo = "mlx-community/gemma-2-2b-it-4bit"
 
         XCTAssertFalse(
             CustomLLMModelCatalog.displayModels(includingInstalled: []).contains { $0.id == hiddenRepo }
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             CustomLLMModelCatalog.displayModels(includingInstalled: [hiddenRepo]).contains { $0.id == hiddenRepo }
         )
     }
@@ -142,7 +142,7 @@ final class CustomLLMModelSupportTests: XCTestCase {
         XCTAssertTrue(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/Qwen2.5-VL-3B-Instruct-4bit"))
         XCTAssertTrue(CustomLLMModelCatalog.supportsImageInput(repo: "lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit"))
         XCTAssertTrue(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/Ministral-3-3B-Instruct-2512-4bit"))
-        XCTAssertTrue(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/paligemma-3b-mix-448-8bit"))
+        XCTAssertFalse(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/paligemma-3b-mix-448-8bit"))
         XCTAssertFalse(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/Qwen3-8B-4bit"))
     }
 

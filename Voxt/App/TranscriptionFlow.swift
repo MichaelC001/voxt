@@ -33,7 +33,7 @@ extension AppDelegate {
 
         case .customLLM:
             guard let enhancementRepo = resolvedTranscriptionEnhancementLocalRepo(),
-                  customLLMManager.isModelDownloaded(repo: enhancementRepo) else {
+                  customLLMManager.canAttemptInference(repo: enhancementRepo) else {
                 VoxtLog.asrWarning("Custom LLM selected but local model is not installed. Using raw transcription.")
                 showOverlayStatus(
                     AppLocalization.localizedString("Custom LLM model is not installed. Open Settings > Model to install it."),

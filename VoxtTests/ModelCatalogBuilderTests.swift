@@ -35,8 +35,6 @@ final class ModelCatalogBuilderTests: XCTestCase {
     }
 
 
-
-
     func testModelCatalogTagPriorityDoesNotExposeMultilingualFilter() {
         XCTAssertFalse(ModelCatalogTag.priority.contains(AppLocalization.localizedString("Multilingual")))
     }
@@ -148,8 +146,8 @@ final class ModelCatalogBuilderTests: XCTestCase {
         XCTAssertFalse(entry.displayTags.contains(AppLocalization.localizedString("Multilingual")))
     }
 
-    func testCanaryLanguageTagUsesItsOfficialLanguageList() {
-        let repo = "Mediform/canary-1b-v2-mlx-q8"
+    func testParakeetLanguageTagUsesItsOfficialLanguageList() {
+        let repo = "mlx-community/parakeet-tdt-0.6b-v3"
         let chineseBuilder = makeBuilder(
             featureSettings: makeFeatureSettings(transcriptionASR: .mlx(repo)),
             primaryUserLanguageCode: "zh-Hans"
@@ -246,7 +244,7 @@ final class ModelCatalogBuilderTests: XCTestCase {
 
     func testCustomLLMCatalogShowsPauseForDownloadingNonSelectedModel() throws {
         let selectedRepo = "mlx-community/Qwen3-8B-4bit"
-        let downloadingRepo = "mlx-community/Qwen3-4B-4bit"
+        let downloadingRepo = "mlx-community/Qwen3.5-4B-OptiQ-4bit"
         let builder = makeBuilder(
             featureSettings: makeFeatureSettings(translationModel: .localLLM(selectedRepo)),
             isDownloadingCustomLLM: { repo in
@@ -335,9 +333,6 @@ final class ModelCatalogBuilderTests: XCTestCase {
     }
 
 
-
-
-
     func testMLXCatalogUsesCuratedRatingAndTags() throws {
         let repo = "beshkenadze/cohere-transcribe-03-2026-mlx-fp16"
         let builder = makeBuilder(
@@ -414,7 +409,7 @@ final class ModelCatalogBuilderTests: XCTestCase {
         XCTAssertEqual(aliyun.badgeText, recommended)
     }
 
-    func testCatalogShowsRecommendedBadgeForWhisperQwenASRAndGemmaGroups() throws {
+    func testCatalogShowsRecommendedBadgeForWhisperQwenASRAndQwenLLMGroups() throws {
         let builder = makeBuilder(
             featureSettings: makeFeatureSettings(
                 transcriptionASR: .mlx("mlx-community/whisper-large-v3-turbo"),
@@ -438,9 +433,9 @@ final class ModelCatalogBuilderTests: XCTestCase {
                 return group
             }.first
         )
-        let gemmaGroup = try XCTUnwrap(
+        let qwenLLMGroup = try XCTUnwrap(
             llmGroups.compactMap { item -> ModelCatalogGroupSection? in
-                guard case .group(let group) = item, group.title == "Gemma" else { return nil }
+                guard case .group(let group) = item, group.title == "Qwen" else { return nil }
                 return group
             }.first
         )
@@ -448,7 +443,7 @@ final class ModelCatalogBuilderTests: XCTestCase {
         XCTAssertEqual(whisperGroup.badgeText, recommended)
         XCTAssertEqual(whisperGroup.entries.map(\.groupedVariantTitle), ["Large v3 Turbo", "Large v3", "Small"])
         XCTAssertEqual(qwenGroup.badgeText, recommended)
-        XCTAssertEqual(gemmaGroup.badgeText, recommended)
+        XCTAssertEqual(qwenLLMGroup.badgeText, recommended)
     }
 
     private func makeBuilder(

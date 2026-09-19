@@ -22,7 +22,6 @@
 		E2A1C3B4D5F60718293A4B6C /* PermissionFlow in Frameworks */ = {isa = PBXBuildFile; productRef = E2A1C3B4D5F60718293A4B6D /* PermissionFlow */; };
 		E2A1C3B4D5F60718293A4B6E /* SystemSettingsKit in Frameworks */ = {isa = PBXBuildFile; productRef = E2A1C3B4D5F60718293A4B6F /* SystemSettingsKit */; };
 		F1A2B3C4D5E6F708090A0B0C /* FaviconFinder in Frameworks */ = {isa = PBXBuildFile; productRef = F1A2B3C4D5E6F708090A0B0D /* FaviconFinder */; };
-		F7A1B2C3D4E5F60718293A01 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = F7A1B2C3D4E5F60718293A02 /* FluidAudio */; };
 		FA11DBA0FA11DBA0FA11DBA0 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = FA11DBA1FA11DBA1FA11DBA1 /* GRDB */; };
 /* End PBXBuildFile section */
 
@@ -155,7 +154,6 @@
 				E2A1C3B4D5F60718293A4B6C /* PermissionFlow in Frameworks */,
 				E2A1C3B4D5F60718293A4B6E /* SystemSettingsKit in Frameworks */,
 				F1A2B3C4D5E6F708090A0B0C /* FaviconFinder in Frameworks */,
-				F7A1B2C3D4E5F60718293A01 /* FluidAudio in Frameworks */,
 				FA11DBA0FA11DBA0FA11DBA0 /* GRDB in Frameworks */,
 				AABBCCDDEEFF001122334457 /* Logging in Frameworks */,
 			);
@@ -270,7 +268,6 @@
 				E2A1C3B4D5F60718293A4B6D /* PermissionFlow */,
 				E2A1C3B4D5F60718293A4B6F /* SystemSettingsKit */,
 				F1A2B3C4D5E6F708090A0B0D /* FaviconFinder */,
-				F7A1B2C3D4E5F60718293A02 /* FluidAudio */,
 				FA11DBA1FA11DBA1FA11DBA1 /* GRDB */,
 				AABBCCDDEEFF001122334456 /* Logging */,
 			);
@@ -334,7 +331,6 @@
 				C1D2E3F4A5060708090A0B03 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				E2A1C3B4D5F60718293A4B70 /* XCRemoteSwiftPackageReference "PermissionFlow" */,
 				F1A2B3C4D5E6F708090A0B0E /* XCRemoteSwiftPackageReference "FaviconFinder" */,
-				F7A1B2C3D4E5F60718293A03 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				FA11DBA2FA11DBA2FA11DBA2 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				AABBCCDDEEFF001122334455 /* XCRemoteSwiftPackageReference "swift-log" */,
 				BB11CC22DD33EE44FF556670 /* XCRemoteSwiftPackageReference "llama.swift" */,
@@ -989,24 +985,24 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/hehehai/mlx-audio-swift.git";
 			requirement = {
-				kind = exactVersion;
-				version = "0.1.3-voxt.12";
+				kind = revision;
+				revision = 2a6e75d28ae6a399ba7c7aec842384ef7a3142b5;
 			};
 		};
 		AABBCCDDEEFF001122334455 /* XCRemoteSwiftPackageReference "swift-log" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-log.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.6.0;
+				kind = exactVersion;
+				version = 1.15.1;
 			};
 		};
 		B1C2D3E4F5060708090A0B0E /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.6.4;
+				kind = exactVersion;
+				version = 2.10.0;
 			};
 		};
 		BB11CC22DD33EE44FF556670 /* XCRemoteSwiftPackageReference "llama.swift" */ = {
@@ -1022,7 +1018,7 @@
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm.git";
 			requirement = {
 				kind = revision;
-				revision = d2424294a6c3bbd0de37a0761d80efc05e6813dd;
+				revision = c6446cf7bfb7cea76408013b614d4b2c530eaa03;
 			};
 		};
 		E2A1C3B4D5F60718293A4B70 /* XCRemoteSwiftPackageReference "PermissionFlow" */ = {
@@ -1037,24 +1033,16 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/will-lumley/FaviconFinder.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 5.1.5;
-			};
-		};
-		F7A1B2C3D4E5F60718293A03 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
-			requirement = {
 				kind = exactVersion;
-				version = 0.15.6;
+				version = 5.1.5;
 			};
 		};
 		FA11DBA2FA11DBA2FA11DBA2 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 7.10.0;
+				kind = exactVersion;
+				version = 7.11.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -1119,11 +1107,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F1A2B3C4D5E6F708090A0B0E /* XCRemoteSwiftPackageReference "FaviconFinder" */;
 			productName = FaviconFinder;
-		};
-		F7A1B2C3D4E5F60718293A02 /* FluidAudio */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F7A1B2C3D4E5F60718293A03 /* XCRemoteSwiftPackageReference "FluidAudio" */;
-			productName = FluidAudio;
 		};
 		FA11DBA1FA11DBA1FA11DBA1 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;

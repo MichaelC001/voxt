@@ -178,8 +178,10 @@ extension OnboardingSettingsView {
                     mlxModelManager.cancelDownload()
                 },
                 onUninstall: {
-                    mlxModelManager.deleteModel(repo: mlxModelRepo)
-                    mlxModelManager.checkExistingModel()
+                    Task {
+                        await mlxModelManager.deleteModel(repo: mlxModelRepo)
+                        mlxModelManager.checkExistingModel()
+                    }
                 }
             )
         }
@@ -272,7 +274,7 @@ extension OnboardingSettingsView {
                     customLLMManager.cancelDownload(repo: customLLMRepo)
                 },
                 onUninstall: {
-                    customLLMManager.deleteModel(repo: customLLMRepo)
+                    Task { await customLLMManager.deleteModel(repo: customLLMRepo) }
                 }
             )
         }

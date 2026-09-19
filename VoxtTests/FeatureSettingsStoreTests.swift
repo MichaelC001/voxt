@@ -437,7 +437,7 @@ final class FeatureSettingsStoreTests: XCTestCase {
     func testMeetingRuntimePreferencesDoNotUseMeetingVADBackend() throws {
         try withEphemeralDefaults { defaults in
             XCTAssertEqual(MeetingChunkingMode.stored(in: defaults), .quality)
-            XCTAssertEqual(MeetingDiarizationMode.stored(in: defaults), .offlineVBx)
+            XCTAssertEqual(MeetingDiarizationMode.stored(in: defaults), .sortformerV2)
 
             defaults.set(MeetingChunkingMode.quality.rawValue, forKey: AppPreferenceKey.meetingChunkingMode)
             defaults.set(MeetingDiarizationMode.sortformerV2.rawValue, forKey: AppPreferenceKey.meetingRealtimeDiarizationMode)
@@ -452,27 +452,27 @@ final class FeatureSettingsStoreTests: XCTestCase {
 
             XCTAssertEqual(settings.meeting.chunkingMode, .quality)
             XCTAssertEqual(settings.meeting.sileroVADSensitivity, .responsive)
-            XCTAssertEqual(settings.meeting.speakerDiarizationModel, .offlineVBx)
+            XCTAssertEqual(settings.meeting.speakerDiarizationModel, .sortformerV2)
             XCTAssertFalse(settings.meeting.finalTranscriptOptimizationEnabled)
 
             settings.meeting.chunkingModeRawValue = MeetingChunkingMode.realtime.rawValue
             settings.meeting.sileroVADSensitivityRawValue = MeetingSileroVADSensitivity.stable.rawValue
-            settings.meeting.speakerDiarizationModelRawValue = MeetingDiarizationMode.offlineVBx.rawValue
+            settings.meeting.speakerDiarizationModelRawValue = MeetingDiarizationMode.sortformerV2.rawValue
             settings.meeting.finalTranscriptOptimizationEnabled = false
             FeatureSettingsStore.save(settings, defaults: defaults)
             FeatureSettingsStore.prepareMeetingRuntime(from: settings, defaults: defaults)
 
             XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.meetingChunkingMode), MeetingChunkingMode.realtime.rawValue)
-            XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.meetingSpeakerDiarizationModel), MeetingDiarizationMode.offlineVBx.rawValue)
+            XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.meetingSpeakerDiarizationModel), MeetingDiarizationMode.sortformerV2.rawValue)
             XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.meetingSileroVADSensitivity), "stable")
             XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.meetingServerVADMode), "stable")
-            XCTAssertEqual(defaults.string(forKey: "meetingSpeakerDiarizationSensitivity"), "sensitive")
-            XCTAssertEqual(defaults.string(forKey: "meetingSpeakerCountHint"), "maxThree")
-            XCTAssertTrue(defaults.bool(forKey: "meetingSpeakerDiarizationDebugEnabled"))
+            XCTAssertNil(defaults.object(forKey: "meetingSpeakerDiarizationSensitivity"))
+            XCTAssertNil(defaults.object(forKey: "meetingSpeakerCountHint"))
+            XCTAssertNil(defaults.object(forKey: "meetingSpeakerDiarizationDebugEnabled"))
             XCTAssertFalse(defaults.bool(forKey: AppPreferenceKey.meetingFinalTranscriptOptimizationEnabled))
             XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults).meeting.chunkingMode, .realtime)
             XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults).meeting.sileroVADSensitivity, .stable)
-            XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults).meeting.speakerDiarizationModel, .offlineVBx)
+            XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults).meeting.speakerDiarizationModel, .sortformerV2)
             XCTAssertFalse(FeatureSettingsStore.load(defaults: defaults).meeting.finalTranscriptOptimizationEnabled)
         }
     }
@@ -495,7 +495,7 @@ final class FeatureSettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(settings.chunkingMode, .quality)
         XCTAssertEqual(settings.sileroVADSensitivity, .balanced)
-        XCTAssertEqual(settings.speakerDiarizationModel, .offlineVBx)
+        XCTAssertEqual(settings.speakerDiarizationModel, .sortformerV2)
         XCTAssertTrue(settings.finalTranscriptOptimizationEnabled)
     }
 
@@ -524,23 +524,37 @@ final class FeatureSettingsStoreTests: XCTestCase {
     func testMeetingDiarizationModeIgnoresLegacyRealtimeKey() throws {
         try withEphemeralDefaults { defaults in
             defaults.set(MeetingDiarizationMode.sortformerV2.rawValue, forKey: AppPreferenceKey.meetingRealtimeDiarizationMode)
-            XCTAssertEqual(MeetingDiarizationMode.stored(in: defaults), .offlineVBx)
+            XCTAssertEqual(MeetingDiarizationMode.stored(in: defaults), .sortformerV2)
 
             defaults.set(MeetingDiarizationMode.sortformerV2.rawValue, forKey: AppPreferenceKey.meetingSpeakerDiarizationModel)
             XCTAssertEqual(MeetingDiarizationMode.stored(in: defaults), .sortformerV2)
         }
     }
 
+    func testRetiredDiarizerMigrationIsIdempotent() throws {
+        try withEphemeralDefaults { defaults in
+            defaults.set("offlineVBx", forKey: AppPreferenceKey.meetingSpeakerDiarizationModel)
+            defaults.set("maxSix", forKey: "meetingSpeakerCountHint")
+            FeatureSettingsStore.migrateIfNeeded(defaults: defaults)
+            let first = defaults.string(forKey: AppPreferenceKey.featureSettings)
+            XCTAssertEqual(MeetingDiarizationMode.stored(in: defaults), .sortformerV2)
+            XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.meetingSpeakerDiarizationModel), "sortformerV2")
+            XCTAssertNil(defaults.object(forKey: "meetingSpeakerCountHint"))
+            XCTAssertFalse(first?.contains("offlineVBx") ?? true)
+            FeatureSettingsStore.migrateIfNeeded(defaults: defaults)
+            XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults).meeting.speakerDiarizationModel, .sortformerV2)
+        }
+    }
+
     func testMeetingSpeakerRuntimeOptionsIgnoreLegacyPreferences() throws {
         try withEphemeralDefaults { defaults in
             defaults.set(MeetingSpeakerDiarizationSensitivity.sensitive.rawValue, forKey: "meetingSpeakerDiarizationSensitivity")
-            defaults.set(MeetingSpeakerCountHint.maxFour.rawValue, forKey: "meetingSpeakerCountHint")
+            defaults.set("maxFour", forKey: "meetingSpeakerCountHint")
             defaults.set(true, forKey: "meetingSpeakerDiarizationDebugEnabled")
 
             let options = MeetingSpeakerDiarizationOptions.fromPreferences(defaults: defaults)
 
             XCTAssertEqual(options.sensitivity, .balanced)
-            XCTAssertEqual(options.speakerCountHint, .auto)
             XCTAssertFalse(options.debugLoggingEnabled)
             XCTAssertEqual(options.minimumSpeakerConfidence, MeetingSpeakerDiarizationSensitivity.balanced.minimumSpeakerConfidence)
             XCTAssertEqual(options.smoothing, MeetingSpeakerDiarizationSensitivity.balanced.smootherOptions)

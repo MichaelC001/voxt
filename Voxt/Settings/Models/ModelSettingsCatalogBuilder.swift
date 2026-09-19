@@ -220,7 +220,7 @@ struct ModelCatalogBuilder {
             switch snapshot.state {
             case .installed, .downloading, .paused:
                 return repo
-            case .installable, .cancelling, .uninstalling:
+            case .checking, .installable, .cancelling, .uninstalling:
                 return nil
             }
         })
@@ -249,7 +249,7 @@ struct ModelCatalogBuilder {
             switch snapshot.state {
             case .installed, .downloading, .paused:
                 return model.id
-            case .installable, .cancelling, .uninstalling:
+            case .checking, .installable, .cancelling, .uninstalling:
                 return nil
             }
         })

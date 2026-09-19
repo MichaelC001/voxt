@@ -140,6 +140,7 @@ extension AppDelegate {
             return false
         }
 
+        let sourceWindowNumber = NSApp.isActive ? NSApp.keyWindow?.windowNumber : nil
         pendingSessionFinishTask?.cancel()
         pendingSessionFinishTask = nil
         silenceMonitorTask?.cancel()
@@ -191,6 +192,11 @@ extension AppDelegate {
             interactionSoundPlayer.playStart()
         }
 
+        OnboardingSessionEvent.started(
+            id: activeRecordingSessionID,
+            kind: .selectedTextTranslation,
+            windowNumber: sourceWindowNumber
+        ).post()
         VoxtLog.translation("Selected text translation started. inputChars=\(selectedText.count)")
         prewarmSelectedTextTranslationLLMIfNeeded(targetLanguage: effectiveSessionTranslationTargetLanguage)
         processSelectedTextTranslation(selectedText)
