@@ -215,11 +215,6 @@ extension AppDelegate {
             llmExecutions: sessionLLMExecutionTimings
         )
 
-        let dictionarySuggestions = previewDictionarySuggestions(
-            for: deliveredText,
-            candidates: dictionaryMatches,
-            correctedTerms: dictionaryCorrectedTerms
-        )
         let historyEntryID = appendHistoryIfNeeded(
             text: deliveredText,
             outputMode: outputMode,
@@ -229,7 +224,9 @@ extension AppDelegate {
             dictionaryHitTerms: Self.orderedUniqueDictionaryTerms(from: dictionaryMatches.map(\.term)),
             dictionaryCorrectedTerms: Self.orderedUniqueDictionaryTerms(from: dictionaryCorrectedTerms),
             dictionaryCorrectionSnapshots: dictionaryCorrectionSnapshots,
-            dictionarySuggestedTerms: dictionarySuggestions.map(\.snapshot),
+            // Automatic suggestion discovery is retired; keep the history field
+            // for older records. Explicit history scans add directly to DictionaryStore.
+            dictionarySuggestedTerms: [],
             rewriteConversationTurns: rewriteConversationTurns
         )
         overlayState.latestHistoryEntryID = historyEntryID
@@ -253,11 +250,7 @@ extension AppDelegate {
             didTriggerAutoKeyPress: didTriggerAutoKeyPress,
             historyEntryID: historyEntryID
         )
-        persistDictionaryEvidence(
-            candidates: dictionaryMatches,
-            suggestions: dictionarySuggestions,
-            historyEntryID: historyEntryID
-        )
+        dictionaryStore.recordMatches(dictionaryMatches)
         VoxtLog.input(
             "Deliver committed output finalized. historyEntryID=\(historyEntryID?.uuidString ?? "nil"), characters=\(deliveredText.count)",
             verbose: true

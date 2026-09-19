@@ -518,7 +518,6 @@ struct SettingsView: View {
                         historyStore: historyStore,
                         noteStore: noteStore,
                         dictionaryStore: dictionaryStore,
-                        dictionarySuggestionStore: dictionarySuggestionStore,
                         selectedFilter: $selectedHistoryFilter,
                         navigationRequest: navigationRequest
                     )

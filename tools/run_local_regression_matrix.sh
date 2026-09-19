@@ -168,6 +168,8 @@ run_refactor() {
     -only-testing:VoxtTests/TextInjectionTransactionTests
     -only-testing:VoxtTests/PasteboardTextWriterTests
     -only-testing:VoxtTests/RemoteProviderConnectivityTesterTests
+    -only-testing:VoxtTests/RemoteProviderConfigurationPolicyTests
+    -only-testing:VoxtTests/DictionarySuggestionStoreTests
     -only-testing:VoxtTests/MeetingCaptureTimelineTests
     -only-testing:VoxtTests/ModelDownloadStatusSnapshotTests
     -only-testing:VoxtTests/RemoteEndpointSecurityPolicyTests

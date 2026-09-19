@@ -85,6 +85,8 @@ Stage 6C adds `TextInjectionTransactionTests` (8), `PasteboardTextWriterTests` (
 
 Stage 6B retires four tests for unused local-LLM builders/size-cache helpers and redirects two repo-selection tests to the actual manager. `CustomLLMRequestRuntimeTests` adds six cases for current compiled plans, output extraction, tuning priority and prefill boundaries; source-selection tests add three attempt-order contracts. Existing resumable URLProtocol, install/cache and configuration/security suites remain in the focused gate. GGUF's three non-model tests are selected explicitly there, while installed inference stays in its opt-in group.
 
+Stage 6D adds eight `DictionarySuggestionStoreTests` and four provider-sheet validation cases. Legacy Codable/history fields, file merging, direct scan insertion, checkpoints and settings persistence use isolated defaults/temporary files. One old OpenAI-wrapper test now exercises the actual generation validation entry; existing tests are retained. The unused generic suggestion factory is removed; local legacy fixtures use explicit dates. Both suites are in `refactor`.
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.

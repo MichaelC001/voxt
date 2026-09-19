@@ -25,6 +25,8 @@ Stage 6B includes current local-LLM request policy, source selection, resumable 
 
 Stage 6C adds queued-injection and pasteboard-ownership tests, lifecycle output-generation cases, and the existing connectivity tester suite. Pasteboard tests use unique named boards, never the general clipboard. They do not post real keys or validate editor/focus behavior; manual acceptance must cover cancel/restart during paste, overlay dismissal, follow-up keys, window switching and concurrent user copies.
 
+Stage 6D adds `DictionarySuggestionStoreTests` and the existing `RemoteProviderConfigurationPolicyTests` to `refactor`. The store uses isolated defaults and temporary legacy files to check compatibility, merge/write-back, direct dictionary insertion and scan checkpoints; provider cases target current generation/schema validation rather than a retired OpenAI wrapper. These do not replace asynchronous reload/network or UI acceptance.
+
 The old `whisper` / `diagnostic` groups were removed because their dedicated Whisper test classes no longer exist. This does not remove MLX Whisper model support or migration coverage. Unknown groups fail rather than selecting nonexistent suites. The `all` / `full` groups avoid rerunning VAD suites already selected by core.
 
 See [test-suite organization](../VoxtTests/README.md) and the [phased refactoring record](RefactoringProgress.zh-CN.md).

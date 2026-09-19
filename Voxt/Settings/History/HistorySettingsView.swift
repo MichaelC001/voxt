@@ -18,7 +18,6 @@ struct HistorySettingsView: View {
     @ObservedObject var historyStore: TranscriptionHistoryStore
     @ObservedObject var noteStore: VoxtNoteStore
     @ObservedObject var dictionaryStore: DictionaryStore
-    @ObservedObject var dictionarySuggestionStore: DictionarySuggestionStore
     @Binding var selectedFilter: HistoryFilterTab
     let navigationRequest: SettingsNavigationRequest?
     @State private var copyToastMessage = ""

@@ -18,12 +18,13 @@
 | 5C | 录音身份/提交、模型加载退出、会议导入资源与最终化快照 | 已实施，新增 22 个测试 | `25776d2` macOS CI 通过；整体集成验收仍待执行 |
 | 6A | Dictionary/History/MeetingDetail 拆分、孤儿调用链与 UI 清理 | 已实施 | `c55101a` macOS CI 通过；UI 待验收 |
 | 6B | 模型/续传/GGUF 与远程配置职责、退役本地 LLM API 清理 | 已实施 | `1b393a3` macOS CI 通过；模型/下载待人工验收 |
-| 6C | 文本交付代次/剪贴板所有权、历史/权限/连通性职责与孤儿链清理 | 已实施，净新增 20 个测试 | 等待本批 macOS CI；编辑器/UI 待验收 |
-| 6D / 最终验收 | 剩余大文件、进一步去重与性能/设备验证 | 待实施 | 仍有 9 个应用文件 >1,000 行，不标记全项目完成 |
+| 6C | 文本交付代次/剪贴板所有权、历史/权限/连通性职责与孤儿链清理 | 已实施，净新增 20 个测试 | `2d62d99` macOS CI 通过；编辑器/UI 待验收 |
+| 6D | 词典建议退役链、持久化兼容与远程设置校验/快照 | 已实施，新增 12 个测试 | 等待本批 macOS CI；UI/扫描待验收 |
+| 6E / 最终验收 | 剩余有状态大类、进一步去重与性能/设备验证 | 待实施 | 仍有 7 个应用文件 >1,000 行，不标记全项目完成 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
-阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 的 `1b393a3` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35448285265)。阶段 6C 仍需单独验证。
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 的 `1b393a3` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35448285265)。阶段 6C 的 `2d62d99` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35452065137)。阶段 6D 仍需单独验证。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -340,6 +341,31 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 - 应用 **483 个 Swift 文件、149,996 行**，本批净减少 **289 行**；>1,000 行文件 **15 → 9**。测试 **205 个文件、41,493 行**，均低于千行。
 - 剩余热点：MLXTranscriber（2,065）、HotkeyManager（1,858）、MeetingSessionCoordinator（1,821）、MLXModelManager（1,610）、HotkeySupport（1,438）、CustomLLMModelManager（1,429）、RemoteASRTranscriber（1,259）、RemoteProviderSheetState（1,149）、DictionarySuggestionStore（1,128）。不以文件缩小宣称性能改善或全项目重构完成。
 
+## 阶段 6D：词典建议兼容与远程设置
+
+### 退役链与保留边界
+
+- 当前录音后的 `previewDictionarySuggestions` 和 store 的旧 `discoverSuggestions` 始终返回空数组。删除这条空发现链、专属 draft / apply / evidence helper；`persistDictionaryEvidence` 收敛为原位置的 `dictionaryStore.recordMatches`。新历史仍写入空建议数组，**保留历史字段及旧快照解码**。
+- 删除自动历史扫描 no-op 与三个调用点；显式一键扫描仍通过 `applyHistoryScanCandidates` 直接写入词典，编辑后自动学习是另一条活跃路径，均未删除。
+- 核对 store 类型全部生产调用、测试与 UI 后，删除无入口的 pending/status/dismiss/add/bulk-add/reset/count API，以及始终为空且无人读取的非 Codable `snapshotsByHistoryID`。去掉 History 视图未使用的观察依赖、孤儿 scope label 和旧测试 factory。
+- **没有删除旧 `dictionary-suggestions.json` 文件、Codable 字段、枚举 raw value 或迁移键**。旧文件的 reload、去重、状态优先级、证据合并和必要写回原样保留；这里只删除退役写入入口，不把存量兼容代码当死代码。Store 增加 defaults/文件路径注入，默认路径与行为不变，测试不访问用户数据。
+- 建议/历史值归 `DictionarySuggestionModels`（99 行），过滤设置、旧 prompt 兼容及候选策略归 `DictionaryHistoryScanPolicy`（366 行）。可变进度、私有 Published setter、reload generation 与写回仍在 store；模型和策略正文定向比对不变。
+
+### 远程设置
+
+- `RemoteProviderSheetSnapshot`（217 行）负责配置、generation/ASR 值装配；`RemoteProviderSheetValidation`（233 行）负责端点与字段校验。父 SwiftUI view 继续持有状态；没有为了拆文件扩大 private setter 或宣称独立状态所有者。
+- 删除 15 个无调用/退役菜单属性及 helper，其中包括 test-only OpenAI token 校验包装和重复整数解析转发；删除两项只用于退役 UI 的 `@State` 及初始化赋值。**Core 持久化 OpenAI/provider 兼容字段仍保留**。
+- 一个旧 OpenAI 测试改测保存流程实际调用的 `validationMessageForGenerationSettings`，不再通过测试引用维持旧 API。
+- 93 个保留声明正文核对通过；唯一表达式简化是用相同实现的 `parsedOptionalInt` 替代 Ollama 专属转发。credential edit intent、端点安全策略、参数/JSON 校验顺序、默认值及快照装配语义不变。
+- 本批没有修改 Codex 模型列表加载或连接测试 task 的取消/迟到回调处理，也未重新设计 legacy async reload；这些运行时边界继续保留后续审查项。
+
+### 测试与规模
+
+- 新增 `DictionarySuggestionStoreTests` 8 项：旧枚举/证据 Codable round-trip、历史快照、去重写回、scope/状态优先级、直接扫描写入、成功 checkpoint、失败/取消进度及隔离设置持久化。复用 `TemporaryDirectory` / `TestDoubles` 并清理 defaults suite。
+- 远程设置新增 4 项：空白/合法 token、负数/小数/溢出、ASR 跳过非活动 generation 字段、OMLX schema 格式校验；保留原测试，聚焦组加入上述两个 suite。
+- `DictionarySuggestionStore` **1,128 → 389**；`RemoteProviderSheetState` **1,149 → 623**。应用 **487 个 Swift 文件、149,596 行**，本批净减少 **400 行**；千行文件 **9 → 7**。测试 **206 个文件、41,725 行**，静态方法 **1,702 → 1,714**，所有测试文件低于千行。
+- 剩余千行热点为 MLXTranscriber、HotkeyManager、MeetingSessionCoordinator、MLXModelManager、HotkeySupport、CustomLLMModelManager、RemoteASRTranscriber。继续按实际所有权推进，不以文件行数证明性能收益。
+
 ## 验证与下一门禁
 
 Linux 已执行：
@@ -348,7 +374,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-阶段 6C 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
+阶段 6D 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
@@ -357,6 +383,6 @@ bash tools/run_local_regression_matrix.sh refactor
 xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
 ```
 
-人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈、历史/Note 编辑；会议远程启动配置；本地 ASR live/final/取消；延迟粘贴时取消/重启、关闭答案、正常结束后的 Auto Key、切换应用/窗口和连续用户复制。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
+人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈、历史/Note 编辑、词典一键扫描及远程 provider 保存/测试；会议远程启动配置；本地 ASR live/final/取消；延迟粘贴时取消/重启、关闭答案、正常结束后的 Auto Key、切换应用/窗口和连续用户复制。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
 
 阶段 4 已补充 ASR/会议协议契约，阶段 5A–5C 收敛了上述核心所有者。阶段 6 继续整理剩余职责与集成验收；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。
