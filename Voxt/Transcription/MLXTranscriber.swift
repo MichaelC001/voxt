@@ -35,23 +35,6 @@ private struct MLXAudioEngineBox: @unchecked Sendable {
     nonisolated(unsafe) let engine: AVAudioEngine
 }
 
-nonisolated protocol MLXNativeStreamingSession: AnyObject, Sendable {
-    var events: AsyncStream<TranscriptionEvent> { get }
-    func feedAudio(samples: [Float])
-    func stop()
-    func cancel()
-}
-
-extension StreamingInferenceSession: MLXNativeStreamingSession {}
-extension NemotronASRStreamingSession: MLXNativeStreamingSession {}
-
-nonisolated struct MLXMeetingNativeStreamingConfiguration: Sendable {
-    let session: any MLXNativeStreamingSession
-    let liveMode: MLXLiveMode
-    let qwenUsesAutomaticLanguageProtocol: Bool
-    let mossVisibleOutputMode: MossASROutputMode?
-}
-
 @MainActor
 class MLXTranscriber: ObservableObject, TranscriberProtocol {
     @Published var isRecording = false
@@ -100,13 +83,10 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     /// Survive `cancelActiveTasks()` at session start so hotkey-time load is not aborted.
     private var earlyPrewarmTask: Task<Void, Never>?
     private var captureWatchdogTask: Task<Void, Never>?
-    private var liveSessionSetupTask: Task<Void, Never>?
+    private let liveSessionSetupTasks = TrackedTaskStore()
     private let correctionPasses = MLXCorrectionPassCoordinator()
     private var activeLiveMode = MLXModelManager.liveMode(for: MLXModelManager.defaultModelRepo)
-    private var nativeStreamingSession: (any MLXNativeStreamingSession)?
-    private var qwenStreamingEventTask: Task<Void, Never>?
-    private var qwenStreamingFeedTask: Task<Void, Never>?
-    private var nativeLiveModelPinned = false
+    private let nativeLiveRuntime = MLXNativeLiveRuntime()
     /// Keeps the ASR model resident for the whole recording + Final window so idle
     /// unload cannot race live release → postStopFinal.
     private var sessionModelPinned = false
@@ -247,12 +227,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             isRecording = true
             scheduleCaptureStartupWatchdog(revision: revision)
 
-            if activeLiveMode == .nativeQwenLive {
-                startNativeQwenLiveSession(revision: revision)
-            } else if activeLiveMode == .nativeStreamingLive {
-                startNativeStreamingLiveSession(revision: revision)
-            } else if activeLiveMode == .nativeNemotronLive {
-                startNativeNemotronLiveSession(revision: revision)
+            if MLXTranscriptionPlanning.isNativeLiveMode(activeLiveMode) {
+                startNativeLiveSession(revision: revision)
             } else if activeSessionBehavior.runsIntermediateCorrections {
                 correctionLoopTask = Task { [weak self] in
                     await self?.runIntermediateCorrectionLoop(revision: revision)
@@ -285,12 +261,10 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
 
         correctionLoopTask?.cancel()
         correctionLoopTask = nil
-        liveSessionSetupTask?.cancel()
-        liveSessionSetupTask = nil
-        qwenStreamingFeedTask?.cancel()
-        qwenStreamingFeedTask = nil
+        liveSessionSetupTasks.cancelAll()
+        nativeLiveRuntime.stopFeeding()
         drainPendingSamplesIntoQwenLiveSession()
-        nativeStreamingSession?.stop()
+        nativeLiveRuntime.session?.stop()
 
         let revision = sessionRevision
         let sampleRate = inputSampleRate
@@ -333,10 +307,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         let preloadTask = preloadTask
         let earlyPrewarmTask = earlyPrewarmTask
         let watchdogTask = captureWatchdogTask
-        let setupTask = liveSessionSetupTask
+        let setupTasks = liveSessionSetupTasks.cancelAll()
         let correctionPassTask = correctionPasses.currentTask
-        let streamingEventTask = qwenStreamingEventTask
-        let streamingFeedTask = qwenStreamingFeedTask
 
         sessionRevision += 1
         stopAudioEngine()
@@ -353,10 +325,9 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         await preloadTask?.value
         await earlyPrewarmTask?.value
         await watchdogTask?.value
-        await setupTask?.value
+        for task in setupTasks { await task.value }
         _ = await correctionPassTask?.value
-        await streamingEventTask?.value
-        await streamingFeedTask?.value
+        await nativeLiveRuntime.waitForRetirement()
 
         sampleStore.clear()
         voiceActivityFrameStore.clear()
@@ -374,7 +345,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     /// dictation transcriber and its lightweight VAD/audio state.
     @discardableResult
     func releaseIdleResources() -> Bool {
-        guard !isRecording, !isFinalizingTranscription, !correctionPasses.hasPendingWork else { return false }
+        guard !isRecording, !isFinalizingTranscription, !correctionPasses.hasPendingWork,
+              liveSessionSetupTasks.isEmpty, !nativeLiveRuntime.hasPendingWork else { return false }
 
         sessionRevision += 1
         stopAudioEngine()
@@ -927,8 +899,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         correctionLoopTask = nil
         finalizationTask?.cancel()
         finalizationTask = nil
-        liveSessionSetupTask?.cancel()
-        liveSessionSetupTask = nil
+        liveSessionSetupTasks.cancelAll()
         correctionPasses.cancel()
         isFinalizingTranscription = false
         preloadTask?.cancel()
@@ -1089,54 +1060,52 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         }
     }
 
-    private func startNativeQwenLiveSession(revision: Int) {
-        liveSessionSetupTask?.cancel()
-        liveSessionSetupTask = Task { @MainActor [weak self] in
+    private func startNativeLiveSession(revision: Int) {
+        liveSessionSetupTasks.cancelAll()
+        let expectedMode = activeLiveMode
+        liveSessionSetupTasks.start { [weak self] in
             guard let self else { return }
             let startedAt = Date()
-            var shouldReleaseModel = false
-            defer {
-                if shouldReleaseModel {
-                    self.modelManager.endActiveUse()
-                }
-            }
-
+            let manager = self.modelManager
+            manager.beginActiveUse()
+            var transferredModelUse = false
+            defer { if !transferredModelUse { manager.endActiveUse() } }
             do {
-                self.modelManager.beginActiveUse()
-                shouldReleaseModel = true
-                let loadedModel = try await self.modelManager.loadModel()
-                guard !Task.isCancelled,
-                      revision == self.sessionRevision,
-                      self.isRecording,
-                      self.activeLiveMode == .nativeQwenLive
-                else { return }
-                guard let qwenModel = loadedModel as? Qwen3ASRModel else {
-                    VoxtLog.asrWarning(
-                        "MLX native live requested for non-Qwen model. repo=\(self.modelManager.currentModelRepo)"
-                    )
+                let model = try await manager.loadModel()
+                guard !Task.isCancelled, revision == self.sessionRevision,
+                      self.isRecording, self.activeLiveMode == expectedMode else { return }
+                let releaseModel: @MainActor () -> Void = { manager.endActiveUse() }
+                defer {
+                    if !transferredModelUse {
+                        VoxtLog.asrWarning("MLX native live requested for incompatible model. repo=\(manager.currentModelRepo), mode=\(String(describing: expectedMode))")
+                    }
+                }
+                switch expectedMode {
+                case .nativeQwenLive:
+                    guard let model = model as? Qwen3ASRModel else { return }
+                    self.installNativeQwenLiveSession(model, revision: revision, releaseModel: releaseModel)
+                case .nativeStreamingLive:
+                    guard model is CohereTranscribeModel || model is MossTranscribeDiarizeModel else { return }
+                    self.installNativeStreamingLiveSession(model, revision: revision, releaseModel: releaseModel)
+                case .nativeNemotronLive:
+                    guard let model = model as? NemotronASRModel else { return }
+                    self.installNativeNemotronLiveSession(model, revision: revision, releaseModel: releaseModel)
+                case .batchPreview:
                     return
                 }
-
-                self.installNativeQwenLiveSession(qwenModel, revision: revision)
+                transferredModelUse = true
                 self.isModelInitializing = false
-                shouldReleaseModel = false
                 let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                VoxtLog.asr(
-                    "MLX native Qwen live session ready. repo=\(self.modelManager.currentModelRepo), elapsedMs=\(elapsedMs)",
-                    verbose: true
-                )
+                VoxtLog.asr("MLX native live session ready. repo=\(manager.currentModelRepo), mode=\(String(describing: expectedMode)), elapsedMs=\(elapsedMs)", verbose: true)
             } catch {
-                guard !Task.isCancelled else { return }
-                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                guard !Task.isCancelled, revision == self.sessionRevision else { return }
                 self.isModelInitializing = false
-                VoxtLog.asrWarning(
-                    "MLX native Qwen live session setup failed. repo=\(self.modelManager.currentModelRepo), elapsedMs=\(elapsedMs), error=\(error.localizedDescription)"
-                )
+                VoxtLog.asrWarning("MLX native live setup failed. repo=\(manager.currentModelRepo), mode=\(String(describing: expectedMode)), error=\(error.localizedDescription)")
             }
         }
     }
 
-    private func installNativeQwenLiveSession(_ model: Qwen3ASRModel, revision: Int) {
+    private func installNativeQwenLiveSession(_ model: Qwen3ASRModel, revision: Int, releaseModel: @escaping @MainActor () -> Void) {
         releaseNativeLiveSession(cancelSession: true)
         let language = resolvedNativeQwenLiveLanguage()
         let kvCachePolicy = MLXModelCatalog.capability(
@@ -1154,57 +1123,10 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 quantizedKVStart: kvCachePolicy?.quantizedStart ?? 0
             )
         )
-        installNativeLiveSession(session, revision: revision, modelPinned: true)
+        installNativeLiveSession(session, revision: revision, releaseModel: releaseModel)
     }
 
-    private func startNativeStreamingLiveSession(revision: Int) {
-        liveSessionSetupTask?.cancel()
-        liveSessionSetupTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            let startedAt = Date()
-            var shouldReleaseModel = false
-            defer {
-                if shouldReleaseModel {
-                    self.modelManager.endActiveUse()
-                }
-            }
-
-            do {
-                self.modelManager.beginActiveUse()
-                shouldReleaseModel = true
-                let loadedModel = try await self.modelManager.loadModel()
-                guard !Task.isCancelled,
-                      revision == self.sessionRevision,
-                      self.isRecording,
-                      self.activeLiveMode == .nativeStreamingLive
-                else { return }
-                guard loadedModel is CohereTranscribeModel || loadedModel is MossTranscribeDiarizeModel else {
-                    VoxtLog.asrWarning(
-                        "MLX native streaming live requested for unsupported model. repo=\(self.modelManager.currentModelRepo)"
-                    )
-                    return
-                }
-
-                self.installNativeStreamingLiveSession(loadedModel, revision: revision)
-                self.isModelInitializing = false
-                shouldReleaseModel = false
-                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                VoxtLog.asr(
-                    "MLX native streaming live session ready. repo=\(self.modelManager.currentModelRepo), elapsedMs=\(elapsedMs)",
-                    verbose: true
-                )
-            } catch {
-                guard !Task.isCancelled else { return }
-                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                self.isModelInitializing = false
-                VoxtLog.asrWarning(
-                    "MLX native streaming live session setup failed. repo=\(self.modelManager.currentModelRepo), elapsedMs=\(elapsedMs), error=\(error.localizedDescription)"
-                )
-            }
-        }
-    }
-
-    private func installNativeStreamingLiveSession(_ model: any STTGenerationModel, revision: Int) {
+    private func installNativeStreamingLiveSession(_ model: any STTGenerationModel, revision: Int, releaseModel: @escaping @MainActor () -> Void) {
         releaseNativeLiveSession(cancelSession: true)
         let inferenceConfiguration = resolvedInferenceConfiguration(for: .intermediate)
         let session = StreamingInferenceSession(
@@ -1217,57 +1139,10 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 usePunctuation: inferenceConfiguration.generationParameters.usePunctuation
             )
         )
-        installNativeLiveSession(session, revision: revision, modelPinned: true)
+        installNativeLiveSession(session, revision: revision, releaseModel: releaseModel)
     }
 
-    private func startNativeNemotronLiveSession(revision: Int) {
-        liveSessionSetupTask?.cancel()
-        liveSessionSetupTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            let startedAt = Date()
-            var shouldReleaseModel = false
-            defer {
-                if shouldReleaseModel {
-                    self.modelManager.endActiveUse()
-                }
-            }
-
-            do {
-                self.modelManager.beginActiveUse()
-                shouldReleaseModel = true
-                let loadedModel = try await self.modelManager.loadModel()
-                guard !Task.isCancelled,
-                      revision == self.sessionRevision,
-                      self.isRecording,
-                      self.activeLiveMode == .nativeNemotronLive
-                else { return }
-                guard let nemotronModel = loadedModel as? NemotronASRModel else {
-                    VoxtLog.asrWarning(
-                        "MLX native live requested for non-Nemotron model. repo=\(self.modelManager.currentModelRepo)"
-                    )
-                    return
-                }
-
-                self.installNativeNemotronLiveSession(nemotronModel, revision: revision)
-                self.isModelInitializing = false
-                shouldReleaseModel = false
-                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                VoxtLog.asr(
-                    "MLX native Nemotron live session ready. repo=\(self.modelManager.currentModelRepo), elapsedMs=\(elapsedMs)",
-                    verbose: true
-                )
-            } catch {
-                guard !Task.isCancelled else { return }
-                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-                self.isModelInitializing = false
-                VoxtLog.asrWarning(
-                    "MLX native Nemotron live session setup failed. repo=\(self.modelManager.currentModelRepo), elapsedMs=\(elapsedMs), error=\(error.localizedDescription)"
-                )
-            }
-        }
-    }
-
-    private func installNativeNemotronLiveSession(_ model: NemotronASRModel, revision: Int) {
+    private func installNativeNemotronLiveSession(_ model: NemotronASRModel, revision: Int, releaseModel: @escaping @MainActor () -> Void) {
         releaseNativeLiveSession(cancelSession: true)
         let tuningSettings = resolvedLocalTuningSettings()
         let chunkMilliseconds = tuningSettings.nemotronStreamLatency.rawValue
@@ -1288,16 +1163,14 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 maxTokensPerPass: 1024
             )
         )
-        installNativeLiveSession(session, revision: revision, modelPinned: true)
+        installNativeLiveSession(session, revision: revision, releaseModel: releaseModel)
     }
 
     private func installNativeLiveSession(
         _ session: any MLXNativeStreamingSession,
         revision: Int,
-        modelPinned: Bool
+        releaseModel: @escaping @MainActor () -> Void
     ) {
-        nativeStreamingSession = session
-        nativeLiveModelPinned = modelPinned
         qwenFeedCursor = 0
         qwenVoiceActivityFeedCursor = 0
         latestNativeLiveConfirmedText = ""
@@ -1307,49 +1180,18 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         if activeLiveMode != .nativeQwenLive {
             nativeQwenLiveUsesAutomaticLanguageProtocol = false
         }
-        let feedPollInterval = qwenLiveFeedPollInterval
-
-        qwenStreamingEventTask = Task { [weak self, session] in
-            for await event in session.events {
-                guard !Task.isCancelled else { return }
-                self?.handleNativeLiveEvent(event, revision: revision)
-            }
-        }
-
-        qwenStreamingFeedTask = Task { [weak self, session] in
-            while true {
-                let chunk = self?.drainPendingSamplesForQwenLiveFeed(revision: revision) ?? []
-                if !chunk.isEmpty {
-                    session.feedAudio(samples: chunk)
-                }
-
-                let shouldContinue = self?.shouldContinueQwenLiveFeed(revision: revision) ?? false
-                if !shouldContinue {
-                    return
-                }
-
-                do {
-                    try await Task.sleep(for: feedPollInterval)
-                } catch {
-                    return
-                }
-            }
-        }
+        nativeLiveRuntime.install(
+            session,
+            pollInterval: qwenLiveFeedPollInterval,
+            nextSamples: { [weak self] in self?.drainPendingSamplesForQwenLiveFeed(revision: revision) ?? [] },
+            shouldContinue: { [weak self] in self?.shouldContinueQwenLiveFeed(revision: revision) ?? false },
+            onEvent: { [weak self] in self?.handleNativeLiveEvent($0, revision: revision) },
+            releaseModel: releaseModel
+        )
     }
 
     private func releaseNativeLiveSession(cancelSession: Bool) {
-        qwenStreamingFeedTask?.cancel()
-        qwenStreamingFeedTask = nil
-        qwenStreamingEventTask?.cancel()
-        qwenStreamingEventTask = nil
-        if cancelSession {
-            nativeStreamingSession?.cancel()
-        }
-        nativeStreamingSession = nil
-        if nativeLiveModelPinned {
-            nativeLiveModelPinned = false
-            modelManager.endActiveUse()
-        }
+        nativeLiveRuntime.release(cancelSession: cancelSession)
     }
 
     private func resolvedNativeQwenLiveLanguage() -> String? {
@@ -1385,11 +1227,11 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         revision == sessionRevision
             && isRecording
             && MLXTranscriptionPlanning.isNativeLiveMode(activeLiveMode)
-            && nativeStreamingSession != nil
+            && nativeLiveRuntime.session != nil
     }
 
     private func drainPendingSamplesIntoQwenLiveSession() {
-        guard let session = nativeStreamingSession else { return }
+        guard let session = nativeLiveRuntime.session else { return }
         let pendingSamples = pendingSamplesForNativeLiveFeed()
         guard !pendingSamples.isEmpty else { return }
 

@@ -13,13 +13,14 @@
 | 2 | 核实的孤儿 UI、下载动作、会议空包装 | 已实施 | CI 通过；人工待验收 |
 | 3 | 大测试套件、目录归位、回归入口维护 | 已实施 | CI 通过；人工待验收 |
 | 4 | Remote ASR / 会议 provider 会话契约与去重 | 已实施，新增 36 个定向测试 | `fd38d43` macOS CI 通过；真实 provider 人工待验收 |
-| 5A | 请求/启动任务、会议 session-token 与清理屏障、MLX 校正任务所有权 | 已实施，新增 20 个测试 | 等待本批 macOS CI |
-| 5B | 热键监听、完整录音状态、模型管理器和 native-live lease 的进一步整理 | 待实施 | 不能用 5A 的局部收敛代替完整生命周期验收 |
+| 5A | 请求/启动任务、会议 session-token 与清理屏障、MLX 校正任务所有权 | 已实施，新增 20 个测试 | `b771be1` macOS CI 通过；设备/模型验收待执行 |
+| 5B | 热键监听安装对象与业务状态、MLX native-live 任务/use 释放 | 已实施，新增 15 个测试 | 等待本批 macOS CI |
+| 5C | 完整录音状态、模型管理器、会议导入/最终化的剩余生命周期 | 待实施 | 不把 5A/5B 的局部收敛当成完整验收 |
 | 6 | Dictionary/History/MeetingDetail 等剩余大文件与最终验收 | 待实施 | 分域推进；完整构建、测试和人工回归 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
-阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的改动需要新的 CI 结果。
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)。阶段 5B 仍需单独验证。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -167,7 +168,31 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 
 这些测试覆盖提取出的所有者契约；尚不能替代真实 CoreAudio、完整 MeetingSessionCoordinator 启停、模型推理与内存回收的集成验收。本批主动改变了启动串行化、清理等待及旧事件拒绝语义，需要重点验证快速连按、取消后重启、暂停恢复、切换双音源、应用退出。
 
-**阶段 5 仍未全部完成**：HotkeyManager 监听资源、AppDelegate 其余会话字段、MLX native-live 的 task/pin、模型管理器及会议文件导入/最终化的整体所有权继续留在 5B；大文件仍需后续按真正边界拆分。
+5A 结束时，热键监听和 native-live 的 task/use 所有权留到 5B；应用完整会话、模型管理器和会议导入/最终化继续作为剩余工作，不因通过单元测试而视为完成。
+
+## 阶段 5B：热键监听与 native-live owner
+
+### 热键
+
+- `HotkeyEventTapInstallation` 拥有一个 tap、source、callback context 和独立 run loop。停止时从 manager 的路由锁内摘出旧 owner，在锁外等待旧线程退出；新安装的线程不会被旧 stop 操作关闭。
+- CGEvent 回调不再直接携带未保留的 HotkeyManager 指针，而是使用安装对象持有的 context / weak manager。source 移除块保留 context 到回调线程执行清理，避免释放过程中遗留裸 manager 指针。
+- `HotkeyEventTapRunLoop` 将启动中的 thread 也纳入条件变量管理。启动超时后 stop 先记录停止请求，即使线程稍后才开始，也不会再进入长期运行状态；停止后的 owner 不复用。
+- deferred event / 恢复请求校验安装代次；主队列业务回调校验状态代次，stop/reset 后不再投递旧 action。实际 App callback 在路由锁外执行，避免重新引入 event tap 超时。
+- 权限重试不在 sleep 期间强持有 manager；stop 使重试 ID 失效。取消的长按/双击 fallback task 在拿锁后再次检查取消，不能命中后来复用的 binding ID。
+- 六种业务的 36 个平行字段归并为 `HotkeyBusinessState` 记录，统一状态读写和 reset；不改快捷键优先级、鼠标/修饰键/长按/双击算法。对 14 个核心路由方法逆向还原存储替换后，正文与上批一致。
+- 删除 4 个未调用的旧 tap-cancel helper 和 `clearNoteTransientState`。`HotkeyManager.swift` 从 2,293 行降至 1,858 行，仍需继续按边界整理，不机械拆文件。
+
+### Native MLX
+
+- `MLXNativeLiveRuntime` 将 installed session、event/feed task 和转交的 model-use release 配对。替换先摘除旧 owner；旧 event 不能更新新状态，旧 retirement 不能清除新 stream。
+- retirement task 等待 Voxt 的两个任务退出后恰好释放一次 model use；关机等待全部 retirement。它不是可跳过的普通取消任务，避免取消 cleanup 自身漏掉 use 释放。未显式关闭而被销毁的 owner 通过 isolated deinit 取消 stream，并仅捕获旧 entry 完成退出/use 释放，不在析构后捕获 self。
+- native setup 复用 `TrackedTaskStore`，被取消的 setup 保留至退出；Qwen / streaming / Nemotron 三份加载和 pin-transfer 流程合并，具体模型的 StreamingConfig 保持原值。
+- 空闲回收同时检查 setup 和 retirement，不能仅因 UI 已停止就销毁仍在退出的 runtime。`MLXTranscriber.swift` 从本批前 2,223 行降至 2,065 行。
+- **依赖边界限制**：检查了固定 Audio revision 的源码，库的同步 `cancel()` 仅发出取消/关闭事件流，不提供等待内部 decode / Metal 工作完全退出的 API。因此这里保证的是 Voxt task/use owner 的退出顺序，不能声称已经证明底层推理完全静止；真正的 native quiescence 仍需模型回放及必要的依赖 API 支持。
+
+新增 `HotkeyManagerLifetimeTests`（4）、`HotkeyEventTapRunLoopTests`（4）、`MLXNativeLiveRuntimeTests`（7），共 15 项；纳入 `refactor`，静态 XCTest 方法数为 1,656。run-loop 测试创建专用线程和普通 CF source，不安装系统 event tap、不请求权限；runtime 测试使用 fake stream，不加载模型。真实事件监听、权限恢复、睡眠唤醒和模型内存行为仍须人工/模型验收。
+
+阶段 5C 继续处理 AppDelegate 其余会话状态、模型管理器和会议导入/最终化；阶段 6 的剩余大文件与最终回归尚未实施。
 
 ## 验证与下一门禁
 
@@ -177,7 +202,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-阶段 5A 新提交仍需 macOS CI / Mac 验证；前两批绿色结果不能替代它。真实执行并记录结果：
+阶段 5B 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
@@ -188,4 +213,4 @@ xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macO
 
 人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈；会议远程启动配置；本地 ASR live/final/取消。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
 
-阶段 4 已补充 ASR/会议协议契约，阶段 5A 收敛了上述局部所有者。阶段 5B 继续处理其余生命周期；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。
+阶段 4 已补充 ASR/会议协议契约，阶段 5A/5B 收敛了上述局部所有者。阶段 5C 继续处理其余生命周期；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。

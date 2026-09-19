@@ -75,6 +75,8 @@ These suites and existing ASR/meeting support tests are included in the `refacto
 
 `TrackedTaskStoreTests`, `LLMRequestLifecycleTests`, `MeetingLiveSessionRegistryTests`, `MLXCorrectionPassCoordinatorTests`, and the added capture-epoch regression cover stage 5A ownership (20 new cases). `TestSupport/ManualTaskBarrier` deliberately holds cancelled work until explicit release to model native cleanup. They are included in `refactor`; full recording/meeting and model lifecycle acceptance remains separate.
 
+Stage 5B adds `HotkeyManagerLifetimeTests` (4), `HotkeyEventTapRunLoopTests` (4) and `MLXNativeLiveRuntimeTests` (7): stale queued actions, independent thread retirement, stream replacement/reentrant cleanup and model-use release. These 15 cases are in `refactor`. They exercise Voxt-owned tasks and CF sources, not real system taps or internal model workers.
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.

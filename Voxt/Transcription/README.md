@@ -14,4 +14,8 @@ Transcription engine adapters, local model managers, model artifacts, and shared
 
 `MLXCorrectionPassCoordinator` owns the one in-flight correction pass. Cancelling a pass does not free its slot until the task has exited; final passes wait for retiring intermediate work. The transcriber still owns session revision and model leases, and verifies them after asynchronous inference/archive work.
 
+`MLXNativeLiveRuntime` owns an installed native stream, event/feed tasks and its transferred model use. Replacement/retirement keeps old tasks separate from the new stream, and releases the use once Voxt's tasks exit; abandoned owners also cancel and retire their stream. Setup uses the tracked-task store so cancelled loaders remain visible during shutdown.
+
+This is not a native decode/Metal completion barrier: the dependency's synchronous `cancel()` has no awaitable internal-worker completion API. Verify actual model memory/cancellation behavior separately.
+
 Keep `nonisolated` inference, cancellation propagation and the existing buffer locks intact when moving code. The source split does not introduce another model/session owner. See the [phase record](../../docs/RefactoringProgress.zh-CN.md) before changing runtime ownership.

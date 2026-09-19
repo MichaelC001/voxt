@@ -44,6 +44,8 @@ Keep framework/UI work at presentation and integration boundaries; prefer pure v
 
 The project enables default MainActor isolation and approachable concurrency. Preserve explicit `nonisolated`, `Sendable`, task cancellation and ownership assumptions when extracting code. Existing `@unchecked Sendable` types require case-by-case review, not mechanical annotation removal.
 
+Hotkey tap installations own their source, callback context and dedicated thread independently of routing state. Queued work is generation-scoped; business actions run outside the routing lock. Native MLX streams similarly own their event/feed tasks and transferred model use in `MLXNativeLiveRuntime`, but the library's synchronous cancellation is not an awaitable native-worker barrier.
+
 Settings sidebar/header/footer and notification/feedback dialogs have dedicated files. Onboarding step implementations and presentation components are separated, but SwiftUI state remains owned by `OnboardingGuideView`; cross-file extensions are not independent state owners.
 
 See the [refactoring assessment (中文)](RefactoringAssessment.zh-CN.md) and [phased implementation record](RefactoringProgress.zh-CN.md) for measured hotspots, completed cleanup, pending work and verification limits.
