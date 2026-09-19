@@ -7,13 +7,19 @@ Use this document to choose focused local checks before a full release gate. CI 
 | Group | Scope | Command |
 | --- | --- | --- |
 | core | Capture pipeline, session flow, prompt building, VAD planning, Feature Settings, MLX planning, model debug | `tools/run_local_regression_matrix.sh core` |
+| refactor | core + split LLM/configuration/hotkey/model/meeting-detail suites, onboarding and storage contracts | `tools/run_local_regression_matrix.sh refactor` |
 | mlx | MLX public fixture and replay tests | `VOXT_RUN_MODEL_TESTS=1 tools/run_local_regression_matrix.sh mlx` |
 | gguf | Installed GGUF inference and native termination cleanup | `tools/run_local_regression_matrix.sh gguf` |
 | vad | Local VAD mode, runtime policy, storage, debug snapshot | `tools/run_local_regression_matrix.sh vad` |
-| whisper | Whisper diagnostic fixture/replay tests | `tools/run_local_regression_matrix.sh whisper` |
-| installed | Installed-model long-form matrix | `tools/run_local_regression_matrix.sh installed` |
-| all | core + mlx + vad | `tools/run_local_regression_matrix.sh all` |
-| full | core + mlx + gguf + vad + whisper + installed | `tools/run_local_regression_matrix.sh full` |
+| installed | Installed-model long-form matrix | `VOXT_RUN_MODEL_TESTS=1 tools/run_local_regression_matrix.sh installed` |
+| all | refactor + mlx (core already includes vad) | `VOXT_RUN_MODEL_TESTS=1 tools/run_local_regression_matrix.sh all` |
+| full | all + gguf + installed | `VOXT_RUN_MODEL_TESTS=1 tools/run_local_regression_matrix.sh full` |
+
+The script resolves the repository from its own location, disables signing, and uses the committed lockfile strictly. `VOXT_SPM_CACHE_PATH` and `VOXT_SPM_CLONE_PATH` override the local cache paths. Model groups need installed checkpoints; review skips separately from passes.
+
+The old `whisper` / `diagnostic` groups were removed because their dedicated Whisper test classes no longer exist. This does not remove MLX Whisper model support or migration coverage. Unknown groups fail rather than selecting nonexistent suites. The `all` / `full` groups avoid rerunning VAD suites already selected by core.
+
+See [test-suite organization](../VoxtTests/README.md) and the [phased refactoring record](RefactoringProgress.zh-CN.md).
 
 ## VAD / ASR Gate Safety
 
