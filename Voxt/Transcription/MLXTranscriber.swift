@@ -14,19 +14,6 @@ private struct MLXUnsafeSendableBox<Value>: @unchecked Sendable {
     nonisolated(unsafe) let value: Value
 }
 
-private struct MLXCorrectionPassResult {
-    let text: String?
-    let error: Error?
-
-    static func success(_ text: String?) -> MLXCorrectionPassResult {
-        MLXCorrectionPassResult(text: text, error: nil)
-    }
-
-    static func failure(_ error: Error) -> MLXCorrectionPassResult {
-        MLXCorrectionPassResult(text: nil, error: error)
-    }
-}
-
 private enum MLXCaptureStartError: LocalizedError {
     case engineStartTimedOut(Double)
 
@@ -114,9 +101,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     private var earlyPrewarmTask: Task<Void, Never>?
     private var captureWatchdogTask: Task<Void, Never>?
     private var liveSessionSetupTask: Task<Void, Never>?
-    private var activeCorrectionPassID: UUID?
-    private var activeCorrectionPassTask: Task<MLXCorrectionPassResult, Never>?
-    private var activeCorrectionPassKind: MLXCorrectionPassKind?
+    private let correctionPasses = MLXCorrectionPassCoordinator()
     private var activeLiveMode = MLXModelManager.liveMode(for: MLXModelManager.defaultModelRepo)
     private var nativeStreamingSession: (any MLXNativeStreamingSession)?
     private var qwenStreamingEventTask: Task<Void, Never>?
@@ -349,7 +334,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         let earlyPrewarmTask = earlyPrewarmTask
         let watchdogTask = captureWatchdogTask
         let setupTask = liveSessionSetupTask
-        let correctionPassTask = activeCorrectionPassTask
+        let correctionPassTask = correctionPasses.currentTask
         let streamingEventTask = qwenStreamingEventTask
         let streamingFeedTask = qwenStreamingFeedTask
 
@@ -389,7 +374,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     /// dictation transcriber and its lightweight VAD/audio state.
     @discardableResult
     func releaseIdleResources() -> Bool {
-        guard !isRecording, !isFinalizingTranscription else { return false }
+        guard !isRecording, !isFinalizingTranscription, !correctionPasses.hasPendingWork else { return false }
 
         sessionRevision += 1
         stopAudioEngine()
@@ -471,6 +456,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     }
 
     private func runFinalizationPipeline(revision: Int, sampleRate: Double) async {
+        guard !Task.isCancelled, revision == sessionRevision else { return }
         defer {
             if revision == sessionRevision {
                 isFinalizingTranscription = false
@@ -568,14 +554,19 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             sampleRate: sampleRate
         )
 
-        guard revision == sessionRevision else {
+        guard !Task.isCancelled, revision == sessionRevision else {
             archiveTask.cancel()
             if let archiveURL = await archiveTask.value {
                 try? FileManager.default.removeItem(at: archiveURL)
             }
             return
         }
-        if let archiveURL = await archiveTask.value {
+        let archiveURL = await archiveTask.value
+        guard !Task.isCancelled, revision == sessionRevision else {
+            if let archiveURL { try? FileManager.default.removeItem(at: archiveURL) }
+            return
+        }
+        if let archiveURL {
             removeCompletedAudioArchiveIfNeeded()
             completedAudioArchiveURL = archiveURL
         } else {
@@ -659,62 +650,22 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         explicitSamples: [Float]?,
         sampleRate: Double
     ) async -> MLXCorrectionPassResult {
-        switch MLXTranscriptionPlanning.correctionPassSchedulingDecision(
-            requestedPass: stage,
-            inFlightPass: activeCorrectionPassKind
-        ) {
-        case .startImmediately:
-            break
-        case .waitForInFlightPass:
-            break
-        case .skipRequestedPass:
-            VoxtLog.asr("MLX intermediate correction skipped because inference is still busy.", verbose: true)
-            return .success(nil)
-        case .interruptInFlightPass:
-            if let activeCorrectionPassKind {
-                VoxtLog.asr(
-                    "MLX correction pass preempted. inFlight=\(stageLabel(for: activeCorrectionPassKind)), requested=\(stageLabel(for: stage))",
-                    verbose: true
+        await correctionPasses.run(
+            kind: stage,
+            isCurrent: { [weak self] in
+                guard let self, revision == self.sessionRevision else { return false }
+                return stage != .intermediate || self.isRecording
+            },
+            operation: { [weak self] in
+                guard let self else { return .success(nil) }
+                return await self.executeCorrectionPass(
+                    stage: stage,
+                    revision: revision,
+                    explicitSamples: explicitSamples,
+                    sampleRate: sampleRate
                 )
             }
-            activeCorrectionPassTask?.cancel()
-        }
-
-        while let activeTask = activeCorrectionPassTask {
-            let activePassID = activeCorrectionPassID
-            _ = await activeTask.result
-            if activeCorrectionPassID == activePassID {
-                clearActiveCorrectionPassIfNeeded(passID: activePassID)
-            }
-        }
-        if stage == .intermediate {
-            guard isRecording, revision == sessionRevision else { return .success(nil) }
-        }
-
-        let passID = UUID()
-        let passTask = Task<MLXCorrectionPassResult, Never> { [weak self] in
-            guard let self else { return .success(nil) }
-            return await self.executeCorrectionPass(
-                stage: stage,
-                revision: revision,
-                explicitSamples: explicitSamples,
-                sampleRate: sampleRate
-            )
-        }
-        activeCorrectionPassID = passID
-        activeCorrectionPassKind = stage
-        activeCorrectionPassTask = passTask
-
-        let result = await passTask.value
-        clearActiveCorrectionPassIfNeeded(passID: passID)
-        return result
-    }
-
-    private func clearActiveCorrectionPassIfNeeded(passID: UUID?) {
-        guard activeCorrectionPassID == passID else { return }
-        activeCorrectionPassID = nil
-        activeCorrectionPassTask = nil
-        activeCorrectionPassKind = nil
+        )
     }
 
     private func executeCorrectionPass(
@@ -746,10 +697,11 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             defer { modelManager.endActiveUse() }
             let model = try await modelManager.loadModel()
             try Task.checkCancellation()
-            await MainActor.run {
-                self.isModelInitializing = false
-            }
+            guard revision == sessionRevision else { return .success(nil) }
+            isModelInitializing = false
             let audioSamples = try await prepareTask.value
+            try Task.checkCancellation()
+            guard revision == sessionRevision else { return .success(nil) }
             let inferenceConfiguration = resolvedInferenceConfiguration(
                 for: stage,
                 audioDurationSeconds: audioSeconds
@@ -762,6 +714,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
                 inferenceConfiguration: inferenceConfiguration
             )
             try Task.checkCancellation()
+            guard revision == sessionRevision else { return .success(nil) }
             let inferenceElapsedMs = Int(Date().timeIntervalSince(inferenceStartedAt) * 1000)
 
             let rawCandidate = normalizeText(inferenceResult.rawText)
@@ -788,9 +741,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             )
             return .success(nil)
         } catch {
-            await MainActor.run {
-                self.isModelInitializing = false
-            }
+            guard revision == sessionRevision else { return .success(nil) }
+            isModelInitializing = false
             let elapsedMs = Int(Date().timeIntervalSince(passStartedAt) * 1000)
             VoxtLog.asrError(
                 "MLXTranscriber \(stageLabel(for: stage)) pass failed. repo=\(repo), audioSec=\(String(format: "%.2f", audioSeconds)), elapsedMs=\(elapsedMs), error=\(error.localizedDescription)"
@@ -977,10 +929,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         finalizationTask = nil
         liveSessionSetupTask?.cancel()
         liveSessionSetupTask = nil
-        activeCorrectionPassTask?.cancel()
-        activeCorrectionPassTask = nil
-        activeCorrectionPassID = nil
-        activeCorrectionPassKind = nil
+        correctionPasses.cancel()
         isFinalizingTranscription = false
         preloadTask?.cancel()
         preloadTask = nil

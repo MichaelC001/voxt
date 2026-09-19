@@ -171,8 +171,8 @@ extension AppDelegate {
             isMeetingActive: meetingSessionCoordinator.isActive,
             hasPendingRecordingWork: pendingTranscriptionStartTask != nil
                 || pendingMeetingStartupTask != nil
-                || !recordingCaptureStartTasksByToken.isEmpty,
-            hasPendingLLMWork: !llmTasksByRequestID.isEmpty
+                || !recordingCaptureStartTasks.isEmpty,
+            hasPendingLLMWork: llmRequests.hasPendingWork
                 || !llmWarmupTasksByRepo.isEmpty
                 || !remoteLLMWarmupTasksByKey.isEmpty
                 || pauseLLMTask != nil

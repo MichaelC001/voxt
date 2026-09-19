@@ -45,8 +45,7 @@ final class MeetingSessionCoordinator {
     private let orderedLiveAudioScheduler = MeetingOrderedLiveAudioScheduler()
     private var transcriber: (any MeetingSegmentTranscribing)?
     private var liveSessionFactory: (any MeetingLiveSessionFactory)?
-    private var liveSessions: [MeetingSpeaker: any MeetingLiveTranscribingSession] = [:]
-    private var liveSessionTokens: [MeetingSpeaker: UUID] = [:]
+    private let liveSessions = MeetingLiveSessionRegistry()
     private var liveAudioPrebuffers: [MeetingSpeaker: MeetingLiveAudioPrebuffer] = [:]
     private var localLiveVoiceActivityGates: [MeetingSpeaker: MeetingLocalLiveVoiceActivityGate] = [:]
     private var localLivePendingAudio: [MeetingSpeaker: MeetingLiveAudioPrebuffer] = [:]
@@ -58,8 +57,10 @@ final class MeetingSessionCoordinator {
     private var accumulatedRecordingDuration: TimeInterval = 0
     private(set) var hasCapturedAudio = false
     private var preferredInputDeviceIDProvider: () -> AudioDeviceID?
-    private var pendingTasks: [UUID: Task<Void, Never>] = [:]
-    private var completedPendingTaskIDs = Set<UUID>()
+    private let audioSubmissionTasks = TrackedTaskStore()
+    private var cleanupTask: Task<Void, Never>?
+    private var cleanupID = UUID()
+    private var sessionRevision = UUID()
     private var pendingChunks: [BufferedMeetingChunk] = []
     private let realtimeTranslationScheduler = MeetingRealtimeTranslationScheduler()
     private var microphoneStartupWatchdogTask: Task<Void, Never>?
@@ -116,7 +117,7 @@ final class MeetingSessionCoordinator {
     }
 
     func releaseIdleVADResources() async {
-        guard !isActive else { return }
+        guard !isActive, cleanupTask == nil, audioSubmissionTasks.isEmpty else { return }
         let idleResources = vadResources.replaceForIdleReclamation()
         await idleResources.streaming.releaseResources()
         await idleResources.offline.releaseResources()
@@ -130,6 +131,11 @@ final class MeetingSessionCoordinator {
             throw MeetingFileAnalysisError.sessionAlreadyActive
         }
         isImportAnalyzing = true
+        await cleanupTask?.value
+        do { try Task.checkCancellation() } catch {
+            isImportAnalyzing = false
+            throw error
+        }
         progress(MeetingFileAnalysisProgress(stage: .preparing))
 
         let analysisTask = Task(priority: .utility) { @MainActor [weak self] () throws -> MeetingSessionResult in
@@ -302,7 +308,6 @@ final class MeetingSessionCoordinator {
         overlayState.isRecording = !engineContext.needsModelInitialization
         overlayState.isModelInitializing = engineContext.needsModelInitialization
         isStarting = true
-        Task { await MeetingLocalInferenceCoordinator.shared.setRecordingActive(true) }
     }
 
     func cancelPendingStart() {
@@ -322,7 +327,13 @@ final class MeetingSessionCoordinator {
             prepareForStart()
         }
 
+        let revision = sessionRevision
         do {
+            await cleanupTask?.value
+            guard revision == sessionRevision else { return nil }
+            try Task.checkCancellation()
+            await MeetingLocalInferenceCoordinator.shared.setRecordingActive(true)
+            guard revision == sessionRevision else { return nil }
             try Task.checkCancellation()
             let engineContext = activeEngineContext ?? resolvedEngineContext()
             activeEngineContext = engineContext
@@ -331,21 +342,26 @@ final class MeetingSessionCoordinator {
                 verbose: true
             )
             let transcriber = try await makeTranscriber(for: engineContext)
+            guard revision == sessionRevision else { return nil }
             try Task.checkCancellation()
             self.transcriber = transcriber
             try await startLiveSessionsIfNeeded(for: engineContext)
+            guard revision == sessionRevision else { return nil }
             try Task.checkCancellation()
             try startCaptures()
             try Task.checkCancellation()
             recordingStartedAt = Date()
             await drainPendingChunksIfNeeded()
+            guard revision == sessionRevision else { return nil }
             try Task.checkCancellation()
         } catch is CancellationError {
+            guard revision == sessionRevision else { return nil }
             cleanupSessionState(shouldLogCaptureStop: false)
             resetSessionPresentationState()
             overlayState.reset()
             return nil
         } catch {
+            guard revision == sessionRevision else { return nil }
             cleanupSessionState()
             resetSessionPresentationState()
             overlayState.reset()
@@ -426,7 +442,7 @@ final class MeetingSessionCoordinator {
                 await self.finishLiveSessionsIfNeeded()
             } else {
                 await self.transcriber?.cancelPendingWork()
-                self.discardPendingAudioWork()
+                await self.discardPendingAudioWork()
                 await self.cancelLiveSessionsIfNeeded()
             }
             await MainActor.run {
@@ -602,6 +618,7 @@ final class MeetingSessionCoordinator {
                 )
             }
             self.cleanupSessionState()
+            await self.cleanupTask?.value
             self.resetSessionPresentationState()
             self.overlayState.reset()
             let didSafelyHandleResult = self.onSessionFinished?(result) ?? false
@@ -692,7 +709,8 @@ final class MeetingSessionCoordinator {
     ) {
         guard overlayState.isRecording || isStarting else { return }
         guard !isReconfiguringCaptureMode else { return }
-        guard overlayState.captureMode.includes(speaker: speaker) else { return }
+        guard overlayState.captureMode.includes(speaker: speaker),
+              captureTimeline.isCurrent(captureGeneration, for: speaker) else { return }
         if speaker == .me {
             micLevel = level
             if loggedInitialBufferSpeakers.contains(.me) == false {
@@ -732,20 +750,15 @@ final class MeetingSessionCoordinator {
         let bufferStartSeconds = timelineRange.lowerBound
         let bufferEndSeconds = timelineRange.upperBound
 
-        let taskID = UUID()
-        let task = Task { [weak self] in
+        audioSubmissionTasks.start { [weak self] in
             guard let self else { return }
-            defer {
-                Task { @MainActor [weak self] in
-                    self?.markPendingTaskCompleted(taskID)
-                }
-            }
             await self.audioArchive.append(
                 samples: samples,
                 sampleRate: sampleRate,
                 speaker: speaker,
                 startSeconds: bufferStartSeconds
             )
+            guard !Task.isCancelled else { return }
             if let safetyMessage = await self.audioArchive.consumeSafetyFailureMessage() {
                 await MainActor.run {
                     self.pendingCaptureFailureMessage = safetyMessage
@@ -782,8 +795,6 @@ final class MeetingSessionCoordinator {
                 }
             }
         }
-        pendingTasks[taskID] = task
-        pruneCompletedTasks()
     }
 
     private func logAudioAnalysisOverloadIfNeeded(pendingAudioSeconds: TimeInterval) {
@@ -811,6 +822,7 @@ final class MeetingSessionCoordinator {
     }
 
     private func processAudioAnalysisFrame(_ frame: MeetingAudioAnalysisFrame) async {
+        guard !Task.isCancelled else { return }
         if usesLiveSessionPath {
             if activeEngineContext?.resolvedMode.usesLocalVoiceActivityGate == true {
                 await processLocalLiveAudioAnalysisFrame(frame)
@@ -931,14 +943,18 @@ final class MeetingSessionCoordinator {
     }
 
     private func enqueue(chunk: BufferedMeetingChunk) async {
+        guard !Task.isCancelled else { return }
         guard let transcriber else {
             pendingChunks.append(chunk)
             return
         }
+        let revision = sessionRevision
         let segments = await transcriber.transcribeSegments(chunk: chunk)
+        guard !Task.isCancelled, revision == sessionRevision else { return }
         if !segments.isEmpty {
             await MainActor.run { [weak self] in
-                guard let self, self.overlayState.isPresented else { return }
+                guard let self, !Task.isCancelled, revision == self.sessionRevision,
+                      self.overlayState.isPresented else { return }
                 for segment in segments {
                     self.applyTranscriptEvent(chunk.isFinal ? .final(segment) : .partial(segment))
                 }
@@ -960,30 +976,38 @@ final class MeetingSessionCoordinator {
         }
     }
 
-    private func pruneCompletedTasks() {
-        for taskID in completedPendingTaskIDs {
-            pendingTasks[taskID] = nil
-        }
-        completedPendingTaskIDs.removeAll()
-        pendingTasks = pendingTasks.filter { !$0.value.isCancelled }
-    }
-
-    private func markPendingTaskCompleted(_ taskID: UUID) {
-        if pendingTasks.removeValue(forKey: taskID) == nil {
-            completedPendingTaskIDs.insert(taskID)
-        }
-    }
-
     private func cleanupSessionState(shouldLogCaptureStop: Bool = true) {
+        sessionRevision = UUID()
         stopCaptures(shouldLog: shouldLogCaptureStop)
-        Task {
-            await self.transcriber?.cancelPendingWork()
-            await self.cancelLiveSessionsIfNeeded()
+        let previousCleanup = cleanupTask
+        let retiredTranscriber = transcriber
+        let retiredSessions = liveSessions.removeAll()
+        let retiringAudioTasks = audioSubmissionTasks.cancelAll()
+        let retiredLocalEngine = activeLocalEngine
+        activeLocalEngine = nil
+        let cleanupID = UUID()
+        self.cleanupID = cleanupID
+        // Capture old owners now. Reading self.transcriber after an await could
+        // otherwise cancel the next meeting and reset its archive/schedulers.
+        cleanupTask = Task { @MainActor [self] in
+            await previousCleanup?.value
+            await retiredTranscriber?.cancelPendingWork()
+            for entry in retiredSessions { await entry.session.cancel() }
+            for task in retiringAudioTasks { await task.value }
+            await audioAnalysisScheduler.cancel()
+            await orderedLiveAudioScheduler.cancel()
+            await audioAnalysisScheduler.flush()
+            await orderedLiveAudioScheduler.flush()
+            await voiceActivityDetector.reset()
+            await MeetingLocalInferenceCoordinator.shared.setRecordingActive(false)
+            await audioArchive.reset()
+            if retiredLocalEngine == .mlxAudio { mlxModelManager.endActiveUse() }
+            if self.cleanupID == cleanupID { self.cleanupTask = nil }
         }
         cancelTranslationTasks()
         micLevel = 0
         systemLevel = 0
-        captureTimeline.resetCursors()
+        captureTimeline.invalidateEpochs()
         lastWaveformPublishUptime = 0
         loggedInitialBufferSpeakers.removeAll()
         loggedChunkSpeakers.removeAll()
@@ -993,15 +1017,7 @@ final class MeetingSessionCoordinator {
         accumulatedRecordingDuration = 0
         hasCapturedAudio = false
         pendingCaptureFailureMessage = nil
-        completedPendingTaskIDs.removeAll()
         pendingChunks.removeAll()
-        let voiceActivityDetector = self.voiceActivityDetector
-        Task {
-            await voiceActivityDetector.reset()
-            await audioAnalysisScheduler.cancel()
-            await orderedLiveAudioScheduler.cancel()
-            await MeetingLocalInferenceCoordinator.shared.setRecordingActive(false)
-        }
         microphoneStartupWatchdogTask?.cancel()
         microphoneStartupWatchdogTask = nil
         microphoneStartupRetryCount = 0
@@ -1018,9 +1034,6 @@ final class MeetingSessionCoordinator {
         activeEngineContext = nil
         overlayState.isModelInitializing = false
         overlayState.isFinalizing = false
-        Task {
-            await audioArchive.reset()
-        }
     }
 
     private func resetSessionPresentationState() {
@@ -1264,12 +1277,7 @@ final class MeetingSessionCoordinator {
     }
 
     private func flushPendingAudio() async {
-        let activeTasks = Array(pendingTasks.values)
-        pendingTasks.removeAll()
-        for task in activeTasks {
-            await task.value
-        }
-        completedPendingTaskIDs.removeAll()
+        await audioSubmissionTasks.waitForAll()
         await orderedLiveAudioScheduler.flush()
         await audioAnalysisScheduler.flush()
 
@@ -1284,15 +1292,14 @@ final class MeetingSessionCoordinator {
         }
     }
 
-    private func discardPendingAudioWork() {
-        pendingTasks.values.forEach { $0.cancel() }
-        pendingTasks.removeAll()
-        completedPendingTaskIDs.removeAll()
+    private func discardPendingAudioWork() async {
+        let tasks = audioSubmissionTasks.cancelAll()
         pendingChunks.removeAll()
-        Task {
-            await audioAnalysisScheduler.cancel()
-            await orderedLiveAudioScheduler.cancel()
-        }
+        for task in tasks { await task.value }
+        await audioAnalysisScheduler.cancel()
+        await orderedLiveAudioScheduler.cancel()
+        await audioAnalysisScheduler.flush()
+        await orderedLiveAudioScheduler.flush()
     }
 
     private func flushPendingTranslations() async {
@@ -1447,6 +1454,7 @@ final class MeetingSessionCoordinator {
         _ event: MeetingTranscriptEvent,
         sessionToken: UUID? = nil
     ) {
+        if let sessionToken, !liveSessions.accepts(event, token: sessionToken) { return }
         switch event {
         case .failed(let speaker, let message):
             VoxtLog.meetingError("Meeting live transcription failed. speaker=\(speaker.rawValue), detail=\(message)")
@@ -1488,15 +1496,8 @@ final class MeetingSessionCoordinator {
     }
 
     private func clearLiveSession(for speaker: MeetingSpeaker, matching sessionToken: UUID?) {
-        guard let sessionToken else {
-            liveSessions[speaker] = nil
-            liveSessionTokens[speaker] = nil
-            localLivePendingAudio[speaker] = nil
-            return
-        }
-        guard liveSessionTokens[speaker] == sessionToken else { return }
-        liveSessions[speaker] = nil
-        liveSessionTokens[speaker] = nil
+        guard let sessionToken, liveSessions.accepts(sessionToken, for: speaker) else { return }
+        liveSessions.remove(sessionToken)
         localLivePendingAudio[speaker] = nil
     }
 
@@ -1768,8 +1769,9 @@ final class MeetingSessionCoordinator {
 
     private func startLiveSessionsIfNeeded(for context: MeetingASREngineContext) async throws {
         guard context.resolvedMode.usesLiveSessions, let liveSessionFactory else { return }
-        liveSessions.removeAll()
-        liveSessionTokens.removeAll()
+        let revision = sessionRevision
+        await cancelLiveSessionsIfNeeded()
+        guard !Task.isCancelled, revision == sessionRevision else { throw CancellationError() }
         localLiveVoiceActivityGates.removeAll(keepingCapacity: false)
         localLivePendingAudio.removeAll(keepingCapacity: false)
 
@@ -1787,51 +1789,46 @@ final class MeetingSessionCoordinator {
 
         for speaker in activeCaptureSpeakers {
             let session = try liveSessionFactory.makeSession(for: speaker, timelineOffsetSeconds: timelineOffsetSeconds)
-            let sessionToken = UUID()
-            liveSessions[speaker] = session
-            liveSessionTokens[speaker] = sessionToken
+            let sessionToken = liveSessions.insert(session, for: speaker).token
             try await session.start(timelineOffsetSeconds: timelineOffsetSeconds) { [weak self] event in
                 self?.applyTranscriptEvent(event, sessionToken: sessionToken)
+            }
+            guard !Task.isCancelled, liveSessions.accepts(sessionToken, for: speaker) else {
+                await session.cancel()
+                throw CancellationError()
             }
         }
     }
 
     private func finishLiveSessionsIfNeeded() async {
-        let sessions = liveSessions
-        liveSessions.removeAll()
-        liveSessionTokens.removeAll()
-        for (speaker, session) in sessions {
+        let sessions = liveSessions.beginFinishingAll()
+        for entry in sessions {
             await flushLocalLivePendingAudio(
-                for: speaker,
-                to: session,
+                for: entry.speaker,
+                to: entry.session,
                 replacingWithSilence: true
             )
-            await session.finish()
+            await entry.session.finish()
+            liveSessions.remove(entry.token)
         }
-        localLivePendingAudio.removeAll(keepingCapacity: false)
     }
 
     private func finishLiveSession(for speaker: MeetingSpeaker) async {
-        guard let session = liveSessions.removeValue(forKey: speaker) else { return }
-        let sessionToken = liveSessionTokens[speaker]
+        guard let entry = liveSessions.beginFinishing(speaker) else { return }
         await flushLocalLivePendingAudio(
             for: speaker,
-            to: session,
+            to: entry.session,
             replacingWithSilence: true
         )
-        await session.finish()
-        if liveSessionTokens[speaker] == sessionToken {
-            liveSessionTokens[speaker] = nil
-        }
+        await entry.session.finish()
+        liveSessions.remove(entry.token)
     }
 
     private func cancelLiveSessionsIfNeeded() async {
-        let sessions = liveSessions.values
-        liveSessions.removeAll()
-        liveSessionTokens.removeAll()
+        let sessions = liveSessions.removeAll()
         localLivePendingAudio.removeAll(keepingCapacity: false)
-        for session in sessions {
-            await session.cancel()
+        for entry in sessions {
+            await entry.session.cancel()
         }
     }
 
@@ -1934,7 +1931,7 @@ final class MeetingSessionCoordinator {
             return nil
         }
 
-        let sessionToken = UUID()
+        var sessionToken: UUID?
         do {
             let prebufferFrames = liveAudioPrebuffers[speaker]?.snapshot() ?? []
             let prebufferDuration = prebufferFrames.reduce(0) { $0 + $1.duration }
@@ -1943,12 +1940,17 @@ final class MeetingSessionCoordinator {
                 0
             )
             let session = try liveSessionFactory.makeSession(for: speaker, timelineOffsetSeconds: timelineOffsetSeconds)
-            liveSessions[speaker] = session
-            liveSessionTokens[speaker] = sessionToken
+            let token = liveSessions.insert(session, for: speaker).token
+            sessionToken = token
             try await session.start(timelineOffsetSeconds: timelineOffsetSeconds) { [weak self] event in
-                self?.applyTranscriptEvent(event, sessionToken: sessionToken)
+                self?.applyTranscriptEvent(event, sessionToken: token)
+            }
+            guard !Task.isCancelled, liveSessions.accepts(token, for: speaker) else {
+                await session.cancel()
+                return nil
             }
             await flushLivePrebuffer(prebufferFrames, to: session)
+            guard liveSessions.accepts(token, for: speaker) else { return nil }
             liveAudioPrebuffers[speaker]?.removeAll()
             return session
         } catch {

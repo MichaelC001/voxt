@@ -241,8 +241,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var pendingDeepIdleMemoryReclamationTask: Task<Void, Never>?
     var deepIdleMemoryReclamationID = UUID()
     var pendingApplicationTerminationTask: Task<Void, Never>?
-    var llmTasksByRequestID: [UUID: Task<Void, Never>] = [:]
-    var recordingCaptureStartTasksByToken: [UUID: Task<Void, Never>] = [:]
+    let llmRequests = LLMRequestLifecycle()
+    let recordingCaptureStartTasks = TrackedTaskStore()
     private(set) var isApplicationTerminating = false
     private var didCompleteApplicationTermination = false
     private var requestedApplicationExitStatus: Int32?
@@ -272,7 +272,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var answerOverlayInjectionMode: AnswerOverlayInjectionMode = .standard
     var didCommitSessionOutput = false
     var activeRecordingSessionID = UUID()
-    var activeLLMRequestID = UUID()
     var currentEndingSessionID: UUID?
     var lastCompletedSessionEndSessionID: UUID?
     var isSessionCancellationRequested = false

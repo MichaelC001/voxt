@@ -8,6 +8,10 @@ Application orchestration layer for launch, menu bar ownership, recording entry 
 - Owns app-level startup policies, runtime synchronization, warmup, and development-only seeding.
 - Uses AppDelegate flow extensions for coordination; substantial shared session state still lives in AppDelegate and is a refactoring boundary, not an isolated module.
 
+## Request and capture tasks
+
+`LLMRequestLifecycle` owns request validity and outstanding LLM work. `TrackedTaskStore` retains cancelled work until it actually exits, so termination and idle reclamation can observe it. Capture-start replacement waits for prior starts to unwind before touching the shared audio engine. Cancellation is not resource-release confirmation.
+
 ## Output delivery
 
 - `SessionOutputPreparation.swift`: normalization, dictionary correction and the prepared delivery snapshot.

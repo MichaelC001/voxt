@@ -153,6 +153,11 @@ run_refactor() {
     -only-testing:VoxtTests/RemoteASRResponseStateTests
     -only-testing:VoxtTests/RemoteASRCompletionTests
     -only-testing:VoxtTests/MeetingRemoteSessionLifecycleTests
+    -only-testing:VoxtTests/TrackedTaskStoreTests
+    -only-testing:VoxtTests/LLMRequestLifecycleTests
+    -only-testing:VoxtTests/MeetingLiveSessionRegistryTests
+    -only-testing:VoxtTests/MLXCorrectionPassCoordinatorTests
+    -only-testing:VoxtTests/MeetingCaptureTimelineTests
     -only-testing:VoxtTests/ModelDownloadStatusSnapshotTests
     -only-testing:VoxtTests/RemoteEndpointSecurityPolicyTests
     -only-testing:VoxtTests/RewriteAnswerContentNormalizerTests

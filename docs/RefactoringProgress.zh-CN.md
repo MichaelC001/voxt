@@ -12,11 +12,14 @@
 | 1 | MLX 纯逻辑/独立推理边界、Onboarding、Settings 组件 | 已实施 | CI 通过；有状态驱动仍待阶段 5 |
 | 2 | 核实的孤儿 UI、下载动作、会议空包装 | 已实施 | CI 通过；人工待验收 |
 | 3 | 大测试套件、目录归位、回归入口维护 | 已实施 | CI 通过；人工待验收 |
-| 4 | Remote ASR / 会议 provider 会话契约与去重 | 已实施，新增 36 个定向测试 | 需本批提交的 CI；真实 provider 人工验收待执行 |
-| 5 | AppDelegate、录音、会议、热键、模型生命周期的状态所有权 | 待实施 | 以阶段 0–3 Mac 通过为前置条件 |
+| 4 | Remote ASR / 会议 provider 会话契约与去重 | 已实施，新增 36 个定向测试 | `fd38d43` macOS CI 通过；真实 provider 人工待验收 |
+| 5A | 请求/启动任务、会议 session-token 与清理屏障、MLX 校正任务所有权 | 已实施，新增 20 个测试 | 等待本批 macOS CI |
+| 5B | 热键监听、完整录音状态、模型管理器和 native-live lease 的进一步整理 | 待实施 | 不能用 5A 的局部收敛代替完整生命周期验收 |
 | 6 | Dictionary/History/MeetingDetail 等剩余大文件与最终验收 | 待实施 | 分域推进；完整构建、测试和人工回归 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
+
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的改动需要新的 CI 结果。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -140,7 +143,31 @@ Xcode 使用同步目录组，无需手工添加 Swift build phase 条目；仍�
 
 Fake 会话复用真实基类，通过既有 override 边界注入故障；截止时间可控，不依赖真实服务或麦克风。测试不等于真实 URLSession WebSocket、provider 账户/服务行为、设备或模型质量验收。远程 LLM 的 transport 故障注入不包含在本批。
 
-`refactor` 回归组已包含这些测试和原有 ASR/会议协议覆盖。应用现有 440 个 Swift 文件、152,041 行，24 个文件仍 >1,000 行；测试 190 个 Swift 文件，静态 XCTest 方法增加至 1,621。阶段 5–6 尚未实施。
+`refactor` 回归组已包含这些测试和原有 ASR/会议协议覆盖。阶段 4 结束时应用 440 个 Swift 文件、152,041 行，24 个文件仍 >1,000 行；测试 190 个 Swift 文件，静态 XCTest 方法增加至 1,621。
+
+## 阶段 5A：在途任务与会话所有权
+
+本批优先减少平行状态和竞态，不为达成文件行数目标继续扩大 private 成员访问范围。
+
+### 实施内容
+
+- `TrackedTaskStore`：统一 MainActor 任务登记、取消和退出等待；每次 invocation 使用独立 ID。取消不删除在途任务，任务退出才注销，避免同一业务请求 ID 的旧任务清掉新任务。
+- `LLMRequestLifecycle`：收敛 current request ID 与任务集合；AppDelegate 不再直接持有 `activeLLMRequestID` / `llmTasksByRequestID`。旧请求不能入队或执行，已取消但仍在清理的任务继续阻止深度空闲回收。
+- 录音启动通过 `TrackedTaskStore` 管理；新启动等待所有旧启动退出后才操作同一 transcriber/音频引擎。取消只是请求，不能假设 CoreAudio 或权限请求立即终止。
+- `MeetingLiveSessionRegistry`：session 与 token 成对存储，区分 active 与 draining。drain 期间的最终文本仍有效；被替换/取消后，旧 token 的 partial、final、failed、finished 都被拒绝。旧 finish 返回不能清掉新 session。
+- 会议音频提交取消后仍被跟踪；移除 completed-ID 辅助集合和按 `isCancelled` 提前丢任务的逻辑。
+- 会议资源清理现在捕获旧 transcriber/session/model use，按单一 cleanup 屏障等待在途提交与 scheduler drain 后再重置 VAD、archive 并释放 model use。新会议/文件导入等待旧清理完成，避免异步 cleanup 误取消新会话。
+- 会话 revision 在清理时立即失效；capture epoch 在清理时递增，旧麦克风回调在修改电平/启动 watchdog 状态前被拒绝。chunk 推理 await 前后校验会话有效性。
+- `MLXCorrectionPassCoordinator`：统一校正 pass ID、kind、task 所有权；被取消的 pass 保留串行槽位到真正退出，新 pass 不与旧推理重叠。父任务取消传播到实际推理，过期 revision 不启动/返回输出。
+- MLX 最终化在 archive await 后再次核验 revision / cancellation，过期归档清理而不是接管新会话输出。未改变模型参数、校正策略和原生 stream 的模型 pin 规则。
+
+### 测试与范围限制
+
+新增 20 个确定性测试：`TrackedTaskStoreTests`（5）、`LLMRequestLifecycleTests`（4）、`MeetingLiveSessionRegistryTests`（5）、`MLXCorrectionPassCoordinatorTests`（5），以及 `MeetingCaptureTimelineTests` 的 cleanup epoch 用例。共享 `ManualTaskBarrier` 模拟忽略取消、仍需释放的在途原生操作，不靠 sleep 推测时序。均纳入 `refactor` 回归组。
+
+这些测试覆盖提取出的所有者契约；尚不能替代真实 CoreAudio、完整 MeetingSessionCoordinator 启停、模型推理与内存回收的集成验收。本批主动改变了启动串行化、清理等待及旧事件拒绝语义，需要重点验证快速连按、取消后重启、暂停恢复、切换双音源、应用退出。
+
+**阶段 5 仍未全部完成**：HotkeyManager 监听资源、AppDelegate 其余会话字段、MLX native-live 的 task/pin、模型管理器及会议文件导入/最终化的整体所有权继续留在 5B；大文件仍需后续按真正边界拆分。
 
 ## 验证与下一门禁
 
@@ -150,7 +177,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-阶段 4 新提交仍需 macOS CI / Mac 验证；通过后再进入阶段 5。真实执行并记录结果：
+阶段 5A 新提交仍需 macOS CI / Mac 验证；前两批绿色结果不能替代它。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
@@ -161,4 +188,4 @@ xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macO
 
 人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈；会议远程启动配置；本地 ASR live/final/取消。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
 
-阶段 4 已补充上述 ASR/会议契约。阶段 5 再确定应用级 task、session ID、音频缓冲和模型 lease 的唯一所有者；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。
+阶段 4 已补充 ASR/会议协议契约，阶段 5A 收敛了上述局部所有者。阶段 5B 继续处理其余生命周期；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。

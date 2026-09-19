@@ -17,7 +17,7 @@ Use this document to choose focused local checks before a full release gate. CI 
 
 The script resolves the repository from its own location, disables signing, and uses the committed lockfile strictly. `VOXT_SPM_CACHE_PATH` and `VOXT_SPM_CLONE_PATH` override the local cache paths. Model groups need installed checkpoints; review skips separately from passes.
 
-The `refactor` group also includes the stage-4 ASR framing/response/completion and meeting-session lifecycle tests, alongside existing ASR/meeting support cases. Its fake sessions and controlled deadlines do not exercise real provider accounts or devices.
+The `refactor` group also includes the stage-4 ASR framing/response/completion and meeting-session lifecycle tests, alongside existing ASR/meeting support cases. It also includes stage-5A tracked-task, request validity, meeting-token, correction-pass and capture-epoch contracts. Its fake sessions, task barriers and controlled deadlines do not exercise real provider accounts or devices.
 
 The old `whisper` / `diagnostic` groups were removed because their dedicated Whisper test classes no longer exist. This does not remove MLX Whisper model support or migration coverage. Unknown groups fail rather than selecting nonexistent suites. The `all` / `full` groups avoid rerunning VAD suites already selected by core.
 

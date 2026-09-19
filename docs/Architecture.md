@@ -28,12 +28,12 @@ Voxt is a macOS 15+ menu bar application, built with the shared `Voxt` Xcode sch
 
 ## Main paths
 
-- `AppDelegate` assembles model managers, stores, transcribers and UI coordinators. Its extensions route hotkeys, recording, translation, rewrite, notes and meetings.
+- `AppDelegate` assembles model managers, stores, transcribers and UI coordinators. Its extensions route hotkeys, recording, translation, rewrite, notes and meetings. `LLMRequestLifecycle` owns request validity and outstanding work; `TrackedTaskStore` retains cancelled capture/LLM/audio submission tasks until exit rather than treating cancellation as completion.
 - Recording selects a `TranscriberProtocol` implementation. MLX planning, merging, preview text, capture buffers, detached inference and structured segment conversion are in separate files under `Transcription/`. `MLXTranscriber` still owns task cancellation, session revision and model leases; the split does not change that lifetime boundary.
 - LLM tasks compile into requests before local or remote execution. `RemoteLLMRuntimeClient` routes compiled requests; sibling extensions own Responses execution, chat completion execution, request construction, provider settings and runtime policy. Existing endpoint/message/parser helpers remain shared with connectivity checks.
 - Final output is prepared once as an immutable `SessionFinalizeContext`, then delivered to the input target or answer UI. The delivery callback records history and dictionary evidence. Session-end orchestration remains under `App/Recording/`; there is no generic finalize-stage runner.
 - Remote ASR retains recording/generation ownership in `RemoteASRTranscriber`, with file requests and provider streams in sibling files. Provider response actors freeze terminal text and respect cancellation. Dictation and meetings share bounded Doubao framing/gzip and Aliyun endpoint helpers, not their different transcript projection policies.
-- Meeting coordination combines microphone/system audio, live transcription and final processing. Remote provider classes are separate; their base session owns ordered buffering, stop deadlines and exactly-once cleanup. App-level session/token ownership remains in the coordinator and is still a refactoring boundary.
+- Meeting coordination combines microphone/system audio, live transcription and final processing. Remote provider classes are separate; their base session owns ordered buffering, stop deadlines and exactly-once cleanup. `MeetingLiveSessionRegistry` pairs sessions with tokens (including draining sessions); the coordinator has a cleanup barrier before reuse of archive, VAD and model resources. Full meeting/import/finalization ownership remains a refactoring boundary.
 - History and dictionary persistence use repositories backed by `VoxtDatabase` (GRDB/SQLite), with legacy-data migration. Notes and external sync have separate stores/coordinators.
 
 ## Current limitations and maintenance rules

@@ -12,4 +12,6 @@ Transcription engine adapters, local model managers, model artifacts, and shared
 
 `MLXTranscriber` owns recording tasks, revision checks, model leases and capture-buffer instances. Pure policy is in `MLXTranscriptionPlanning`, `MLXTranscriptMerging`, and `MLXLiveTextPreview`. Shared values, buffers, detached inference and structured segment conversion live in their correspondingly named files.
 
+`MLXCorrectionPassCoordinator` owns the one in-flight correction pass. Cancelling a pass does not free its slot until the task has exited; final passes wait for retiring intermediate work. The transcriber still owns session revision and model leases, and verifies them after asynchronous inference/archive work.
+
 Keep `nonisolated` inference, cancellation propagation and the existing buffer locks intact when moving code. The source split does not introduce another model/session owner. See the [phase record](../../docs/RefactoringProgress.zh-CN.md) before changing runtime ownership.

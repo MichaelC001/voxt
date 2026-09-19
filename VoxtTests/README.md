@@ -71,6 +71,10 @@ This command includes all split family files and related onboarding, settings, s
 
 These suites and existing ASR/meeting support tests are included in the `refactor` group. Real URLSession/provider behavior, credentials and device transitions still require separate acceptance.
 
+## Task and session ownership contracts
+
+`TrackedTaskStoreTests`, `LLMRequestLifecycleTests`, `MeetingLiveSessionRegistryTests`, `MLXCorrectionPassCoordinatorTests`, and the added capture-epoch regression cover stage 5A ownership (20 new cases). `TestSupport/ManualTaskBarrier` deliberately holds cancelled work until explicit release to model native cleanup. They are included in `refactor`; full recording/meeting and model lifecycle acceptance remains separate.
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.
