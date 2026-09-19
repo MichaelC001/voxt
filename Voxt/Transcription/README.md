@@ -8,6 +8,8 @@ Transcription engine adapters, local model managers, model artifacts, and shared
 - Manages local ASR model discovery, downloads, repository state, and artifact validation.
 - Provides common transcriber protocols, support types, and post-processing for transcript text.
 
+ASR model construction is in `MLXSTTModelLoader`. Catalog/state values and reusable resumable transfer live under `Core/Models`; `MLXModelDownloadSupport` retains ASR metadata/validation and tokenizer-asset policy. Managers continue to own install/download state, storage revision and load lifetimes.
+
 ## MLX boundaries
 
 `MLXTranscriber` owns recording tasks, revision checks, model leases and capture-buffer instances. Pure policy is in `MLXTranscriptionPlanning`, `MLXTranscriptMerging`, and `MLXLiveTextPreview`. Shared values, buffers, detached inference and structured segment conversion live in their correspondingly named files.

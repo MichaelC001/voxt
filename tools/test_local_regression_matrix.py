@@ -44,12 +44,19 @@ class LocalRegressionMatrixTests(unittest.TestCase):
             return result, commands
 
     def test_static_selectors_reference_existing_suites(self):
-        names = set()
+        suites = {}
         for path in (ROOT / "VoxtTests").rglob("*.swift"):
-            names.update(re.findall(r"^(?:final )?class (\w+)", path.read_text(), re.M))
-        selectors = re.findall(r"-only-testing:VoxtTests/(\w+)", SCRIPT.read_text())
+            text = path.read_text()
+            classes = list(re.finditer(r"^(?:final )?class (\w+)", text, re.M))
+            for index, match in enumerate(classes):
+                end = classes[index + 1].start() if index + 1 < len(classes) else len(text)
+                suites[match[1]] = set(re.findall(r"func (test\w+)\(", text[match.end():end]))
+        selectors = re.findall(r"-only-testing:VoxtTests/(\w+)(?:/(\w+))?", SCRIPT.read_text())
         self.assertTrue(selectors)
-        self.assertEqual(set(selectors) - names, set())
+        for suite, method in selectors:
+            self.assertIn(suite, suites)
+            if method:
+                self.assertIn(method, suites[suite], f"{suite}/{method}")
 
     def test_refactor_selects_split_suites_with_portable_unsigned_strict_commands(self):
         result, commands = self.run_matrix("refactor")
@@ -66,6 +73,8 @@ class LocalRegressionMatrixTests(unittest.TestCase):
         for suite in ("SharedModelLoadCoordinatorTests", "MeetingImportedFileAnalyzerTests", "MeetingFileTaskQueueTests", "MeetingFinalizationContextTests", "MeetingFinalizationCheckpointStoreTests", "RecordingSessionLifecycleTests"):
             self.assertIn(f"-only-testing:VoxtTests/{suite}", selectors)
         for suite in ("AutomaticDictionaryLearningMonitorTests", "DictionaryStoreAsyncTests", "TranscriptionHistoryStoreAsyncTests", "TranscriptionHistoryEntryAudioTests", "MeetingTranscriptVirtualListTests", "MeetingDetailTranscriptListCacheTests"):
+            self.assertIn(f"-only-testing:VoxtTests/{suite}", selectors)
+        for suite in ("CustomLLMRequestRuntimeTests", "CustomLLMModelDownloadSupportTests", "CustomLLMModelSupportTests", "ModelDownloadSourceSupportTests", "MLXModelSupportTests", "ModelInstallationCacheTests"):
             self.assertIn(f"-only-testing:VoxtTests/{suite}", selectors)
         for command in commands:
             self.assertEqual(command[0], "test")

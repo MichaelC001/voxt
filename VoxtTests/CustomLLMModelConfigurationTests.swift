@@ -134,79 +134,23 @@ final class CustomLLMModelConfigurationTests: MLXModelManagerTestCase {
         XCTAssertEqual(CustomLLMTaskKind.rewrite.tokenBudgetMultiplier, 1.35, accuracy: 0.0001)
     }
 
-    func testCustomLLMRepoSelectionFallsBackForUnsupportedRepo() {
-        let selection = CustomLLMRepoSelection.resolve(
-            requestedRepo: "unsupported/repo",
-            supportedRepos: ["a", "b"],
-            fallbackRepo: "a"
-        )
-
-        XCTAssertEqual(selection.effectiveRepo, "a")
-        XCTAssertTrue(selection.didFallback)
+    func testManagerFallsBackForUnsupportedRepo() async {
+        await withIsolatedModelStorageRoot { _ in
+            let manager = CustomLLMModelManager(modelRepo: "unsupported/repo")
+            XCTAssertEqual(manager.currentModelRepo, CustomLLMModelManager.defaultModelRepo)
+            await manager.shutdownForApplicationTermination()
+        }
     }
 
-    func testCustomLLMRepoSelectionPreservesSupportedRepo() {
-        let selection = CustomLLMRepoSelection.resolve(
-            requestedRepo: "b",
-            supportedRepos: ["a", "b"],
-            fallbackRepo: "a"
-        )
-
-        XCTAssertEqual(selection.effectiveRepo, "b")
-        XCTAssertFalse(selection.didFallback)
-    }
-
-    func testCustomLLMRemoteSizeCacheTreatsUnknownAsMissing() {
-        XCTAssertNil(
-            CustomLLMRemoteSizeCache.cachedState(
-                for: "repo",
-                cache: ["repo": CustomLLMRemoteSizeCache.unknownText]
-            )
-        )
-        XCTAssertTrue(
-            CustomLLMRemoteSizeCache.shouldPrefetch(
-                repo: "missing",
-                cache: ["repo": "2.1 GB"]
-            )
-        )
-        XCTAssertFalse(
-            CustomLLMRemoteSizeCache.shouldPrefetch(
-                repo: "repo",
-                cache: ["repo": "2.1 GB"]
-            )
-        )
-    }
-
-    func testCustomLLMRemoteSizeCacheReturnsReadyStateForCachedText() {
-        let cachedState = CustomLLMRemoteSizeCache.cachedState(
-            for: "repo",
-            cache: ["repo": "2.1 GB"]
-        )
-
-        XCTAssertEqual(cachedState, .ready(bytes: 0, text: "2.1 GB"))
-        XCTAssertEqual(
-            CustomLLMRemoteSizeCache.updatedCache([:], repo: "repo", text: "1.0 GB"),
-            ["repo": "1.0 GB"]
-        )
-    }
-
-    func testCustomLLMRequestPlanBuilderBuildsStructuredEnhancementRequest() {
-        let plan = CustomLLMRequestPlanBuilder.enhancement(
-            input: "hello world",
-            systemPrompt: "clean it",
-            repo: "mlx-community/Qwen3-4B-4bit",
-            resultFallback: "raw text",
-            structuredOutputPrompt: { instruction, input in "\(instruction)\nINPUT:\(input)" }
-        )
-
-        XCTAssertEqual(plan.kind, .enhancement)
-        XCTAssertEqual(plan.repo, "mlx-community/Qwen3-4B-4bit")
-        XCTAssertEqual(plan.instructions, "clean it")
-        XCTAssertEqual(plan.inputCharacterCount, 11)
-        XCTAssertEqual(plan.resultFallback, "raw text")
-        XCTAssertNil(plan.logMode)
-        XCTAssertEqual(plan.contentLogSections.map(\.label), ["system_prompt", "input", "request_content"])
-        XCTAssertEqual(plan.contentLogSections.last?.content, "Clean up this transcription while preserving meaning and style.\nINPUT:hello world")
+    func testManagerPreservesSupportedRepoOnSelection() async throws {
+        try await withIsolatedModelStorageRoot { _ in
+            let selected = try XCTUnwrap(CustomLLMModelManager.availableModels.last?.id)
+            let manager = CustomLLMModelManager(modelRepo: selected)
+            XCTAssertEqual(manager.currentModelRepo, selected)
+            manager.updateModel(repo: CustomLLMModelManager.defaultModelRepo)
+            XCTAssertEqual(manager.currentModelRepo, CustomLLMModelManager.defaultModelRepo)
+            await manager.shutdownForApplicationTermination()
+        }
     }
 
     func testCustomLLMRequestPlanBuilderBuildsUserPromptEnhancementRequest() {
@@ -221,22 +165,6 @@ final class CustomLLMModelConfigurationTests: MLXModelManagerTestCase {
         XCTAssertEqual(plan.logMode, "userMessage")
         XCTAssertEqual(plan.contentLogSections.map(\.label), ["system_prompt", "input"])
         XCTAssertEqual(plan.contentLogSections.first?.content, "<empty>")
-    }
-
-    func testCustomLLMRequestPlanBuilderBuildsTranslationRequest() {
-        let plan = CustomLLMRequestPlanBuilder.translation(
-            text: "bonjour",
-            instructions: "translate to english",
-            repo: "mlx-community/GLM-4-9B-0414-4bit",
-            structuredOutputPrompt: { instruction, input in "\(instruction) => \(input)" }
-        )
-
-        XCTAssertEqual(plan.kind, .translation)
-        XCTAssertEqual(plan.repo, "mlx-community/GLM-4-9B-0414-4bit")
-        XCTAssertEqual(plan.instructions, "translate to english")
-        XCTAssertEqual(plan.inputCharacterCount, 7)
-        XCTAssertEqual(plan.contentLogSections.map(\.label), ["system_prompt", "input", "request_content"])
-        XCTAssertEqual(plan.contentLogSections.last?.content, "Process the input according to the instructions. => bonjour")
     }
 
     func testCustomLLMCompiledPlanPreservesOutputTokenBudgetHint() {

@@ -21,6 +21,8 @@ The `refactor` group also includes the stage-4 ASR framing/response/completion a
 
 Stage 6A adds existing dictionary learning/matcher/store, history serialization/store/correction, and meeting-detail formatting/virtual-list/cache coverage to `refactor`. Playback controls, scrolling and accessibility still need UI acceptance on macOS.
 
+Stage 6B includes current local-LLM request policy, source selection, resumable URLProtocol, installation/cache and catalog contracts. The three non-model GGUF tests are selected by method; installed GGUF inference is still isolated in `gguf`. Tooling validates both suite and method names to detect stale selectors.
+
 The old `whisper` / `diagnostic` groups were removed because their dedicated Whisper test classes no longer exist. This does not remove MLX Whisper model support or migration coverage. Unknown groups fail rather than selecting nonexistent suites. The `all` / `full` groups avoid rerunning VAD suites already selected by core.
 
 See [test-suite organization](../VoxtTests/README.md) and the [phased refactoring record](RefactoringProgress.zh-CN.md).

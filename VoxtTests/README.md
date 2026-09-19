@@ -81,6 +81,8 @@ Stage 5C adds `SharedModelLoadCoordinatorTests` (6), `MeetingImportedFileAnalyze
 
 Stage 6A reuses the existing dictionary learning/matching/store, history serialization/store, and meeting-detail/virtual-list coverage in `refactor`. One redundant fresh-end test was removed: `testSessionEndExecutionDecisionRejectsDuplicateInFlightSession` already asserts the same first `.execute` transition before checking the duplicate. All other existing test methods are unchanged in that batch.
 
+Stage 6B retires four tests for unused local-LLM builders/size-cache helpers and redirects two repo-selection tests to the actual manager. `CustomLLMRequestRuntimeTests` adds six cases for current compiled plans, output extraction, tuning priority and prefill boundaries; source-selection tests add three attempt-order contracts. Existing resumable URLProtocol, install/cache and configuration/security suites remain in the focused gate. GGUF's three non-model tests are selected explicitly there, while installed inference stays in its opt-in group.
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.

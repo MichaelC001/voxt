@@ -16,12 +16,13 @@
 | 5A | 请求/启动任务、会议 session-token 与清理屏障、MLX 校正任务所有权 | 已实施，新增 20 个测试 | `b771be1` macOS CI 通过；设备/模型验收待执行 |
 | 5B | 热键监听安装对象与业务状态、MLX native-live 任务/use 释放 | 已实施，新增 15 个测试 | `5936e62` macOS CI 通过；设备/模型验收待执行 |
 | 5C | 录音身份/提交、模型加载退出、会议导入资源与最终化快照 | 已实施，新增 22 个测试 | `25776d2` macOS CI 通过；整体集成验收仍待执行 |
-| 6A | Dictionary/History/MeetingDetail 拆分、孤儿调用链与 UI 清理 | 已实施 | 等待本批 macOS CI 与 UI 验收 |
-| 6B / 最终验收 | 剩余大文件、交付事务、进一步去重与性能/设备验证 | 待实施 | 仍有 18 个应用文件 >1,000 行，不标记全项目完成 |
+| 6A | Dictionary/History/MeetingDetail 拆分、孤儿调用链与 UI 清理 | 已实施 | `c55101a` macOS CI 通过；UI 待验收 |
+| 6B | 模型/续传/GGUF 与远程配置职责、退役本地 LLM API 清理 | 已实施 | 等待本批 macOS CI |
+| 6C / 最终验收 | 剩余大文件、交付事务、进一步去重与性能/设备验证 | 待实施 | 仍有 15 个应用文件 >1,000 行，不标记全项目完成 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
-阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 仍需单独验证。
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 仍需单独验证。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -265,6 +266,42 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 
 本批 Linux 已完成声明/模型正文对比、孤儿引用/跨文件 private 检查和工具回归。**这些不是 macOS 编译或 UI 验收结果。** 重点人工检查词典分类/导入/自动学习、历史兼容数据，以及会议详情搜索/编辑/说话人、播放速率/缩放/高亮/滚动联动。
 
+## 阶段 6B：模型、续传和配置边界
+
+### 清理与保留
+
+- Custom LLM 删除 7 个没有生产调用的旧重载（raw/system-prompt enhance、无 repo enhance、两个 translate、两个 rewrite）、3 个独占私有 helper，以及 5 个退役 request builder。现行 `executeCompiledRequest`、`enhance(userPrompt:repo:)`、词典扫描及真实模型生成测试路径保留。
+- 删除只由旧测试引用的 `CustomLLMRemoteSizeCache` 与通用 `CustomLLMRepoSelection` helper；manager 原有“支持检查 → canonical repo / fallback”策略改为直接返回 String，不再装箱未使用的 requested/effective 字段。输出 JSON/resultText 解析仍用于现行编译请求，**没有一起删除**。
+- ASR / Custom LLM 的 `sizeTask`、`prefetchTask` 从未创建实际任务；删除始终为 nil 的占位字段、取消/等待代码及无调用的 no-op API。真正执行工作的 VAD / diarization prefetch/size task 不动。
+- 续传删除无调用的 HubClient 工厂、快照 getter、递归 partial purge、未使用 formatter，以及 delegate 的只写字段/参数。实际 URLSession 协议回调、ETag/Range/416、sidecar、重试与取消实现保留。
+- 删除无人调用的 HTTP HEAD probe helper；`makeDownloadContext` 去掉未使用的 token/cache 参数。实际文件下载的 bearer token 路径保留，元数据请求的原有认证行为未改变。
+
+### 职责整理
+
+| 原文件 | 本批前 | 本批后 | 提取边界 |
+| --- | ---: | ---: | --- |
+| CustomLLMModelManager | 2,000 | 1,429 | Stateless request/runtime policy、tokenizer adapter、catalog values |
+| MLXModelManager | 1,843 | 1,610 | STT factory、catalog values、通用 FileManager helper |
+| MLXModelDownloadSupport | 1,387 | 491 | 续传 types（175）、delegate（210）、传输/sidecar（443）归 Core/Models |
+| GGUFTranslationModelManager | 1,100 | 668 | GGUFTranslationRuntime（434），actor/底层资源代码原样移动 |
+| RemoteProviderConfiguration | 1,294 | 965 | ModelOptions（229）和模型/端点 resolution（106） |
+
+- `CustomLLMRequestRuntime`（255 行）只接收计划、设置和 tuning；container/model use、异步任务及 Published diagnostics 仍由 manager 管理，没有全面开放 private setter。
+- `LocalModelManagerCatalog`（228 行）保留原有嵌套类型路径/值和 catalog 转发，加载和下载的可变状态仍在 manager。
+- 下载源重试候选收敛到 `ModelDownloadSourceSelection.attemptCandidates`；保留 resume 固定已选源、fresh 按探测耗时尝试可达源的原策略。
+- GGUF runtime 和远程配置的受保护 model/Codable 声明逐段比对原样保留。`RemoteStoredCredentialPresence`、presence 字段和 runtime configuration 构造器仍为同文件 `fileprivate`；没有为了拆文件弱化凭据边界。仅纯兼容性规范化 helper 跨文件共享。
+- 没有重写下载算法、调整推理参数、修改依赖 pin、模型清单、数据格式或音频夹具。manager 尚超过 1,000 行的部分不以任意切片冒充职责解耦。
+
+### 测试与规模
+
+- 删除 4 个退役代码专属测试（两个旧 request builder、两个旧 size-cache helper）；两个旧 repo helper 测试改测实际 manager 选择/fallback。
+- 新增 `CustomLLMRequestRuntimeTests` 6 项：编译请求任务映射/字段、结构化输出与文本回退、预算优先级、默认参数及 prefill 边界；下载源测试新增 3 项重试顺序/固定源契约。
+- XCTest 静态方法数 **1,677 → 1,682**；不是为了维持数量而保留旧 API 测试。聚焦组补入现有续传/校验/模型目录/安装缓存及 GGUF 的三个非模型用例；installed GGUF 仍走显式模型门禁，避免重复执行。
+- CLI 测试现在还校验 `-only-testing` 的方法名存在，而非只检查 suite，避免改名后静默选择零测试；source-selection 测试补充隔离 defaults 的 teardown。
+- 应用 Swift 行数 **150,761 → 150,285，净减少 476 行**；>1,000 行文件 **18 → 15**。剩余重点仍是录音、模型管理器、热键、会议协调、远程连通性和设置大文件，以及 UI/编辑器交付事务与最终验收。
+
+本批 Linux 工具检查、受保护声明/运行时正文对比通过；新 Swift 测试和全部移动声明仍需本批 Mac CI。真实暂停/续传、网络切换、下载源回退、模型安装/取消/卸载和 GGUF/native 内存行为保留人工/模型验收要求。
+
 ## 验证与下一门禁
 
 Linux 已执行：
@@ -273,7 +310,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-阶段 6A 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
+阶段 6B 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO

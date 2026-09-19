@@ -171,6 +171,16 @@ run_refactor() {
     -only-testing:VoxtTests/RewriteAnswerContentNormalizerTests
     -only-testing:VoxtTests/RewriteAnswerPayloadParserTests
     -only-testing:VoxtTests/CustomLLMModelConfigurationTests
+    -only-testing:VoxtTests/CustomLLMRequestRuntimeTests
+    -only-testing:VoxtTests/CustomLLMModelSupportTests
+    -only-testing:VoxtTests/CustomLLMModelDownloadSupportTests
+    -only-testing:VoxtTests/ModelDownloadSourceSupportTests
+    -only-testing:VoxtTests/ModelInstallationCacheTests
+    -only-testing:VoxtTests/MLXModelSupportTests
+    -only-testing:VoxtTests/MLXModelPerRepoStateSupportTests
+    -only-testing:VoxtTests/GGUFUTF8OutputAccumulatorTests/testWaitsForCompleteMultibyteSequenceBeforeDecoding
+    -only-testing:VoxtTests/GGUFUTF8OutputAccumulatorTests/testFinalizesInvalidUTF8WithReplacementFlag
+    -only-testing:VoxtTests/GGUFUTF8OutputAccumulatorTests/testApplicationTerminationShutdownRejectsNewGGUFInference
     -only-testing:VoxtTests/SQLiteStorageRepositoryTests
     -only-testing:VoxtTests/AutomaticDictionaryLearningMonitorTests
     -only-testing:VoxtTests/DictionaryEntryCollectionTests
