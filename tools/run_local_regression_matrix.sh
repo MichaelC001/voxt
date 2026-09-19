@@ -172,6 +172,19 @@ run_refactor() {
     -only-testing:VoxtTests/RewriteAnswerPayloadParserTests
     -only-testing:VoxtTests/CustomLLMModelConfigurationTests
     -only-testing:VoxtTests/SQLiteStorageRepositoryTests
+    -only-testing:VoxtTests/AutomaticDictionaryLearningMonitorTests
+    -only-testing:VoxtTests/DictionaryEntryCollectionTests
+    -only-testing:VoxtTests/DictionaryMatcherTests
+    -only-testing:VoxtTests/DictionaryMatcherAliasTests
+    -only-testing:VoxtTests/DictionaryStoreAsyncTests
+    -only-testing:VoxtTests/TranscriptionHistoryStoreAsyncTests
+    -only-testing:VoxtTests/TranscriptionHistoryEntryAudioTests
+    -only-testing:VoxtTests/TranscriptionHistoryConversationSupportTests
+    -only-testing:VoxtTests/HistoryValueResolverTests
+    -only-testing:VoxtTests/HistoryCorrectionPresentationTests
+    -only-testing:VoxtTests/MeetingDetailFormattingTests
+    -only-testing:VoxtTests/MeetingTranscriptVirtualListTests
+    -only-testing:VoxtTests/MeetingDetailTranscriptListCacheTests
     -only-testing:VoxtTests/VoxtNoteStoreTests
     -only-testing:VoxtTests/VoxtObsidianSyncCoordinatorTests
     -only-testing:VoxtTests/VoxtRemindersSyncCoordinatorTests

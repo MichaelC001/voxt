@@ -19,6 +19,8 @@ The script resolves the repository from its own location, disables signing, and 
 
 The `refactor` group also includes the stage-4 ASR framing/response/completion and meeting-session lifecycle tests, alongside existing ASR/meeting support cases. It also includes stage-5A tracked-task, request validity, meeting-token, correction-pass and capture-epoch contracts. Its fake sessions, task barriers and controlled deadlines do not exercise real provider accounts or devices.
 
+Stage 6A adds existing dictionary learning/matcher/store, history serialization/store/correction, and meeting-detail formatting/virtual-list/cache coverage to `refactor`. Playback controls, scrolling and accessibility still need UI acceptance on macOS.
+
 The old `whisper` / `diagnostic` groups were removed because their dedicated Whisper test classes no longer exist. This does not remove MLX Whisper model support or migration coverage. Unknown groups fail rather than selecting nonexistent suites. The `all` / `full` groups avoid rerunning VAD suites already selected by core.
 
 See [test-suite organization](../VoxtTests/README.md) and the [phased refactoring record](RefactoringProgress.zh-CN.md).

@@ -42,11 +42,6 @@ final class SessionEndFlowTests: XCTestCase {
         )
     }
 
-    func testSessionEndExecutionDecisionAllowsFreshSession() {
-        var lifecycle = RecordingSessionLifecycle()
-        XCTAssertEqual(lifecycle.beginEnding(lifecycle.id), .execute)
-    }
-
     func testSessionEndExecutionDecisionRejectsDuplicateInFlightSession() {
         var lifecycle = RecordingSessionLifecycle()
         let sessionID = lifecycle.id

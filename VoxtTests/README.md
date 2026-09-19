@@ -79,6 +79,8 @@ Stage 5B adds `HotkeyManagerLifetimeTests` (4), `HotkeyEventTapRunLoopTests` (4)
 
 Stage 5C adds `SharedModelLoadCoordinatorTests` (6), `MeetingImportedFileAnalyzerTests` (7), `RecordingSessionLifecycleTests` (6), and `MeetingFinalizationContextTests` (3): 22 cases for retained cancelled loads, import cancellation/cleanup windows, stale session output/end and stable checkpoint metadata. Three existing `SessionEndFlowTests` now exercise the real lifecycle transitions instead of a test-only static helper. The focused group includes the existing file queue and checkpoint persistence suites as well.
 
+Stage 6A reuses the existing dictionary learning/matching/store, history serialization/store, and meeting-detail/virtual-list coverage in `refactor`. One redundant fresh-end test was removed: `testSessionEndExecutionDecisionRejectsDuplicateInFlightSession` already asserts the same first `.execute` transition before checking the duplicate. All other existing test methods are unchanged in that batch.
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.

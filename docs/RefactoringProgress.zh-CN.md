@@ -15,12 +15,13 @@
 | 4 | Remote ASR / 会议 provider 会话契约与去重 | 已实施，新增 36 个定向测试 | `fd38d43` macOS CI 通过；真实 provider 人工待验收 |
 | 5A | 请求/启动任务、会议 session-token 与清理屏障、MLX 校正任务所有权 | 已实施，新增 20 个测试 | `b771be1` macOS CI 通过；设备/模型验收待执行 |
 | 5B | 热键监听安装对象与业务状态、MLX native-live 任务/use 释放 | 已实施，新增 15 个测试 | `5936e62` macOS CI 通过；设备/模型验收待执行 |
-| 5C | 录音身份/提交、模型加载退出、会议导入资源与最终化快照 | 已实施，新增 22 个测试 | 等待本批 macOS CI；整体集成验收仍待执行 |
-| 6 | Dictionary/History/MeetingDetail 等剩余大文件与最终验收 | 待实施 | 分域推进；完整构建、测试和人工回归 |
+| 5C | 录音身份/提交、模型加载退出、会议导入资源与最终化快照 | 已实施，新增 22 个测试 | `25776d2` macOS CI 通过；整体集成验收仍待执行 |
+| 6A | Dictionary/History/MeetingDetail 拆分、孤儿调用链与 UI 清理 | 已实施 | 等待本批 macOS CI 与 UI 验收 |
+| 6B / 最终验收 | 剩余大文件、交付事务、进一步去重与性能/设备验证 | 待实施 | 仍有 18 个应用文件 >1,000 行，不标记全项目完成 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
-阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 仍需单独验证。
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 仍需单独验证。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -230,6 +231,40 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 
 阶段 5 的这组核心边界已实施，不能推导出所有异步路径已逐行审计或全部大类已拆完。剩余 UI/编辑器事务快照、模型下载状态、大文件、孤儿代码/测试去重和性能基准继续列入阶段 6，库内部 native 退出限制保留为明确待验收项。
 
+## 阶段 6A：Dictionary / History / MeetingDetail
+
+### 清理依据
+
+- 词典学习里 `semanticChangeSummary` 的两个重载、候选聚类/评分/词缀扩展及专用类型/常量构成封闭的 private 子图，没有来自业务入口的调用。当前请求实际走 `typefluxChangeSummary`。共删除 **28 个 private 声明（约 760 行，含声明间空行）**，不是按单次符号出现机械删除。
+- 保留活跃的 token/LCS 删除检测：`containsSemanticDeletionOnlyChangeGroup` 仍用于“等待用户完成替换”的观察策略，不能连同旧评分管线一起删掉。保留的 76 个学习声明逐个核对，除跨文件访问级别外正文不变。
+- `DictionaryStore` 删除无调用的 `entriesByCategory`、`setCategoryExpanded`、`importProjectTerms`、`activeEntriesAcrossAllScopesForRemoteSync` 及旧项目导入结果类型；现行分类、热词、项目扫描/一键摄入和 JSON 导入入口保留。
+- History 删除两个无调用的批量建议/修正快照更新入口、仅供旧入口使用的 suggestion merge helper 和两个孤儿 entry-copy wrapper；实际修正结果更新、历史追加和序列化字段保留。
+- 删除 8 个孤儿 UI 类型：旧 `DictionarySuggestionRow` 及其独占容器/badge；旧 `DictionaryHeaderIcon` 及其独占图形；`MeetingPrimaryIconButtonStyle`。保留当前 toolbar 的 `DictionaryHeaderIconButton`，也不删除 AppKit/SwiftUI 协议回调。
+
+### 职责拆分
+
+| 原文件 | 本批前 | 本批后 | 新职责文件 |
+| --- | ---: | ---: | --- |
+| DictionaryLearningMonitor | 2,161 | 377 | Prompt / TextScope / TextDiff，最大 455 行 |
+| DictionaryStore | 1,777 | 996 | DictionaryModels（410）、DictionaryStoreQueries（264） |
+| TranscriptionHistoryStore | 1,344 | 917 | TranscriptionHistoryModels（371） |
+| MeetingDetailWindow | 1,409 | 232 | WindowView（762）、PlaybackController（89）、PlaybackPane（315） |
+| MeetingDetailViewModel | 1,206 | 981 | MeetingDetailPresentation（214）、MeetingTranscriptExporter（22） |
+
+- Store 仍唯一持有 Published 状态、缓存、reload generation 和持久化写入。Query 扩展只读取不可变依赖；未把 Store 的 private setter 全面开放。
+- Dictionary / History 的模型和 Codable 声明原样移动（除已无人使用的项目导入结果类型），保留 CodingKeys、旧字段回退、枚举 raw values 和数据路径；没有 schema migration，也没有删除历史兼容字段。
+- MeetingDetail 的窗口/controller 所有权不变；播放器仍由主视图持有。播放控件子视图只接管自身开关/缩放/popover，scrubbing 通过 binding 与主视图同步；虚拟列表的 equatable 比较和回调原样归入现有 transcript components 文件。
+- ViewModel 拆出只读展示策略，Published setter、异步任务、编辑/翻译/摘要变更仍在原所有者。并未把这次文件拆分描述成新的独立业务模块。
+
+### 测试与规模
+
+- 仅删除 1 个可证实冗余测试：`SessionEndFlowTests.testSessionEndExecutionDecisionAllowsFreshSession`。同文件 `testSessionEndExecutionDecisionRejectsDuplicateInFlightSession` 已在相同初始状态先断言首次 `.execute`，再断言重复结束；首次结束契约仍被覆盖。其余测试方法不变。
+- 聚焦回归新增现有词典学习/匹配/异步 Store、历史 Codable/会话/修正、会议详情格式/虚拟列表/cache suite；没有新增只检验搬文件的 Swift 测试。
+- 应用 Swift 行数 **151,965 → 150,761，净减少 1,204 行**（含注释和空行）；>1,000 行文件 **23 → 18**。测试方法 **1,678 → 1,677**，测试文件仍全部 <1,000 行。
+- 剩余热点：MLXTranscriber、CustomLLMModelManager、HotkeyManager、MLXModelManager、MeetingSessionCoordinator，以及下载、远程配置、文本输入和历史设置等。Store / ViewModel 虽低于 1,000 行，仍高于 800 行复审线，后续只按真实职责边界继续整理。
+
+本批 Linux 已完成声明/模型正文对比、孤儿引用/跨文件 private 检查和工具回归。**这些不是 macOS 编译或 UI 验收结果。** 重点人工检查词典分类/导入/自动学习、历史兼容数据，以及会议详情搜索/编辑/说话人、播放速率/缩放/高亮/滚动联动。
+
 ## 验证与下一门禁
 
 Linux 已执行：
@@ -238,7 +273,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-阶段 5C 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
+阶段 6A 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
