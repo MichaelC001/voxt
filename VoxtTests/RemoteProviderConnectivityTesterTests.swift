@@ -13,17 +13,48 @@ final class RemoteProviderConnectivityTesterTests: XCTestCase {
             endpoint: "https://api.deepseek.com/chat/completions",
             configuration: TestFactories.makeRemoteConfiguration(
                 providerID: RemoteLLMProvider.deepseek.rawValue,
-                model: "deepseek-v4-flash"
+                model: "deepseek-flash"
             ),
-            model: "deepseek-v4-flash"
+            model: "deepseek-flash"
         )
 
-        XCTAssertEqual(body["model"] as? String, "deepseek-v4-flash")
+        XCTAssertEqual(body["model"] as? String, "deepseek-flash")
         XCTAssertEqual(body["max_tokens"] as? Int, 1)
         XCTAssertEqual(body["stream"] as? Bool, false)
 
         let thinking = try XCTUnwrap(body["thinking"] as? [String: String])
         XCTAssertEqual(thinking["type"], "disabled")
+    }
+
+    func testDeepSeekProbeRejectsInvalidModelsAndValidationErrors() throws {
+        let tester = RemoteProviderConnectivityTester(testTarget: .llm(.deepseek))
+        let data = Data(#"{"error":{"message":"Model Not Exist","type":"invalid_request_error"}}"#.utf8)
+
+        for statusCode in [400, 401, 403, 404, 422, 429, 500] {
+            XCTAssertThrowsError(try tester.llmTestResponseMessage(
+                statusCode: statusCode,
+                data: data
+            )) { error in
+                XCTAssertEqual((error as NSError).code, statusCode)
+                XCTAssertTrue(error.localizedDescription.contains("Model Not Exist"))
+            }
+        }
+        XCTAssertNoThrow(try tester.llmTestResponseMessage(
+            statusCode: 200,
+            data: Data()
+        ))
+        // Providers with deliberately minimal probes retain their existing policy.
+        let anthropicTester = RemoteProviderConnectivityTester(testTarget: .llm(.anthropic))
+        XCTAssertNoThrow(try anthropicTester.llmTestResponseMessage(
+            statusCode: 422,
+            data: data
+        ))
+        let codexTester = RemoteProviderConnectivityTester(testTarget: .llm(.codex))
+        XCTAssertThrowsError(try codexTester.llmTestResponseMessage(
+            statusCode: 422,
+            data: data,
+            allowValidationErrorsAsReachable: false
+        ))
     }
 
     func testOllamaNativeReachabilityBodyIncludesConfiguredOptions() async throws {

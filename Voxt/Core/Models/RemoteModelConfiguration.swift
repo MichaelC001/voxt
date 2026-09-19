@@ -461,7 +461,7 @@ enum RemoteLLMProvider: String, CaseIterable, Identifiable {
         case .omlx:
             return "qwen3"
         case .deepseek:
-            return "deepseek-v4-flash"
+            return "deepseek-flash"
         case .openrouter:
             return "openrouter/auto"
         case .grok:
@@ -549,7 +549,7 @@ enum RemoteLLMProvider: String, CaseIterable, Identifiable {
             ]
         case .deepseek:
             return [
-                RemoteModelOption(id: "deepseek-v4-flash", title: "DeepSeek V4 Flash (Recommended)"),
+                RemoteModelOption(id: "deepseek-flash", title: "DeepSeek V4.1 Flash (Recommended)"),
                 RemoteModelOption(id: "deepseek-v4-pro", title: "DeepSeek V4 Pro")
             ]
         case .openrouter:
@@ -664,7 +664,11 @@ enum RemoteLLMProvider: String, CaseIterable, Identifiable {
                 RemoteModelOption(id: "mistral", title: "Mistral")
             ]
         case .deepseek:
-            return [RemoteModelOption(id: "deepseek-chat", title: "DeepSeek Chat (Compatibility Alias)")]
+            return [
+                RemoteModelOption(id: "deepseek-v4-flash", title: "DeepSeek V4 Flash (Compatibility Alias)"),
+                RemoteModelOption(id: "deepseek-v4-flash-vision-exp", title: "DeepSeek V4 Flash Vision (Compatibility Alias)"),
+                RemoteModelOption(id: "deepseek-chat", title: "DeepSeek Chat (Legacy Alias)")
+            ]
         case .openrouter:
             return [
                 RemoteModelOption(id: "google/gemini-2.5-flash", title: "Gemini 2.5 Flash"),

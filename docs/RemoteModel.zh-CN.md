@@ -174,11 +174,13 @@ Voxt 的远程 LLM 配置页除了内置预置模型外，也支持手动填写�
 
 ### DeepSeek
 
-- 默认推荐：`deepseek-chat`
-- 内置模型：`deepseek-chat`、`deepseek-reasoner`
-- 简介：适合中文和代码相关场景，配置简单，适合把远程增强集中放在 DeepSeek 体系内。
-
-*Soon*
+- 默认推荐：`deepseek-flash`（DeepSeek V4.1 Flash）；另提供 `deepseek-v4-pro`。
+- 兼容选项：保留 `deepseek-v4-flash`、`deepseek-v4-flash-vision-exp` 及历史 `deepseek-chat` / `deepseek-reasoner` 配置，不自动改写用户的自定义模型 ID。
+- 官方说明：V4.1 Flash 的 API ID 是 `deepseek-flash`，不要根据显示名称自行拼接 `deepseek-v4.1-*`。旧 V4 Flash / Vision ID 目前由官方转到 V4.1 Flash；旧 ID 测试成功不代表仍在使用旧版本。
+- 思考模式：官方默认开启。Voxt 默认文本调用显式关闭思考，避免短输出预算被推理占满后没有正文；保留显式开启、推理强度和历史 `deepseek-reasoner` 默认行为。DeepSeek 不支持独立 `thinking.budget_tokens`，历史预算配置按开启思考处理。
+- 连接测试：轻量探测关闭思考、最多输出 1 token；HTTP 400/422 会显示失败及服务端错误，不再误报成功。测试通过不代表长文本、流式调用或所有高级参数均可用。
+- 若增强看似被跳过：先核对模型 ID，关闭思考及不必要的 Extra Body JSON 后重试。日志中的 `enhancement failed, using raw text` 表示调用失败后回退原文，而非未执行增强。
+- 官方依据：[V4.1 Flash 发布说明](https://api-docs.deepseek.com/news/news260910)、[思考模式](https://api-docs.deepseek.com/guides/thinking_mode)、[Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion)。
 
 ### OpenRouter
 

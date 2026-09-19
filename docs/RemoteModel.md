@@ -174,11 +174,13 @@ In Voxt, the remote LLM configuration sheet supports both preset models and cust
 
 ### DeepSeek
 
-- Suggested default: `deepseek-chat`
-- Built-in models: `deepseek-chat`, `deepseek-reasoner`
-- Overview: A simple choice for users who want to keep remote enhancement inside the DeepSeek ecosystem, especially for Chinese and code-related use cases.
-
-*Soon*
+- Suggested default: `deepseek-flash` (DeepSeek V4.1 Flash); `deepseek-v4-pro` is also available.
+- Compatibility options: `deepseek-v4-flash`, `deepseek-v4-flash-vision-exp`, and historical `deepseek-chat` / `deepseek-reasoner` configurations remain available. Custom model IDs are not rewritten.
+- Official model ID: use `deepseek-flash`, not an inferred `deepseek-v4.1-*` name. The old V4 Flash / Vision IDs currently route to V4.1 Flash, so a successful test with an old ID does not imply the old model is still running.
+- Thinking: enabled by default upstream. Voxt explicitly disables it for default text requests to avoid spending the short output budget on reasoning without visible text. Explicit thinking/effort choices and the legacy `deepseek-reasoner` default are preserved. DeepSeek does not support a separate `thinking.budget_tokens`; saved budget settings are treated as thinking enabled.
+- Connection test: a lightweight, non-thinking probe with at most one output token. HTTP 400/422 now fail with the server error instead of reporting success. A passing probe does not validate long input, streaming, or every advanced setting.
+- If enhancement appears skipped, check the model ID and retry with thinking and unnecessary Extra Body JSON disabled. The log message `enhancement failed, using raw text` indicates fallback after a failed call, not a skipped enhancement step.
+- Official references: [V4.1 Flash release](https://api-docs.deepseek.com/news/news260910), [Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode), [Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion).
 
 ### OpenRouter
 

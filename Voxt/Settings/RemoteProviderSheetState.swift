@@ -296,6 +296,8 @@ extension RemoteProviderConfigurationSheet {
             values = OpenAIReasoningEffort.supportedCases(forModel: resolvedModelValue())
                 .filter { $0 != .automatic }
                 .map(\.rawValue)
+        } else if llmProviderForPicker == .deepseek {
+            values = ["none", "low", "high", "max"]
         } else if isStepFunLLMProvider {
             values = supportsStepFunReasoningEffort ? ["low", "high"] : []
         } else if isOllamaLLMProvider {

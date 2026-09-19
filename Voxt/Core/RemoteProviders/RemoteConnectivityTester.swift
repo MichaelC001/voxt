@@ -903,27 +903,50 @@ struct RemoteProviderConnectivityTester {
         }
         RemoteProviderConnectivityTestLogging.logHTTPResponse(context: context, response: http, data: data)
 
+        return try llmTestResponseMessage(
+            statusCode: http.statusCode,
+            data: data,
+            successMessage: successMessage,
+            allowValidationErrorsAsReachable: allowValidationErrorsAsReachable
+        )
+    }
+
+    func llmTestResponseMessage(
+        statusCode: Int,
+        data: Data,
+        successMessage: String = "",
+        allowValidationErrorsAsReachable: Bool = true
+    ) throws -> String {
+        let acceptsValidationErrors: Bool
+        switch testTarget {
+        case .llm(.deepseek):
+            // DeepSeek's probe is a valid completion request. A 400/422 can
+            // indicate an invalid custom model ID, not a usable connection.
+            acceptsValidationErrors = false
+        default:
+            acceptsValidationErrors = allowValidationErrorsAsReachable
+        }
         let payload = String(data: data.prefix(220), encoding: .utf8) ?? ""
-        if (200...299).contains(http.statusCode) {
+        if (200...299).contains(statusCode) {
             if !successMessage.isEmpty {
                 return successMessage
             }
-            return AppLocalization.format("Connection test succeeded (HTTP %d).", http.statusCode)
+            return AppLocalization.format("Connection test succeeded (HTTP %d).", statusCode)
         }
-        if allowValidationErrorsAsReachable && (http.statusCode == 400 || http.statusCode == 422) {
-            return AppLocalization.format("Endpoint reachable (HTTP %d). Authentication and routing look valid.", http.statusCode)
+        if acceptsValidationErrors && (statusCode == 400 || statusCode == 422) {
+            return AppLocalization.format("Endpoint reachable (HTTP %d). Authentication and routing look valid.", statusCode)
         }
-        if http.statusCode == 401 || http.statusCode == 403 {
+        if statusCode == 401 || statusCode == 403 {
             throw NSError(
                 domain: "Voxt.Settings",
-                code: http.statusCode,
-                userInfo: [NSLocalizedDescriptionKey: AppLocalization.format("Server reachable, but authentication failed (HTTP %d). %@", http.statusCode, payload)]
+                code: statusCode,
+                userInfo: [NSLocalizedDescriptionKey: AppLocalization.format("Server reachable, but authentication failed (HTTP %d). %@", statusCode, payload)]
             )
         }
         throw NSError(
             domain: "Voxt.Settings",
-            code: http.statusCode,
-            userInfo: [NSLocalizedDescriptionKey: AppLocalization.format("Connection failed (HTTP %d). %@", http.statusCode, payload)]
+            code: statusCode,
+            userInfo: [NSLocalizedDescriptionKey: AppLocalization.format("Connection failed (HTTP %d). %@", statusCode, payload)]
         )
     }
 

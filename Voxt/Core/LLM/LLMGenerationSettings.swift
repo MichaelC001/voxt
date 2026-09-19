@@ -181,7 +181,14 @@ enum LLMProviderCapabilityRegistry {
                 supportsLogprobs: true,
                 supportsResponseFormat: true
             )
-        case .deepseek, .zai, .volcengine, .aliyunBailian:
+        case .deepseek:
+            return LLMProviderCapabilities(
+                supportsThinkingToggle: true,
+                supportsThinkingEffort: true,
+                supportsLogprobs: true,
+                supportsResponseFormat: true
+            )
+        case .zai, .volcengine, .aliyunBailian:
             return LLMProviderCapabilities(
                 supportsThinkingToggle: true,
                 supportsThinkingEffort: true,
@@ -356,6 +363,18 @@ extension RemoteProviderConfiguration {
         var settings = generationSettings
         if provider == .stepFun, settings.thinking.mode == .providerDefault {
             settings.thinking = .off
+        }
+        if provider == .deepseek {
+            // Current DeepSeek models default to thinking, which can consume the
+            // short output budget before producing any visible text. Keep legacy
+            // reasoner semantics and explicit user choices, but use fast text
+            // generation by default for all other models (including custom IDs).
+            let normalizedModel = model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if settings.thinking.mode == .providerDefault, normalizedModel != "deepseek-reasoner" {
+                settings.thinking = .off
+            }
+            settings.presencePenalty = nil
+            settings.frequencyPenalty = nil
         }
         guard provider == .codex else {
             return settings

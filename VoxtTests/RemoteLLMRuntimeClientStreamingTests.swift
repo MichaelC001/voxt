@@ -1690,6 +1690,80 @@ final class RemoteLLMRuntimeClientStreamingTests: XCTestCase {
         XCTAssertEqual(provider["order"] as? [String], ["openai"])
     }
 
+    func testDeepSeekDefaultTextGenerationDisablesThinkingForCurrentAndCustomModels() throws {
+        let client = RemoteLLMRuntimeClient()
+        let tuning = RemoteLLMRuntimeClient.GenerationTuning(maxTokens: 256, temperature: 0.2, topP: 0.9)
+        for model in ["deepseek-flash", "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat", "custom-deepseek-model"] {
+            for streaming in [false, true] {
+                var payload = client.openAICompatiblePayload(
+                    model: model,
+                    systemPrompt: "Polish the transcription.",
+                    userPrompt: "hello world",
+                    tuning: tuning,
+                    streamingEnabled: streaming
+                )
+                try client.applyOpenAICompatibleGenerationSettings(
+                    to: &payload,
+                    provider: .deepseek,
+                    configuration: TestFactories.makeRemoteConfiguration(
+                        providerID: RemoteLLMProvider.deepseek.rawValue,
+                        model: model
+                    ),
+                    tuning: tuning,
+                    responseFormat: nil
+                )
+                XCTAssertEqual(payload["model"] as? String, model)
+                XCTAssertEqual(payload["stream"] as? Bool, streaming)
+                XCTAssertEqual(payload["max_tokens"] as? Int, 256)
+                XCTAssertEqual((payload["thinking"] as? [String: String])?["type"], "disabled")
+            }
+        }
+    }
+
+    func testDeepSeekPreservesExplicitThinkingAndLegacyReasonerWithoutUnsupportedBudget() throws {
+        let client = RemoteLLMRuntimeClient()
+        for mode in [LLMThinkingMode.on, .off, .budget, .effort, .providerDefault] {
+            var payload: [String: Any] = [:]
+            try client.applyOpenAICompatibleGenerationSettings(
+                to: &payload,
+                provider: .deepseek,
+                configuration: TestFactories.makeRemoteConfiguration(
+                    providerID: RemoteLLMProvider.deepseek.rawValue,
+                    model: "deepseek-reasoner",
+                    generationSettings: LLMGenerationSettings(
+                        maxOutputTokens: 4096,
+                        presencePenalty: 0.2,
+                        frequencyPenalty: 0.2,
+                        thinking: LLMThinkingSettings(
+                            mode: mode,
+                            effort: "max",
+                            budgetTokens: 1024,
+                            exposeReasoning: false
+                        )
+                    )
+                ),
+                tuning: .init(maxTokens: 256, temperature: 0.2, topP: 0.9),
+                responseFormat: nil
+            )
+            let thinking = payload["thinking"] as? [String: Any]
+            switch mode {
+            case .on, .budget:
+                XCTAssertEqual(thinking?["type"] as? String, "enabled")
+            case .off:
+                XCTAssertEqual(thinking?["type"] as? String, "disabled")
+            case .effort:
+                XCTAssertEqual(payload["reasoning_effort"] as? String, "max")
+            case .providerDefault:
+                XCTAssertNil(thinking)
+                XCTAssertNil(payload["reasoning_effort"])
+            }
+            XCTAssertNil(thinking?["budget_tokens"])
+            XCTAssertNil(payload["presence_penalty"])
+            XCTAssertNil(payload["frequency_penalty"])
+            XCTAssertEqual(payload["max_tokens"] as? Int, 4096)
+        }
+    }
+
     func testXiaomiMiMoGenerationSettingsMapDocumentedChatCompletionFields() throws {
         let client = RemoteLLMRuntimeClient()
         var payload = client.openAICompatiblePayload(

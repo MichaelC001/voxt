@@ -1368,15 +1368,52 @@ final class RemoteModelConfigurationTests: XCTestCase {
     }
 
     func testDeepSeekUsesCurrentSuggestedModelAndKeepsLegacyAliases() {
-        XCTAssertEqual(RemoteLLMProvider.deepseek.suggestedModel, "deepseek-v4-flash")
+        XCTAssertEqual(RemoteLLMProvider.deepseek.suggestedModel, "deepseek-flash")
 
         let latestIDs = RemoteLLMProvider.deepseek.latestModelOptions.map(\.id)
-        XCTAssertTrue(latestIDs.contains("deepseek-v4-flash"))
+        XCTAssertTrue(latestIDs.contains("deepseek-flash"))
         XCTAssertTrue(latestIDs.contains("deepseek-v4-pro"))
 
         let allIDs = RemoteLLMProvider.deepseek.modelOptions.map(\.id)
+        XCTAssertTrue(allIDs.contains("deepseek-v4-flash"))
+        XCTAssertTrue(allIDs.contains("deepseek-v4-flash-vision-exp"))
         XCTAssertTrue(allIDs.contains("deepseek-chat"))
         XCTAssertTrue(allIDs.contains("deepseek-reasoner"))
+    }
+
+    func testDeepSeekEffectiveSettingsPreserveExplicitThinkingChoices() {
+        for mode in [LLMThinkingMode.on, .off, .effort, .budget] {
+            let thinking = LLMThinkingSettings(
+                mode: mode,
+                effort: "high",
+                budgetTokens: 1024,
+                exposeReasoning: false
+            )
+            let configuration = TestFactories.makeRemoteConfiguration(
+                providerID: RemoteLLMProvider.deepseek.rawValue,
+                model: "deepseek-flash",
+                generationSettings: LLMGenerationSettings(thinking: thinking)
+            )
+            XCTAssertEqual(configuration.effectiveGenerationSettings(provider: .deepseek).thinking, thinking)
+        }
+    }
+
+    func testDeepSeekDefaultThinkingOverrideDoesNotMutateStoredSettingsOrOtherProviders() {
+        let configuration = TestFactories.makeRemoteConfiguration(
+            providerID: RemoteLLMProvider.deepseek.rawValue,
+            model: "deepseek-flash"
+        )
+        XCTAssertEqual(configuration.effectiveGenerationSettings(provider: .deepseek).thinking.mode, .off)
+        XCTAssertEqual(configuration.generationSettings.thinking.mode, .providerDefault)
+        XCTAssertEqual(configuration.effectiveGenerationSettings(provider: .openrouter).thinking.mode, .providerDefault)
+    }
+
+    func testDeepSeekCapabilitiesMatchDocumentedThinkingControls() {
+        let capabilities = LLMProviderCapabilityRegistry.capabilities(for: .deepseek)
+        XCTAssertTrue(capabilities.supportsThinkingToggle)
+        XCTAssertTrue(capabilities.supportsThinkingEffort)
+        XCTAssertFalse(capabilities.supportsThinkingBudget)
+        XCTAssertFalse(capabilities.supportsPenalties)
     }
 
     func testStepFunUsesChatCompletionModelCatalogAndCapabilities() {

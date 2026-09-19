@@ -1823,11 +1823,9 @@ struct RemoteLLMRuntimeClient {
             case .off:
                 payload["thinking"] = ["type": "disabled"]
             case .on, .budget:
-                var thinking: [String: Any] = ["type": "enabled"]
-                if let budget = settings.thinking.budgetTokens {
-                    thinking["budget_tokens"] = budget
-                }
-                payload["thinking"] = thinking
+                // DeepSeek supports effort, not a separate thinking-token budget.
+                // Preserve old budget configurations as an explicit thinking opt-in.
+                payload["thinking"] = ["type": "enabled"]
             case .effort:
                 if let effort = settings.thinking.effort {
                     payload["reasoning_effort"] = effort
