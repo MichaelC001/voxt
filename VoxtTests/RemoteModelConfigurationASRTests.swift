@@ -76,13 +76,13 @@ final class RemoteModelConfigurationASRTests: RemoteModelConfigurationTestCase {
     func testDoubaoParserRejectsOversizedCompressedPayload() {
         let oversizedPayload = Data(
             repeating: 0,
-            count: MeetingRemoteAudioSupport.maxDoubaoCompressedPayloadBytes + 1
+            count: DoubaoPacketCodec.maxCompressedPayloadBytes + 1
         )
-        let packet = MeetingRemoteAudioSupport.buildDoubaoPacket(
-            messageType: MeetingRemoteAudioSupport.DoubaoProtocol.messageTypeFullServerResponse,
-            messageFlags: MeetingRemoteAudioSupport.DoubaoProtocol.flagPositiveSequence,
-            serialization: MeetingRemoteAudioSupport.DoubaoProtocol.serializationJSON,
-            compression: MeetingRemoteAudioSupport.DoubaoProtocol.compressionGzip,
+        let packet = DoubaoPacketCodec.buildPacket(
+            messageType: DoubaoProtocol.messageTypeFullServerResponse,
+            messageFlags: DoubaoProtocol.flagPositiveSequence,
+            serialization: DoubaoProtocol.serializationJSON,
+            compression: DoubaoProtocol.compressionGzip,
             sequence: 1,
             payload: oversizedPayload
         )
@@ -92,12 +92,12 @@ final class RemoteModelConfigurationASRTests: RemoteModelConfigurationTestCase {
 
     func testDoubaoParserRejectsHighExpansionGzipPayload() throws {
         let largePlaintext = Data(repeating: 65, count: 1_048_577)
-        let encoded = try MeetingRemoteAudioSupport.encodeDoubaoPayload(largePlaintext)
-        XCTAssertEqual(encoded.compression, MeetingRemoteAudioSupport.DoubaoProtocol.compressionGzip)
-        let packet = MeetingRemoteAudioSupport.buildDoubaoPacket(
-            messageType: MeetingRemoteAudioSupport.DoubaoProtocol.messageTypeFullServerResponse,
-            messageFlags: MeetingRemoteAudioSupport.DoubaoProtocol.flagPositiveSequence,
-            serialization: MeetingRemoteAudioSupport.DoubaoProtocol.serializationJSON,
+        let encoded = try DoubaoPacketCodec.encodePayload(largePlaintext)
+        XCTAssertEqual(encoded.compression, DoubaoProtocol.compressionGzip)
+        let packet = DoubaoPacketCodec.buildPacket(
+            messageType: DoubaoProtocol.messageTypeFullServerResponse,
+            messageFlags: DoubaoProtocol.flagPositiveSequence,
+            serialization: DoubaoProtocol.serializationJSON,
             compression: encoded.compression,
             sequence: 1,
             payload: encoded.payload

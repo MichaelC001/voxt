@@ -65,6 +65,12 @@ bash tools/run_local_regression_matrix.sh refactor
 
 This command includes all split family files and related onboarding, settings, security and persistence suites. Follow with the full Xcode test scheme and verify test discovery/counts on macOS. See the [phase record](../docs/RefactoringProgress.zh-CN.md) for pending validation.
 
+## Remote ASR / meeting transport contracts
+
+`DoubaoPacketCodecTests`, `RemoteASRResponseStateTests`, `RemoteASRCompletionTests`, and `MeetingRemoteSessionLifecycleTests` add 36 deterministic cases for framing, bounded gzip, terminal text, handshake failure/timeout, cancellation, generation isolation and ordered drain. Meeting tests override the existing provider boundary and use a controllable deadline; they do not open sockets or record microphone audio.
+
+These suites and existing ASR/meeting support tests are included in the `refactor` group. Real URLSession/provider behavior, credentials and device transitions still require separate acceptance.
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.

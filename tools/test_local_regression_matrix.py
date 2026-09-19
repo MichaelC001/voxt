@@ -59,6 +59,8 @@ class LocalRegressionMatrixTests(unittest.TestCase):
         for family in ("RemoteLLMRuntimeClient", "RemoteModelConfiguration", "HotkeyManager", "MLXModelManager", "MeetingDetailViewModel"):
             for path in (ROOT / "VoxtTests").glob(f"{family}*Tests.swift"):
                 self.assertIn(f"-only-testing:VoxtTests/{path.stem}", selectors)
+        for suite in ("DoubaoPacketCodecTests", "RemoteASRResponseStateTests", "RemoteASRCompletionTests", "MeetingRemoteSessionLifecycleTests"):
+            self.assertIn(f"-only-testing:VoxtTests/{suite}", selectors)
         for command in commands:
             self.assertEqual(command[0], "test")
             self.assertIn(str(ROOT / "Voxt.xcodeproj"), command)

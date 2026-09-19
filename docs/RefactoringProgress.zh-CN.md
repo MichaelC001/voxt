@@ -8,13 +8,15 @@
 
 | 阶段 | 范围 | 实施状态 | 验收状态 |
 | --- | --- | --- | --- |
-| 0 | 远程 LLM 拆分、旧收尾流水线删除、首轮文档修正 | 已实施，见评估报告 | 等待 Mac |
-| 1 | MLX 纯逻辑/独立推理边界、Onboarding、Settings 组件 | 已实施 | 等待 Mac；MLX 有状态驱动仍待阶段 5 |
-| 2 | 核实的孤儿 UI、下载动作、会议空包装 | 已实施 | 等待 Mac |
-| 3 | 大测试套件、目录归位、回归入口维护 | 已实施 | 等待 Mac 测试发现与运行 |
-| 4 | Remote ASR / 会议 provider 会话契约与去重 | 待实施 | 先补故障注入，再改传输逻辑 |
+| 0 | 远程 LLM 拆分、旧收尾流水线删除、首轮文档修正 | 已实施，见评估报告 | CI 测试工作流通过；Release / 人工待验收 |
+| 1 | MLX 纯逻辑/独立推理边界、Onboarding、Settings 组件 | 已实施 | CI 通过；有状态驱动仍待阶段 5 |
+| 2 | 核实的孤儿 UI、下载动作、会议空包装 | 已实施 | CI 通过；人工待验收 |
+| 3 | 大测试套件、目录归位、回归入口维护 | 已实施 | CI 通过；人工待验收 |
+| 4 | Remote ASR / 会议 provider 会话契约与去重 | 已实施，新增 36 个定向测试 | 需本批提交的 CI；真实 provider 人工验收待执行 |
 | 5 | AppDelegate、录音、会议、热键、模型生命周期的状态所有权 | 待实施 | 以阶段 0–3 Mac 通过为前置条件 |
 | 6 | Dictionary/History/MeetingDetail 等剩余大文件与最终验收 | 待实施 | 分域推进；完整构建、测试和人工回归 |
+
+阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -85,7 +87,7 @@
 
 共享 fixture 放在 `VoxtTests/TestSupport/*TestCase.swift`，不在基类声明测试方法；保留 MainActor、默认配置恢复、临时目录清理、受控 continuation 和原有 manager 保留策略。迁移不是修改测试的等待/调度策略。
 
-当前应用 425 个 Swift 文件、152,512 行，26 个文件仍 >1,000 行；测试 186 个 Swift 文件、39,560 行，最大文件 874 行，静态 `func test…` 数仍为 1,585。行数包含注释和空行；测试文本保留不等于 XCTest 已成功发现/运行。
+阶段 3 结束时应用 425 个 Swift 文件、152,512 行，26 个文件仍 >1,000 行；测试 186 个 Swift 文件、39,560 行，最大文件 874 行，静态 `func test…` 数仍为 1,585。行数包含注释和空行；测试文本保留不等于 XCTest 已成功发现/运行。
 
 ### 目录
 
@@ -108,6 +110,38 @@ Xcode 使用同步目录组，无需手工添加 Swift build phase 条目；仍�
 - 普通和 build-for-testing 路径均显式关闭签名并严格使用锁文件。
 - 新增 5 项 Python CLI 测试，使用假的 xcodebuild 检查 suite 存在、覆盖、路径、参数、去重及失败传播；不冒充 Swift 测试。
 
+## 阶段 4：远程 ASR 协议与完成契约
+
+### 职责拆分与共享
+
+- `RemoteASRTranscriber.swift`：3,547 → 1,259 行。文件请求、Aliyun 流、Doubao 流和响应投影分离；录音/generation 状态仍归 transcriber，剩余有状态驱动属于阶段 5。
+- `MeetingRemoteProviderLiveSession.swift`：1,869 → 51 行，仅保留工厂；已有 Base / Doubao / Aliyun Fun / Qwen 类型整体分离。基类 561 行，各 provider 文件均不超过 211 行。
+- 原 `RemoteASRSupport.swift` 的 11 个支持声明按文本解析、端点、Aliyun、StepFun、Gemini 原样归位，新文件最大 359 行。
+- 会议与短句复用同一份 `DoubaoPacketCodec`，移除重复常量、帧构造、gzip、整数序号/文本提取处理和未调用的旧文件上传实现。保留 dictation 全文与 meeting utterance 时间片段的不同投影。
+- Aliyun 端点解析复用已有 `RemoteASREndpointSupport`；PCM 转换复用原 `RemoteASRTranscriber` 的静态实现，不改变采样算法。会议的模型路由和认证头保持原策略。
+
+### 有意改变的行为（不是仅移动代码）
+
+1. **有界解压、拒绝损坏报文**：豆包 WebSocket 短句路径现在与会议一样限制压缩输入 2 MiB、解压输出 8 MiB、扩张比 64（允许 1 MiB 基础窗口）。损坏 gzip 不再当成普通文本回退；未知压缩类型明确失败。整个帧在复制/解码前也受尺寸限制。自建兼容服务的非规范响应需要人工复核。
+2. **终包和序号**：区分 flag 2 无序号终包与 flag 3 负序号终包；不再把时间戳等任意 JSON 数字识别成 sequence，不让越界整数转换崩溃。非 JSON 文本回退及 JSON metadata 不会抹掉线上的终包标记。
+3. **会议完成仅一次**：提前完成先记录终态；重复 finish 共用完成结果和截止时间，重复回调不会重复 `.finished`。超时从停止请求开始计时，保留原 1.8 秒预算，并覆盖握手/发送期间的等待。
+4. **有序 drain 与取消**：握手完成时先发送已缓冲音频，再发送 finish；等待期间的 append 不会越过队列。取消清理队列，不把取消的 partial 提升为 final。失败时在 `.failed` 移除会话 token 前保存可用 partial，然后关闭 socket / receiver / keepalive。
+5. **响应 actor 冻结终态**：5 类 provider 的最终等待传播取消，终态、超时返回或取消后不再接受迟到文本/错误。保留各 provider 的拼接规则及 StepFun / Gemini grace window。
+6. **握手与错误隔离**：文件转录的握手 gate 记录成功/失败，增加 20 秒上限并响应取消；所有退出路径清理接收任务。错误回调绑定创建时的 generation，不能污染新录音；取消不触发 partial fallback 或交付。
+
+### 新增回归与边界
+
+| 套件 | 方法数 | 重点 |
+| --- | ---: | --- |
+| `DoubaoPacketCodecTests` | 13 | 帧布局、负序号、无序号终包、截断、gzip 限制、非零 Data 索引、两种文本投影 |
+| `RemoteASRResponseStateTests` | 10 | provider 终态、partial drain、取消、迟到事件、握手成功/失败/超时 |
+| `RemoteASRCompletionTests` | 5 | 有/无 partial 的失败、取消不交付、旧 generation 的结果/错误隔离 |
+| `MeetingRemoteSessionLifecycleTests` | 8 | 提前确认、并发 finish、可控超时、握手/发送失败、取消 drain、重复完成 |
+
+Fake 会话复用真实基类，通过既有 override 边界注入故障；截止时间可控，不依赖真实服务或麦克风。测试不等于真实 URLSession WebSocket、provider 账户/服务行为、设备或模型质量验收。远程 LLM 的 transport 故障注入不包含在本批。
+
+`refactor` 回归组已包含这些测试和原有 ASR/会议协议覆盖。应用现有 440 个 Swift 文件、152,041 行，24 个文件仍 >1,000 行；测试 190 个 Swift 文件，静态 XCTest 方法增加至 1,621。阶段 5–6 尚未实施。
+
 ## 验证与下一门禁
 
 Linux 已执行：
@@ -116,7 +150,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-Mac 上执行并记录真实结果后，再进入阶段 4–5：
+阶段 4 新提交仍需 macOS CI / Mac 验证；通过后再进入阶段 5。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
@@ -127,4 +161,4 @@ xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macO
 
 人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈；会议远程启动配置；本地 ASR live/final/取消。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
 
-阶段 4 先补 transport 的超时、零 chunk 回退、partial 后失败、取消、关闭 drain 和迟到回调契约；阶段 5 再确定每个 task、session ID、音频缓冲和模型 lease 的唯一所有者。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。
+阶段 4 已补充上述 ASR/会议契约。阶段 5 再确定应用级 task、session ID、音频缓冲和模型 lease 的唯一所有者；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。
