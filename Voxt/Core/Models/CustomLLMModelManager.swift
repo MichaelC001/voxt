@@ -544,7 +544,7 @@ class CustomLLMModelManager: ObservableObject {
                     }
                 case .info(let info):
                     completionInfo = info
-                case .toolCall:
+                case .toolCall, .rejectedToolCall:
                     continue
                 }
             }
