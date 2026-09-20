@@ -7,7 +7,7 @@
 阶段 0–6D 后列出的代码事项在本轮集中处理，不再按文件逐批等待下一次“继续”。**代码实施、自动门禁、真实环境验收是三种不同状态**：
 
 - 已实施：下面的异步修复、职责整理及测试。
-- 自动门禁：PR #151 当前 HEAD 的 macOS Tests 工作流为准；包含 XCTest/Debug 测试构建和新增的无签名 Release 构建。失败的旧 run 不作通过证据。
+- 自动门禁：代码提交 **`d817b78`** 已通过 [macOS Tests 工作流 35482326300](https://github.com/hehehai/voxt/actions/runs/35482326300)：XCTest/Debug 测试构建及无签名 Release 构建均成功。后续纯文档提交不冒称使用同一 HEAD；任何新代码必须重跑门禁。
 - 未完成的外部验收：真实设备/TCC 权限、provider 账户、编辑器交付、模型/native 退出和运行时性能对比。Linux 实施环境不能代做这些项目，不能因此宣称“所有优化及验收全部完成”。
 
 没有修改依赖 pin、模型清单/调参默认值、音频夹具或个人签名配置。PR 仍为草稿，未合入、未发布。
@@ -49,7 +49,11 @@ Tests 工作流现在保存 `validation-evidence`（7 天保留）：
 - `VoxtTests.xcresult`、`test-summary.json`、`test-discovery.json`；
 - `debug-test.log`、`release-build.log`，包含 `/usr/bin/time -l` 的原始命令资源统计与 Xcode build timing summary。
 
-`68701e5` 的 run `35479399460` 已确认 1,740 项通过、23 项模型门禁跳过、0 失败；Release 随后触发 Swift 6.3.2 泛型析构优化器崩溃，单独调整 Entry 类型边界后的 `39ed131` / run `35481423733` 也复现同一崩溃（XCTest 再次 1,740 通过/23 跳过），继续改为成员级 MainActor 隔离，不关闭 Release 优化。后续必须重新验证，不能把这些 run 算作完整门禁通过。冷实例清理测试在 `39ed131` 降至 0.0013 秒（前次约 600 秒），这是该场景的观测，不外推为整体应用提速。CI 现在也限定单测试默认 120 秒、最多 300 秒，避免硬件意外初始化或死等待无界阻塞。
+`68701e5` 的 run `35479399460` XCTest 通过但 Release 触发 Swift 6.3.2 泛型析构优化器崩溃；单独提取 Entry 后 `39ed131` / run `35481423733` 仍复现。最终采用成员级 MainActor 隔离，**`d817b78` / run `35482326300` 已同时通过 XCTest 和 Release**，没有关闭优化或使用 unsafe 存储。
+
+核对 xcresult：总计 **1,763**，**1,740 通过、23 跳过、0 失败**。新增各 suite 全部执行通过，包括 7 项真实执行入口的 LLM 流式故障注入；6 项 SharedModelLoadCoordinator 契约也全部通过。23 项跳过均为需安装模型/显式开启的回放、内存与 GGUF 等集成门禁，不视为模型验收。
+
+冷实例清理测试在最终 run 为 **0.0025 秒**（此前约 600 秒），这是该测试场景的观测，不外推为整体应用提速。原始命令统计：Debug test 595.34 秒、RSS 1,057,259,520 字节；Release build 708.42 秒、RSS 247,201,792 字节。这是本次虚拟 runner 的命令观测，**不是应用/Metal 总峰值或前后性能对比**。CI 现在也限定单测试默认 120 秒、最多 300 秒，避免硬件意外初始化或死等待无界阻塞。
 
 必须核对 HEAD SHA、所有新增 suite 的发现/执行及 skip 数。**模型门禁 skip 不是模型通过；构建命令的 RSS 不是整个应用/Metal 的峰值内存。**
 

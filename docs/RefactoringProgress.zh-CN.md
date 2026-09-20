@@ -20,12 +20,12 @@
 | 6B | 模型/续传/GGUF 与远程配置职责、退役本地 LLM API 清理 | 已实施 | `1b393a3` macOS CI 通过；模型/下载待人工验收 |
 | 6C | 文本交付代次/剪贴板所有权、历史/权限/连通性职责与孤儿链清理 | 已实施，净新增 20 个测试 | `2d62d99` macOS CI 通过；编辑器/UI 待验收 |
 | 6D | 词典建议退役链、持久化兼容与远程设置校验/快照 | 已实施，新增 12 个测试 | `f1a1a0f` macOS CI 通过；UI/扫描待验收 |
-| 6E 集中收尾 | 剩余热点复审、异步/取消边界、流式故障注入与 Release 门禁 | 已实施，新增 49 个测试 | 本轮 HEAD 的 CI 待确认；首轮编译失败已修正，不能沿用旧绿色 |
+| 6E 集中收尾 | 剩余热点复审、异步/取消边界、流式故障注入与 Release 门禁 | 已实施，新增 49 个测试 | `d817b78` 完整 XCTest / 无签名 Release CI 通过；真机/模型验收仍待执行 |
 | 最终验收 | 真实设备/权限/provider/编辑器/模型与性能对比 | 外部验收未执行 | 见集中收尾清单；不标记全部已验收 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
-阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 的 `1b393a3` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35448285265)。阶段 6C 的 `2d62d99` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35452065137)。阶段 6D 的 `f1a1a0f` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35454152580)。集中收尾以当前 HEAD 的自动门禁为准。
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 的 `1b393a3` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35448285265)。阶段 6C 的 `2d62d99` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35452065137)。阶段 6D 的 `f1a1a0f` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35454152580)。集中收尾代码提交 `d817b78` 已通过 [完整 XCTest / Release CI](https://github.com/hehehai/voxt/actions/runs/35482326300)，发现 1,763 项：1,740 通过、23 项模型门禁跳过、0 失败。后续纯文档提交单独标明，不冒称其 SHA 与此 run 相同。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -395,7 +395,7 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 
 新增 49 项（设置 7、WebSocket 7、reload 6、ASR preview 4、热键 3、进度 3、推理规划 5、会议展示 5、repo 校验 2、LLM 故障 7），静态方法总数 **1,763**。聚焦脚本纳入新 suite；原回归覆盖不删。
 
-CI 增加 unsigned Release build、xcresult/discovery/summary 及 `/usr/bin/time -l` 原始资源记录。首个收尾 run `35478088469` 因 `@concurrent` 随新增 helper 错位导致编译失败；已恢复至原异步校验方法。第二轮 run `35478584544` 又发现说话人模型下载仍引用旧进度 helper，已改接通用实现并复查全部调用点。第三轮 run `35479399460` 的 `68701e5` 已完成 1,763 项 XCTest：1,740 通过、23 个模型门禁跳过、0 失败；随后 Release 在 Swift 6.3.2 的 `EarlyPerfInliner` / 泛型 coordinator 析构处崩溃。将 Entry 改为独立 nonisolated 泛型值，保持任务类型安全及 Release 优化，等待重新验证。该 run 还显示冷实例 Remote ASR 完成测试耗时约 600 秒；清理改为只移除实际采集过的 input node，避免清理时懒初始化硬件。第四轮 `35481423733`（`39ed131`）XCTest 再次 1,740 通过/23 跳过/0 失败，冷清理测试降至 0.0013 秒；Release 仍在同一析构处崩溃，单独提取 Entry 不足以解决。继续改为成员级 MainActor 隔离，保留类型安全/私有状态及 Release 优化。失败记录保留，旧 HEAD 的 XCTest 通过不替代新 HEAD 的完整门禁。
+CI 增加 unsigned Release build、xcresult/discovery/summary 及 `/usr/bin/time -l` 原始资源记录。首个收尾 run `35478088469` 因 `@concurrent` 随新增 helper 错位导致编译失败；已恢复至原异步校验方法。第二轮 run `35478584544` 又发现说话人模型下载仍引用旧进度 helper，已改接通用实现并复查全部调用点。第三轮 run `35479399460` 的 `68701e5` 已完成 1,763 项 XCTest：1,740 通过、23 个模型门禁跳过、0 失败；随后 Release 在 Swift 6.3.2 的 `EarlyPerfInliner` / 泛型 coordinator 析构处崩溃。将 Entry 改为独立 nonisolated 泛型值，保持任务类型安全及 Release 优化，等待重新验证。该 run 还显示冷实例 Remote ASR 完成测试耗时约 600 秒；清理改为只移除实际采集过的 input node，避免清理时懒初始化硬件。第四轮 `35481423733`（`39ed131`）XCTest 再次 1,740 通过/23 跳过/0 失败，冷清理测试降至 0.0013 秒；Release 仍在同一析构处崩溃，单独提取 Entry 不足以解决。最终改为成员级 MainActor 隔离，保留类型安全/私有状态及 Release 优化。第五轮 `35482326300`（`d817b78`）**XCTest 和 Release 全部通过**：1,740 通过、23 跳过、0 失败，新增 suite 与原 6 项加载协调器测试均已核对执行。冷清理回归 0.0025 秒。前面失败记录保留，不冒称失败 run 通过；详细命令统计及外部限制见收尾清单。
 
 ## 验证与下一门禁
 
@@ -405,7 +405,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-集中收尾仍需当前 HEAD 的 macOS CI 确认及真实 Mac 外部验收；前几批绿色结果不能替代它。真实执行并记录结果：
+集中收尾代码 `d817b78` 已完成完整 XCTest/Debug 测试构建和 unsigned Release CI。单独 `refactor` 聚焦组在 Linux 仅核对命令与 selector，尚未独立跑 Mac（其 suite 已进入完整 XCTest）。真实 Mac 外部验收仍未完成；以下命令供复现，不将未运行项写成通过：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
