@@ -248,18 +248,19 @@ private struct MeetingFileTaskRow: View {
         case .preparing:
             return featureSettingsLocalized("Preparing audio…")
         case .processing:
-            return featureSettingsLocalized("Processing")
+            return task.progressStage.displayTitle
         case .cancelling:
             return featureSettingsLocalized("Cancelling…")
         case .completed:
             return featureSettingsLocalized("Completed")
         case .failed:
+            let heading = featureSettingsLocalized("Failed") + " · " + task.progressStage.displayTitle
             guard let errorMessage = task.errorMessage,
                   !errorMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             else {
-                return featureSettingsLocalized("Failed")
+                return heading
             }
-            return featureSettingsLocalized("Failed") + " · " + errorMessage
+            return heading + " · " + errorMessage
         case .cancelled:
             return featureSettingsLocalized("Cancelled")
         }

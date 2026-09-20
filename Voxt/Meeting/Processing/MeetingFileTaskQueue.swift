@@ -281,6 +281,7 @@ final class MeetingFileTaskQueue: ObservableObject {
                     enqueuedAt: now()
                 )
             )
+            MeetingFileTrace.event("enqueued", taskID: taskID, "queueCount=\(tasks.count)")
             stagingTaskIDs.insert(taskID)
             stage(sourceURL: sourceURL, taskID: taskID, stagedFileName: stagedFileName)
         }
@@ -292,6 +293,7 @@ final class MeetingFileTaskQueue: ObservableObject {
     func cancel(taskID: UUID) {
         guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
         guard !tasks[index].isTerminal else { return }
+        MeetingFileTrace.event("cancel-requested", taskID: taskID, diagnosticContext(for: tasks[index]))
 
         if activeTaskID == taskID, tasks[index].status == .processing {
             tasks[index].status = .cancelling
@@ -384,6 +386,7 @@ final class MeetingFileTaskQueue: ObservableObject {
     }
 
     func shutdown() async {
+        MeetingFileTrace.event("shutdown-requested", taskID: activeTaskID ?? activePreparationID)
         isShuttingDown = true
         tickerTask?.cancel()
         tickerTask = nil
@@ -464,13 +467,16 @@ final class MeetingFileTaskQueue: ObservableObject {
             tasks[currentIndex].estimatedTotalSeconds = nil
             tasks[currentIndex].errorMessage = nil
             activeTaskID = taskID
+            VoxtLog.meeting("File task analysis started. \(diagnosticContext(for: tasks[currentIndex]))")
             persist()
 
             do {
                 let task = tasks[currentIndex]
-                let entry = try await analyzer(stagedURL(for: task), task.fileName) { [weak self] progress in
-                    guard let self else { return }
-                    self.apply(progress: progress, to: taskID)
+                let entry = try await MeetingFileTrace.$taskID.withValue(taskID) {
+                    try await analyzer(stagedURL(for: task), task.fileName) { [weak self] progress in
+                        guard let self else { return }
+                        self.apply(progress: progress, to: taskID)
+                    }
                 }
                 guard let finishedIndex = tasks.firstIndex(where: { $0.id == taskID }) else { continue }
                 let shouldRollback = isShuttingDown || tasks[finishedIndex].status == .cancelling
@@ -488,6 +494,8 @@ final class MeetingFileTaskQueue: ObservableObject {
                     tasks[finishedIndex].progressStage = .saving
                     tasks[finishedIndex].progressFraction = 1
                     tasks[finishedIndex].historyEntryID = entry.id
+                    VoxtLog.meeting("File task completed. \(diagnosticContext(for: tasks[finishedIndex]))")
+                    MeetingFileTrace.event("task-completed", taskID: taskID, diagnosticContext(for: tasks[finishedIndex]))
                     SystemNotificationSupport.post(
                         title: AppLocalization.localizedString("File conversion completed"),
                         body: AppLocalization.format("%@ has been converted successfully.", tasks[finishedIndex].fileName),
@@ -514,10 +522,17 @@ final class MeetingFileTaskQueue: ObservableObject {
 
     private func runTicker() async {
         defer { tickerTask = nil }
+        var lastTrace = ContinuousClock.now
         while !Task.isCancelled, !isShuttingDown {
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
             guard hasActiveTasks else { return }
+            if lastTrace.duration(to: .now) >= .seconds(15),
+               let current = tasks.first(where: { !$0.isTerminal }) {
+                MeetingFileTrace.event("heartbeat", taskID: current.id,
+                    "status=\(current.status.rawValue), canStart=\(canStart()), \(diagnosticContext(for: current))")
+                lastTrace = .now
+            }
             objectWillChange.send()
         }
     }
@@ -546,6 +561,9 @@ final class MeetingFileTaskQueue: ObservableObject {
               tasks[index].status == .processing || tasks[index].status == .preparing
         else { return }
         let sampleDate = now()
+        let previousStage = tasks[index].progressStage
+        let previousProcessedSeconds = tasks[index].processedMediaDurationSeconds ?? 0
+        let previousFraction = tasks[index].progressFraction
         tasks[index].progressStage = progress.stage
         tasks[index].progressFraction = min(max(progress.fractionCompleted, 0), 1)
         if let mediaDurationSeconds = progress.mediaDurationSeconds {
@@ -553,6 +571,11 @@ final class MeetingFileTaskQueue: ObservableObject {
         }
         if let processedMediaDurationSeconds = progress.processedMediaDurationSeconds {
             tasks[index].processedMediaDurationSeconds = processedMediaDurationSeconds
+        }
+        let crossedAudioMinute = floor((tasks[index].processedMediaDurationSeconds ?? 0) / 60) > floor(previousProcessedSeconds / 60)
+        let crossedProgressStep = floor(tasks[index].progressFraction * 20) > floor(previousFraction * 20)
+        if previousStage != progress.stage || crossedAudioMinute || crossedProgressStep {
+            VoxtLog.meeting("File task progress. \(diagnosticContext(for: tasks[index]))")
         }
         updateProcessingSpeed(for: &tasks[index], at: sampleDate)
         tasks[index].estimatedTotalSeconds = MeetingFileTask.updatedEstimatedTotalSeconds(
@@ -595,6 +618,8 @@ final class MeetingFileTaskQueue: ObservableObject {
         guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
         tasks[index].status = .cancelled
         tasks[index].completedAt = now()
+        VoxtLog.meeting("File task cancelled. \(diagnosticContext(for: tasks[index]))")
+        MeetingFileTrace.event("task-cancelled", taskID: taskID, diagnosticContext(for: tasks[index]))
     }
 
     private func markInterrupted(taskID: UUID) {
@@ -609,10 +634,23 @@ final class MeetingFileTaskQueue: ObservableObject {
         tasks[index].status = .failed
         tasks[index].completedAt = now()
         tasks[index].errorMessage = error.localizedDescription
+        VoxtLog.meetingError(
+            "File task failed. \(diagnosticContext(for: tasks[index])), \(MeetingFileTaskDiagnostics.errorSummary(error))"
+        )
+        MeetingFileTrace.event("task-failed", taskID: taskID,
+            "\(diagnosticContext(for: tasks[index])), \(MeetingFileTaskDiagnostics.errorSummary(error))")
         SystemNotificationSupport.post(
             title: AppLocalization.localizedString("File conversion failed"),
             body: AppLocalization.format("%@: %@", tasks[index].fileName, error.localizedDescription)
         )
+    }
+
+    private func diagnosticContext(for task: MeetingFileTask) -> String {
+        let elapsed = String(format: "%.2f", task.elapsedSeconds(now: now()))
+        let processed = task.processedMediaDurationSeconds.map { String(format: "%.2f", $0) } ?? "unknown"
+        let duration = task.mediaDurationSeconds.map { String(format: "%.2f", $0) } ?? "unknown"
+        let fraction = String(format: "%.4f", task.progressFraction)
+        return "taskID=\(task.id), stage=\(task.progressStage.diagnosticName), elapsedSeconds=\(elapsed), processedAudioSeconds=\(processed), totalAudioSeconds=\(duration), progress=\(fraction), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue)"
     }
 
     private func stage(sourceURL: URL, taskID: UUID, stagedFileName: String) {
@@ -655,6 +693,7 @@ final class MeetingFileTaskQueue: ObservableObject {
                 self.tasks[index].startedAt = self.now()
                 self.tasks[index].progressStage = .preparing
                 self.tasks[index].progressFraction = 0
+                VoxtLog.meeting("File task preparation started. \(self.diagnosticContext(for: self.tasks[index]))")
                 self.persist()
                 try fileManager.createDirectory(at: self.storageDirectoryURL, withIntermediateDirectories: true)
                 self.restoreStagingReservations()
@@ -665,31 +704,35 @@ final class MeetingFileTaskQueue: ObservableObject {
                 createdDestination = !fileManager.fileExists(atPath: destinationURL.path)
                 let shouldPrepare = createdDestination
                 let preparationTask = Task.detached(priority: .utility) { [weak self] in
-                    if !shouldPrepare {
-                        // Recover a renamed cache even if metadata wasn't flushed.
-                        return try MeetingImportedAudioFile.validatedPreparedFile(at: destinationURL)
+                    try await MeetingFileTrace.$taskID.withValue(taskID) {
+                        MeetingFileTrace.event("preparation-admitted", "cacheReuse=\(!shouldPrepare), outputBudgetBytes=\(preparationLimits.maximumOutputBytes)")
+                        if !shouldPrepare {
+                            // Recover a renamed cache even if metadata wasn't flushed.
+                            return try MeetingImportedAudioFile.validatedPreparedFile(at: destinationURL)
+                        }
+                        let before = try fileManager.attributesOfItem(atPath: sourceURL.path)
+                        guard before[.type] as? FileAttributeType == .typeRegular else {
+                            throw MeetingFileTaskStagingError.sourceUnavailable
+                        }
+                        let audio = try await preparer(sourceURL, destinationURL, preparationLimits, {
+                            guard let self else { throw CancellationError() }
+                            try await self.waitForPreparationAvailability()
+                        }, { fraction in
+                            await self?.apply(
+                                progress: MeetingFileAnalysisProgress(stage: .preparing, stageFraction: fraction),
+                                to: taskID
+                            )
+                        })
+                        let after = try fileManager.attributesOfItem(atPath: sourceURL.path)
+                        guard (before[.size] as? NSNumber) == (after[.size] as? NSNumber),
+                              (before[.modificationDate] as? Date) == (after[.modificationDate] as? Date),
+                              (before[.systemFileNumber] as? NSNumber) == (after[.systemFileNumber] as? NSNumber),
+                              (before[.systemNumber] as? NSNumber) == (after[.systemNumber] as? NSNumber) else {
+                            throw MeetingFileTaskStagingError.sourceUnavailable
+                        }
+                        MeetingFileTrace.event("source-validation-completed", "samples=\(audio.sampleCount)")
+                        return audio
                     }
-                    let before = try fileManager.attributesOfItem(atPath: sourceURL.path)
-                    guard before[.type] as? FileAttributeType == .typeRegular else {
-                        throw MeetingFileTaskStagingError.sourceUnavailable
-                    }
-                    let audio = try await preparer(sourceURL, destinationURL, preparationLimits, {
-                        guard let self else { throw CancellationError() }
-                        try await self.waitForPreparationAvailability()
-                    }, { fraction in
-                        await self?.apply(
-                            progress: MeetingFileAnalysisProgress(stage: .preparing, stageFraction: fraction),
-                            to: taskID
-                        )
-                    })
-                    let after = try fileManager.attributesOfItem(atPath: sourceURL.path)
-                    guard (before[.size] as? NSNumber) == (after[.size] as? NSNumber),
-                          (before[.modificationDate] as? Date) == (after[.modificationDate] as? Date),
-                          (before[.systemFileNumber] as? NSNumber) == (after[.systemFileNumber] as? NSNumber),
-                          (before[.systemNumber] as? NSNumber) == (after[.systemNumber] as? NSNumber) else {
-                        throw MeetingFileTaskStagingError.sourceUnavailable
-                    }
-                    return audio
                 }
                 let audio = try await withTaskCancellationHandler {
                     try await preparationTask.value
@@ -704,7 +747,9 @@ final class MeetingFileTaskQueue: ObservableObject {
                 self.tasks[updatedIndex].mediaDurationSeconds = audio.durationSeconds
                 self.tasks[updatedIndex].progressFraction = 0.15
                 self.tasks[updatedIndex].status = .queued
+                VoxtLog.meeting("File task preparation ready. \(self.diagnosticContext(for: self.tasks[updatedIndex]))")
             } catch {
+                MeetingFileTrace.event("preparation-stopped", taskID: taskID, MeetingFileTaskDiagnostics.errorSummary(error))
                 if createdDestination {
                     try? fileManager.removeItem(at: destinationURL)
                     try? fileManager.removeItem(at: destinationURL.appendingPathExtension("partial"))
@@ -725,7 +770,13 @@ final class MeetingFileTaskQueue: ObservableObject {
     }
 
     private func waitForPreparationAvailability() async throws {
+        var waited = false
+        defer { if waited { MeetingFileTrace.event("preparation-recording-wait-ended", "cancelled=\(Task.isCancelled)") } }
         while !canStart() {
+            if !waited {
+                MeetingFileTrace.event("preparation-recording-wait-started")
+                waited = true
+            }
             try Task.checkCancellation()
             guard !isShuttingDown else { throw CancellationError() }
             try await Task.sleep(for: .milliseconds(250))

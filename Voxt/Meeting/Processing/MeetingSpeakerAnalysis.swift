@@ -78,6 +78,7 @@ enum MeetingSpeakerAnalysisPipeline {
         progress: (@Sendable (Double) async -> Void)? = nil
     ) async -> [MeetingTranscriptSegment] {
         guard !segments.isEmpty, !descriptors.isEmpty, let engine else {
+            MeetingFileTrace.event("speaker-analysis-skipped", "reason=missing-input-or-engine, segments=\(segments.count), windows=\(descriptors.count)")
             return segments
         }
 
@@ -105,8 +106,11 @@ enum MeetingSpeakerAnalysisPipeline {
                 "Meeting speaker analysis session raw turns. assets=\(eligibleDescriptors.count), rawTurns=\(turns.count), rawSpeakers=\(speakerCount(turns))",
                 options: options
             )
-            return assembledSegments(from: segments, turns: turns, options: options)
+            let assembled = assembledSegments(from: segments, turns: turns, options: options)
+            MeetingFileTrace.event("speaker-analysis-completed", "turns=\(turns.count), outputSegments=\(assembled.count)")
+            return assembled
         } catch {
+            MeetingFileTrace.event("speaker-analysis-fallback", MeetingFileTaskDiagnostics.errorSummary(error))
             VoxtLog.meetingWarning("Meeting speaker analysis failed: \(error.localizedDescription)")
             return segments
         }

@@ -244,6 +244,7 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         var originalNames: [String] = []
         let queue = MeetingFileTaskQueue(
             analyzer: { url, originalName, _ in
+                XCTAssertNotNil(MeetingFileTrace.taskID)
                 await probe.begin("analysis")
                 originalNames.append(originalName)
                 let audio = try MeetingImportedAudioFile.validatedPreparedFile(at: url)
@@ -255,6 +256,7 @@ final class MeetingFileTaskQueueTests: XCTestCase {
             cancelActiveAnalysis: {},
             canStart: { true },
             preparer: { source, destination, limits, checkpoint, progress in
+                XCTAssertNotNil(MeetingFileTrace.taskID)
                 await probe.begin("preparation")
                 let audio = try await MeetingImportedAudioFile.prepare(
                     from: source, to: destination, limits: limits, checkpoint: checkpoint, progress: progress
@@ -443,6 +445,40 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         XCTAssertTrue(queue.tasks.allSatisfy { $0.status == .queued })
         await queue.shutdown()
         XCTAssertTrue(queue.tasks.allSatisfy(\.isTerminal))
+    }
+
+    func testFailedAnalysisPreservesStageAndCauseForDiagnosis() async throws {
+        let storage = try TemporaryDirectory()
+        let source = try makeSourceFile(named: "failed-transcription.wav")
+        let queue = MeetingFileTaskQueue(
+            analyzer: { _, _, progress in
+                progress(MeetingFileAnalysisProgress(
+                    stage: .transcribing,
+                    stageFraction: 0.25,
+                    mediaDurationSeconds: 7_200,
+                    processedMediaDurationSeconds: 1_800
+                ))
+                throw MeetingLocalInferenceCoordinatorError.memoryConstrained
+            },
+            cancelActiveAnalysis: {}, canStart: { true }, storageDirectoryURL: storage.url
+        )
+        queue.enqueue(urls: [source])
+        try await waitUntil(queue, status: .failed, at: 0)
+        let failed = try XCTUnwrap(queue.tasks.first)
+        XCTAssertEqual(failed.progressStage, .transcribing)
+        XCTAssertEqual(failed.processedMediaDurationSeconds, 1_800)
+        XCTAssertEqual(failed.mediaDurationSeconds, 7_200)
+        XCTAssertEqual(failed.errorMessage, MeetingLocalInferenceCoordinatorError.memoryConstrained.localizedDescription)
+        XCTAssertNotNil(failed.completedAt)
+        await queue.shutdown()
+
+        struct Payload: Decodable { let tasks: [MeetingFileTask] }
+        let payload = try JSONDecoder().decode(
+            Payload.self, from: Data(contentsOf: storage.url.appendingPathComponent("tasks.json"))
+        )
+        XCTAssertEqual(payload.tasks.first?.progressStage, failed.progressStage)
+        XCTAssertEqual(payload.tasks.first?.errorMessage, failed.errorMessage)
+        XCTAssertEqual(payload.tasks.first?.processedMediaDurationSeconds, failed.processedMediaDurationSeconds)
     }
 
     func testTaskEstimateAndRetryReset() {

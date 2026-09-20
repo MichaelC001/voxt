@@ -198,6 +198,7 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
         let partialURL = destinationURL.appendingPathExtension("partial")
         let resources = MeetingFilePreparationResources()
         let startedAt = ContinuousClock.now
+        MeetingFileTrace.event("decode-preflight-started", "maxSourceBytes=\(limits.maximumSourceBytes), maxOutputBytes=\(limits.maximumOutputBytes)")
         try Task.checkCancellation()
         guard !FileManager.default.fileExists(atPath: destinationURL.path) else {
             throw CocoaError(.fileWriteFileExists)
@@ -231,6 +232,7 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
                 at: destinationURL.deletingLastPathComponent(),
                 additionalBytes: Int64(estimatedSampleCount.rounded(.up)) * 2 + 44
             )
+            MeetingFileTrace.event("decode-preflight-completed", "sourceBytes=\(sourceBytes), durationSeconds=\(durationSeconds), targetRate=\(targetSampleRate), channels=1, pcmBits=16")
             await progress?(0)
 
             let reader = try AVAssetReader(asset: asset)
@@ -269,6 +271,8 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
                 throw reader.error ?? MeetingImportedAudioFileError.unableToDecode
             }
 
+            MeetingFileTrace.event("decode-started")
+            var lastTrace = ContinuousClock.now
             var lastReportedProgress = 0.0
             var lastSafetyCheck = ContinuousClock.now
             var samplesAtSafetyCheck = 0
@@ -294,6 +298,10 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
                     return true
                 }
                 guard hasBuffer else { break }
+                if lastTrace.duration(to: .now) >= .seconds(5) {
+                    MeetingFileTrace.event("decode-progress", "samples=\(writer.sampleCount), outputBytes=\(Int64(writer.sampleCount) * 2 + 44), peakDecoderBufferBytes=\(writer.peakDecoderBufferByteCount), elapsed=\(startedAt.duration(to: .now))")
+                    lastTrace = .now
+                }
                 let currentProgress = min(Double(writer.sampleCount) / estimatedSampleCount, 1)
                 if currentProgress - lastReportedProgress >= 0.01 {
                     lastReportedProgress = currentProgress
@@ -310,13 +318,16 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
             let validated = try validatedPreparedFile(at: partialURL, limits: limits)
             try Task.checkCancellation()
             try FileManager.default.moveItem(at: partialURL, to: destinationURL)
+            MeetingFileTrace.event("decode-published", "samples=\(validated.sampleCount), elapsed=\(startedAt.duration(to: .now))")
             await progress?(1)
             VoxtLog.meeting(
                 "File audio preparation completed. samples=\(validated.sampleCount), outputBytes=\(Int64(validated.sampleCount) * 2 + 44), peakDecoderBufferBytes=\(writer.peakDecoderBufferByteCount), elapsed=\(startedAt.duration(to: .now))"
             )
             return MeetingImportedAudioFile(standardizedAudioURL: destinationURL, sampleCount: validated.sampleCount)
         } catch {
+            MeetingFileTrace.event("decode-stopped", "elapsed=\(startedAt.duration(to: .now)), \(MeetingFileTaskDiagnostics.errorSummary(error))")
             try? FileManager.default.removeItem(at: partialURL)
+            MeetingFileTrace.event("decode-cleanup", "partialRemaining=\(FileManager.default.fileExists(atPath: partialURL.path))")
             throw error
         }
     }
@@ -359,6 +370,8 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
         let partial = destination.appendingPathExtension("partial")
         let resources = MeetingFilePreparationResources()
         let expectedBytes = Int64(source.sampleCount) * 2 + 44
+        let startedAt = ContinuousClock.now
+        MeetingFileTrace.event("archive-copy-started", "expectedBytes=\(expectedBytes)")
         try await resources.waitUntilAvailable()
         try limits.checkDiskSpace(at: destination.deletingLastPathComponent(), additionalBytes: expectedBytes)
         do {
@@ -370,6 +383,7 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
             let output = try FileHandle(forWritingTo: partial)
             defer { try? output.close() }
             var copied: Int64 = 0
+            var lastTrace = ContinuousClock.now
             while copied < expectedBytes {
                 try await resources.waitUntilAvailable()
                 let copiedBytes = try autoreleasepool {
@@ -380,14 +394,20 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
                     return Int64(data.count)
                 }
                 copied += copiedBytes
+                if lastTrace.duration(to: .now) >= .seconds(5) {
+                    MeetingFileTrace.event("archive-copy-progress", "copiedBytes=\(copied), expectedBytes=\(expectedBytes)")
+                    lastTrace = .now
+                }
             }
             try output.synchronize()
             try output.close()
             _ = try validatedPreparedFile(at: partial)
             try Task.checkCancellation()
             try FileManager.default.moveItem(at: partial, to: destination)
+            MeetingFileTrace.event("archive-copy-completed", "copiedBytes=\(copied), elapsed=\(startedAt.duration(to: .now))")
             return MeetingImportedAudioFile(standardizedAudioURL: destination, sampleCount: source.sampleCount)
         } catch {
+            MeetingFileTrace.event("archive-copy-stopped", "elapsed=\(startedAt.duration(to: .now)), \(MeetingFileTaskDiagnostics.errorSummary(error))")
             try? FileManager.default.removeItem(at: partial)
             throw error
         }

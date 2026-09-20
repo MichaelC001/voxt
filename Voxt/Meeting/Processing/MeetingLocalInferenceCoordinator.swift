@@ -121,12 +121,24 @@ actor MeetingLocalInferenceCoordinator {
         _ workClass: MeetingLocalInferenceWorkClass,
         operation: @escaping @Sendable () async throws -> T
     ) async throws -> T {
-        let token = try await acquire(workClass)
-        defer { release(token) }
-        try Task.checkCancellation()
-        let value = try await operation()
-        statistics.completedCount += 1
-        return value
+        let submittedAt = ContinuousClock.now
+        MeetingFileTrace.event("inference-permit-requested", "workClass=\(workClass.rawValue), queuedCount=\(waiters.count), recordingActive=\(recordingActive), memoryPressure=\(memoryPressureConstrained)")
+        do {
+            let token = try await acquire(workClass)
+            let admittedAt = ContinuousClock.now
+            MeetingFileTrace.event("inference-permit-admitted", "workClass=\(workClass.rawValue), waitElapsed=\(submittedAt.duration(to: admittedAt))")
+            defer {
+                release(token)
+                MeetingFileTrace.event("inference-permit-released", "workClass=\(workClass.rawValue), operationElapsed=\(admittedAt.duration(to: .now))")
+            }
+            try Task.checkCancellation()
+            let value = try await operation()
+            statistics.completedCount += 1
+            return value
+        } catch {
+            MeetingFileTrace.event("inference-stopped", "workClass=\(workClass.rawValue), elapsed=\(submittedAt.duration(to: .now)), \(MeetingFileTaskDiagnostics.errorSummary(error))")
+            throw error
+        }
     }
 
     func currentStatistics() -> MeetingLocalInferenceStatistics {
@@ -145,6 +157,7 @@ actor MeetingLocalInferenceCoordinator {
             switch ProcessInfo.processInfo.thermalState {
             case .serious, .critical:
                 statistics.thermalDeferralCount += 1
+                VoxtLog.meetingWarning("Local inference admission rejected. workClass=\(workClass.rawValue), reason=thermal-pressure, thermalState=\(ProcessInfo.processInfo.thermalState.rawValue)")
                 throw MeetingLocalInferenceCoordinatorError.thermallyConstrained
             case .nominal, .fair:
                 break
@@ -155,6 +168,7 @@ actor MeetingLocalInferenceCoordinator {
 
         if memoryPressureConstrained, workClass.isMemoryDeferrable {
             statistics.memoryDeferralCount += 1
+            VoxtLog.meetingWarning("Local inference admission rejected. workClass=\(workClass.rawValue), reason=memory-pressure")
             throw MeetingLocalInferenceCoordinatorError.memoryConstrained
         }
 
@@ -165,6 +179,7 @@ actor MeetingLocalInferenceCoordinator {
         }
         guard waiters.count < Self.maximumQueuedWork else {
             statistics.overloadedCount += 1
+            VoxtLog.meetingWarning("Local inference admission rejected. workClass=\(workClass.rawValue), reason=inference-queue-full, queuedCount=\(waiters.count)")
             throw MeetingLocalInferenceCoordinatorError.overloaded
         }
 

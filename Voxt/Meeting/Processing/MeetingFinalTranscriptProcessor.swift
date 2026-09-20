@@ -85,8 +85,16 @@ enum MeetingFinalTranscriptionPass {
         for (descriptorIndex, descriptor) in descriptors.enumerated() {
             try Task.checkCancellation()
             let descriptorDuration = max(descriptor.durationSeconds, 0)
-            defer { completedDurationBeforeDescriptor += descriptorDuration }
+            let windowStarted = ContinuousClock.now
+            var windowCompleted = false
+            MeetingFileTrace.event("asr-window-started", "window=\(descriptorIndex + 1)/\(descriptors.count), audioStartSeconds=\(descriptor.sessionStartOffset), durationSeconds=\(descriptorDuration)")
+            defer {
+                completedDurationBeforeDescriptor += descriptorDuration
+                MeetingFileTrace.event(windowCompleted ? "asr-window-completed" : "asr-window-stopped",
+                    "window=\(descriptorIndex + 1)/\(descriptors.count), elapsed=\(windowStarted.duration(to: .now)), accumulatedSegments=\(segments.count), cancelled=\(Task.isCancelled)")
+            }
             guard let asset = await loadAsset(descriptor) else {
+                MeetingFileTrace.event("asr-audio-load-failed", "window=\(descriptorIndex + 1), audioStartSeconds=\(descriptor.sessionStartOffset)")
                 throw Failure.assetUnavailable(descriptor.source)
             }
             try Task.checkCancellation()
@@ -98,18 +106,23 @@ enum MeetingFinalTranscriptionPass {
                     descriptorProgress,
                     completedDurationBeforeDescriptor + descriptorDuration
                 )
+                windowCompleted = true
                 continue
             }
             let chunks = chunks(for: asset, options: options)
             let chunkCount = max(chunks.count, 1)
+            MeetingFileTrace.event("asr-window-planned", "window=\(descriptorIndex + 1), chunks=\(chunks.count)")
             for (chunkIndex, chunk) in chunks.enumerated() {
                 try Task.checkCancellation()
+                let chunkStarted = ContinuousClock.now
+                MeetingFileTrace.event("asr-chunk-started", "window=\(descriptorIndex + 1), chunk=\(chunkIndex + 1)/\(chunks.count), audioStartSeconds=\(chunk.startSeconds), audioEndSeconds=\(chunk.endSeconds), samples=\(chunk.samples.count)")
                 let chunkSegments = if requiresCompleteTranscription {
                     try await transcriber.transcribeSegmentsStrict(chunk: chunk)
                 } else {
                     await transcriber.transcribeSegments(chunk: chunk)
                 }
                 try Task.checkCancellation()
+                MeetingFileTrace.event("asr-chunk-completed", "window=\(descriptorIndex + 1), chunk=\(chunkIndex + 1), segments=\(chunkSegments.count), elapsed=\(chunkStarted.duration(to: .now))")
                 appendCleaned(chunkSegments, to: &segments)
                 let descriptorProgress = Double(chunkIndex + 1) / Double(chunkCount)
                 let overallProgress = (Double(descriptorIndex) + descriptorProgress) / Double(descriptorCount)
@@ -127,6 +140,7 @@ enum MeetingFinalTranscriptionPass {
                     completedDurationBeforeDescriptor + descriptorDuration
                 )
             }
+            windowCompleted = true
         }
         try Task.checkCancellation()
         return MeetingTranscriptPostProcessor.process(segments)

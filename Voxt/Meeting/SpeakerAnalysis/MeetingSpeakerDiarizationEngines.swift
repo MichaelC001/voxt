@@ -105,6 +105,13 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
 
         for (index, descriptor) in descriptors.enumerated() {
             try Task.checkCancellation()
+            let windowStarted = ContinuousClock.now
+            var windowCompleted = false
+            MeetingFileTrace.event("speaker-window-started", "window=\(index + 1)/\(descriptors.count), audioStartSeconds=\(descriptor.sessionStartOffset), durationSeconds=\(descriptor.durationSeconds)")
+            defer {
+                MeetingFileTrace.event(windowCompleted ? "speaker-window-completed" : "speaker-window-stopped",
+                    "window=\(index + 1), turns=\(turns.count), elapsed=\(windowStarted.duration(to: .now)), cancelled=\(Task.isCancelled)")
+            }
             if let previousDescriptor {
                 let expectedStart = previousDescriptor.sessionStartOffset + previousDescriptor.durationSeconds
                 let isContinuous = descriptor.source == previousDescriptor.source
@@ -117,6 +124,7 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
             previousDescriptor = descriptor
 
             guard let asset = await loadAsset(descriptor) else {
+                MeetingFileTrace.event("speaker-window-skipped", "window=\(index + 1), reason=audio-unavailable")
                 await progress?(Double(index + 1) / Double(descriptorCount))
                 continue
             }
@@ -126,6 +134,7 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
                 to: 16_000
             )
             guard !prepared.isEmpty else {
+                MeetingFileTrace.event("speaker-window-skipped", "window=\(index + 1), reason=empty-audio")
                 await progress?(Double(index + 1) / Double(descriptorCount))
                 continue
             }
@@ -139,6 +148,7 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
                 mergeGap: 0.18
             )
             state = newState
+            windowCompleted = true
             turns.append(contentsOf: output.segments.compactMap { item in
                 let turn = MeetingSpeakerTurn(
                     source: asset.source,
@@ -159,12 +169,14 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
         if let model {
             return model
         }
+        MeetingFileTrace.event("speaker-model-load-started")
         let directory = await MeetingSortformerModelStorage.validatedModelDirectory()
         guard let directory else {
             throw MeetingVADModelError.modelNotDownloaded
         }
         let loaded = try SortformerModel.fromModelDirectory(directory)
         model = loaded
+        MeetingFileTrace.event("speaker-model-load-completed")
         return loaded
     }
 }

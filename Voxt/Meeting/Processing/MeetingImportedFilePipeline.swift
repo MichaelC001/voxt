@@ -23,19 +23,25 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
     ) async throws -> MeetingSessionResult {
         try Task.checkCancellation()
         progress(MeetingFileAnalysisProgress(stage: .preparing, stageFraction: sourceIsPreparedAudio ? 1 : 0))
+        let startedAt = ContinuousClock.now
+        var stage = "archive-preparation"
+        MeetingFileTrace.event("pipeline-started", "preparedInput=\(sourceIsPreparedAudio), engine=\(engineContext.engine.rawValue)")
         do {
             let sourceIsPreparedAudio = sourceIsPreparedAudio
+            let traceTaskID = MeetingFileTrace.taskID
             let preparationTask = Task.detached(priority: .utility) {
-                if sourceIsPreparedAudio {
-                    return try await MeetingImportedAudioFile.copyPreparedForAnalysis(from: sourceURL)
-                }
-                return try await MeetingImportedAudioFile.prepare(from: sourceURL) { fraction in
-                    await progress(
-                        MeetingFileAnalysisProgress(
-                            stage: .preparing,
-                            stageFraction: fraction
+                try await MeetingFileTrace.$taskID.withValue(traceTaskID) {
+                    if sourceIsPreparedAudio {
+                        return try await MeetingImportedAudioFile.copyPreparedForAnalysis(from: sourceURL)
+                    }
+                    return try await MeetingImportedAudioFile.prepare(from: sourceURL) { fraction in
+                        await progress(
+                            MeetingFileAnalysisProgress(
+                                stage: .preparing,
+                                stageFraction: fraction
+                            )
                         )
-                    )
+                    }
                 }
             }
             let importedAudio = try await withTaskCancellationHandler {
@@ -54,6 +60,8 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                 )
             )
 
+            stage = "transcribing"
+            MeetingFileTrace.event("transcription-started", "durationSeconds=\(importedAudio.durationSeconds), windows=\(importedAudio.assetDescriptors.count)")
             progress(MeetingFileAnalysisProgress(stage: .transcribing))
             let importedTranscriber = try makeTranscriber()
             transcriber = importedTranscriber
@@ -78,15 +86,19 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                 }
             )
             try Task.checkCancellation()
+            MeetingFileTrace.event("transcription-completed", "segments=\(transcriptSegments.count), elapsed=\(startedAt.duration(to: .now))")
             guard !MeetingTranscriptFormatter.meaningfulSegments(for: transcriptSegments).isEmpty else {
                 throw MeetingFileAnalysisError.noTranscript
             }
 
+            stage = "identifyingSpeakers"
+            MeetingFileTrace.event("speaker-analysis-requested", "segments=\(transcriptSegments.count)")
             progress(MeetingFileAnalysisProgress(stage: .identifyingSpeakers))
             let finalSegments: [MeetingTranscriptSegment]
             do {
                 finalSegments = try await MeetingLocalInferenceCoordinator.shared.withPermit(.speakerAnalysis) {
-                    await MeetingSpeakerAnalysisPipeline.analyzedSegments(
+                    MeetingFileTrace.event("speaker-analysis-admitted")
+                    return await MeetingSpeakerAnalysisPipeline.analyzedSegments(
                         from: transcriptSegments,
                         descriptors: importedAudio.assetDescriptors,
                         loadAsset: { descriptor in
@@ -108,10 +120,13 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                 VoxtLog.meetingWarning(
                     "Imported meeting speaker analysis skipped by device safety policy: \(error.localizedDescription)"
                 )
+                MeetingFileTrace.event("speaker-analysis-fallback", MeetingFileTaskDiagnostics.errorSummary(error))
                 finalSegments = MeetingTranscriptPostProcessor.process(transcriptSegments)
             }
             try Task.checkCancellation()
 
+            MeetingFileTrace.event("speaker-analysis-returned", "segments=\(finalSegments.count)")
+            stage = "saving"
             progress(MeetingFileAnalysisProgress(stage: .saving))
             let result = MeetingSessionResult(
                 captureMode: .meeting,
@@ -122,8 +137,10 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                 audioDurationSeconds: importedAudio.durationSeconds,
                 archivedAudioURL: importedAudio.standardizedAudioURL
             )
+            MeetingFileTrace.event("pipeline-result-ready", "elapsed=\(startedAt.duration(to: .now)), segments=\(finalSegments.count)")
             return result
         } catch {
+            MeetingFileTrace.event("pipeline-stopped", "stage=\(stage), elapsed=\(startedAt.duration(to: .now)), \(MeetingFileTaskDiagnostics.errorSummary(error))")
             if let preparedAudioURL {
                 try? FileManager.default.removeItem(at: preparedAudioURL)
             }
@@ -149,6 +166,8 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
     }
 
     func finish(keepingResult: Bool) async {
+        MeetingFileTrace.event("pipeline-cleanup-started", "keepingResult=\(keepingResult)")
+        defer { MeetingFileTrace.event("pipeline-cleanup-completed", "keepingResult=\(keepingResult), cancelled=\(Task.isCancelled)") }
         await transcriber?.cancelPendingWork()
         transcriber = nil
         if holdsModelUse {

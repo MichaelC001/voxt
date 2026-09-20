@@ -73,11 +73,14 @@ extension AppDelegate {
             throw CancellationError()
         }
         let displayTitle = URL(fileURLWithPath: originalFileName).deletingPathExtension().lastPathComponent
+        MeetingFileTrace.event("history-save-started", "segments=\(result.segments.count), audioStorageEnabled=\(historyAudioStorageEnabled)")
+        let saveStartedAt = ContinuousClock.now
         guard let entry = persistMeetingHistory(
             result,
             forceSave: true,
             displayTitle: displayTitle
         ) else {
+            MeetingFileTrace.event("history-save-failed", "elapsed=\(saveStartedAt.duration(to: .now))")
             if let importedAudioURL {
                 try? FileManager.default.removeItem(at: importedAudioURL)
             }
@@ -95,6 +98,7 @@ extension AppDelegate {
             try? FileManager.default.removeItem(at: importedAudioURL)
         }
         progress(MeetingFileAnalysisProgress(stage: .saving, stageFraction: 1))
+        MeetingFileTrace.event("history-save-completed", "elapsed=\(saveStartedAt.duration(to: .now)), historyEntryID=\(entry.id)")
         return entry
     }
 

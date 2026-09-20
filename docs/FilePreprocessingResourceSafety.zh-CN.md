@@ -48,6 +48,41 @@
 
 若真机发现特定容器/编码器的内部峰值不可控，先限制该输入路径，再评估独立进程解码与强制终止；不能只增大 buffer 上限放行。预处理完成日志记录样本数、输出字节、最大已接受 decoder buffer 和墙钟耗时，不记录源路径或音频内容；RSS/CPU/GPU/能耗需另行采样。
 
+## 长文件失败诊断
+
+一次用户提供的约两小时视频测试日志显示：`samples=116040324`、`outputBytes=232080692`、`peakDecoderBufferBytes=17836`、`elapsed=15.62977475 seconds`。这证明该次标准化音频（约 7252.52 秒）已完成生成，后续还出现了 Qwen3 ASR 模型加载及转录过滤日志；不能把稍后任务失败直接归因于预处理。17.42 KiB 是最大已接受解码 buffer，不是进程内存峰值。
+
+旧版队列只将失败原因保存到任务元数据/通知，未记录失败日志，因此仅凭这份控制台输出无法定位最终错误。特别需要核实推理准入的温度/内存拒绝：当前 `.fileASR` 在安全限制下会抛错，严格转录将其向上传递为文件任务失败，而不是自动等待恢复。这是一条已确认的代码路径，不是该次事故已确认的根因；本次诊断补丁不修改准入保护或自动重试策略。
+
+新增诊断包括：
+
+- 任务预处理开始/就绪、分析开始、阶段变化、按进度阈值节流的心跳、失败和完成日志，带 task ID、阶段、墙钟耗时、已处理音频时长、总音频时长及温度状态。
+- 严格 MLX ASR 失败记录当前音频块的起止秒数、模型、工作类型和异常类别/代码，仍原样抛出错误，不吞错或返回部分成功。
+- 推理准入拒绝明确标记 `thermal-pressure`、`memory-pressure` 或 `inference-queue-full`。
+- 任务行显示具体处理阶段；失败提示包含保留的失败阶段和原始用户可见错误。
+- 诊断错误摘要不展开任意错误描述、请求载荷或 userInfo；不记录文件名、音频内容或转录文本。
+
+对已有失败任务，在清理/重试前读取 `~/Library/Application Support/Voxt/meeting-file-tasks/tasks.json` 的 `progressStage`、`errorMessage`、`processedMediaDurationSeconds`、`startedAt`、`completedAt`（沙盒运行时可能在容器下）。`processedMediaDurationSeconds` 是进度估计，不是精确失败块位置；新 ASR 错误日志中的块范围用于精确定位。分享时无需发送源路径、文件名或媒体内容。预处理成功、后续 ASR 失败仍应分别诊断。
+
+### 临时详细日志开关与查看方法
+
+详细诊断集中在 `MeetingFileTrace.swift`，统一前缀 `[FileTaskTrace]`。Debug 构建默认开启，Release 默认关闭；环境变量 `VOXT_FILE_TASK_TRACE=1` 强制开启，`VOXT_FILE_TASK_TRACE=0` 强制关闭，修改后重启进程。Xcode 中可在 Scheme → Run → Arguments → Environment Variables 设置。开关只影响临时详细日志，不关闭常规失败和阶段日志。
+
+通过任务局部上下文携带 task ID，跨 detached 预处理/归档复制任务时显式传递，不使用全局可变的“当前任务 ID”。调用同一 ASR/说话人/推理模块的实时会议没有文件任务上下文时，不输出这组详细日志。后续删除临时日志可集中搜索 `MeetingFileTrace`，不需要修改处理策略。
+
+覆盖事件：入队、预处理准入/缓存复用、媒体预检、解码开始/进度/发布/失败清理、标准化归档副本复制、ASR 窗口及分块开始/结束、模型准备、推理准入与返回、说话人窗口/回退、历史保存，以及取消和退出。解码/复制进度最多每 5 秒一条；队列心跳与资源等待最多每 15 秒一条；ASR/说话人按窗口或分块边界记录，不按采样或 token 输出。心跳依赖主线程调度，不是卡死看门狗。
+
+每条详细事件附带进程当前 RSS 和温度状态：`processRSSBytes` 是进程级瞬时采样，不是任务独占内存、完整峰值、physical footprint 或 GPU 内存。不要用日志中的 buffer 大小代替 RSS。日志仅包含结构化状态、时长、数量、随机 ID 和错误类别/代码，不包含媒体内容、识别文本或完整文件路径。
+
+沿用现有滚动日志存储（单文件约 2 MiB，保留 5 个归档），不另建无界日志文件：
+
+```text
+~/Library/Application Support/Voxt/Logs/current.log
+~/Library/Application Support/Voxt/Logs/archive/
+```
+
+沙盒构建可能在应用容器对应目录中。复现后尽快通过应用日志导出功能导出，或一起收集 current.log 与 archive；长任务的早期日志可能已轮转。Xcode 控制台可筛选 `FileTaskTrace`，再按 task ID 查完整链路。最后一个 `asr-chunk-started` / `speaker-window-started` 与对应完成/错误事件可区分排队、推理、失败及清理，不必猜测总进度。
+
 ## 验证
 
 新增/扩展测试：
