@@ -121,9 +121,6 @@ extension OnboardingGuideView {
     var modelGuidePanel: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(currentStep.subtitle).font(.callout).foregroundStyle(.secondary)
-                GuideInfoRow(title: AppLocalization.localizedString("Speech Model"), value: asrSelectionSummary(selectedSpeechModel))
-                GuideInfoRow(title: AppLocalization.localizedString("Translation (Optional)"), value: translationSelectionSummary(selectedTranslationModel))
                 Text(AppLocalization.localizedString("Selections are applied when you continue. Other feature settings stay unchanged."))
                     .font(.caption).foregroundStyle(.secondary)
                 modelSelectionContent

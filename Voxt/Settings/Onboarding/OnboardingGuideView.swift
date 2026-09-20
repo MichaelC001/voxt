@@ -367,11 +367,8 @@ struct OnboardingGuideView: View {
 
     var footer: some View {
         HStack(spacing: 8) {
-            Spacer(minLength: 0)
-
-            leadingFooterAction
-
             if currentStep == .finish {
+                Spacer(minLength: 0)
                 Button {
                     OnboardingPreferenceManager.markCompleted()
                     onFinish()
@@ -379,7 +376,12 @@ struct OnboardingGuideView: View {
                     Label(AppLocalization.localizedString("Start Voxt"), systemImage: "checkmark.circle")
                 }
                 .buttonStyle(OnboardingGuidePrimaryButtonStyle())
+                Spacer(minLength: 0)
             } else if currentStep.next != nil {
+                Spacer(minLength: 0)
+
+                leadingFooterAction
+
                 Button {
                     advanceStep()
                 } label: {

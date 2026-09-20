@@ -56,6 +56,10 @@ enum OnboardingGuideStyle {
         light: NSColor.black.withAlphaComponent(0.055),
         dark: NSColor.white.withAlphaComponent(0.11)
     )
+    static let cardFill = dynamicColor(
+        light: NSColor(calibratedWhite: 0.955, alpha: 1),
+        dark: NSColor(calibratedWhite: 0.14, alpha: 1)
+    )
     static let controlPressedFill = dynamicColor(
         light: NSColor.black.withAlphaComponent(0.095),
         dark: NSColor.white.withAlphaComponent(0.17)

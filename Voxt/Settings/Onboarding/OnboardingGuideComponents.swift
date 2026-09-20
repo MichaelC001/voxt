@@ -166,27 +166,3 @@ struct OnboardingLanguageSelectLabel: View {
         .contentShape(Capsule(style: .continuous))
     }
 }
-
-struct GuideInfoRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(title)
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
-            Text(value)
-                .font(.callout.weight(.medium))
-                .lineLimit(2)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.horizontal, 10)
-        .frame(minHeight: 32)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(SettingsUIStyle.controlFillColor)
-        )
-    }
-}

@@ -169,7 +169,7 @@ extension OnboardingGuideView {
             Spacer(minLength: 0)
         }
         .padding(16)
-        .background(OnboardingGuideStyle.controlFill, in: RoundedRectangle(cornerRadius: 14))
+        .background(OnboardingGuideStyle.cardFill, in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var translationPracticeControls: some View {
@@ -249,7 +249,7 @@ extension OnboardingGuideView {
         }
         .padding(18)
         .frame(maxWidth: .infinity, minHeight: 145, alignment: .topLeading)
-        .background(OnboardingGuideStyle.controlFill, in: RoundedRectangle(cornerRadius: 14))
+        .background(OnboardingGuideStyle.cardFill, in: RoundedRectangle(cornerRadius: 14))
     }
 
     func cancelPracticeSessionIfNeeded() {
