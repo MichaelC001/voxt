@@ -2,6 +2,9 @@
 "Feature" = "功能";
 "Choose which features are available in Voxt." = "选择在 Voxt 中启用的功能。";
 "History" = "历史记录";
+"Recent Transcriptions" = "最近转录";
+"No recent transcriptions" = "暂无最近转录";
+"Click to copy full text" = "点击复制完整文本";
 "Model" = "模型";
 "Hotkey" = "快捷键";
 "About" = "关于";

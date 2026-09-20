@@ -198,6 +198,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let mainWindowVisibilityState = MainWindowVisibilityState()
     var pendingStatusMenuActions: [() -> Void] = []
     var isStatusMenuOpen = false
+    var statusMenuNeedsRebuild = false
+    var statusMenuHistoryCancellable: AnyCancellable?
+    var statusMenuHistoryGeneration = 0
+    var statusMenuRecentEntries: [TranscriptionHistoryListEntry] = []
     private var interfaceLanguageObserver: NSObjectProtocol?
     private var updateAvailabilityObserver: NSObjectProtocol?
     private var selectedInputDeviceObserver: NSObjectProtocol?
@@ -557,6 +561,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appUpdateManager.syncAutomaticallyChecksForUpdates(autoCheckForUpdates)
         startObservingAudioInputDevices()
         refreshInputDevicesSnapshot(reason: "launch")
+        startObservingStatusMenuHistory()
         buildMenu()
         Task { @MainActor [weak self] in
             await self?.recoverInterruptedMeetingFinalizationIfNeeded()

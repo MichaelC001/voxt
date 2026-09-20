@@ -213,6 +213,23 @@ final class TranscriptionHistoryStore: ObservableObject {
         }
     }
 
+    /// Query each kind independently so unrelated history and UI pagination cannot
+    /// crowd recent dictation/translation results out of the status menu.
+    func loadRecentMenuEntries(
+        limitPerKind: Int,
+        completion: @escaping ([TranscriptionHistoryListEntry]) -> Void
+    ) {
+        let repository = repository
+        DispatchQueue.global(qos: .utility).async {
+            let candidates = [TranscriptionHistoryKind.normal, .translation].flatMap { kind in
+                (try? repository.listEntries(kind: kind, query: "", limit: limitPerKind, offset: 0)) ?? []
+            }
+            DispatchQueue.main.async {
+                completion(candidates)
+            }
+        }
+    }
+
     func loadEntry(
         id: UUID,
         completion: @escaping (TranscriptionHistoryEntry?) -> Void

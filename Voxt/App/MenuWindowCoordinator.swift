@@ -4,6 +4,7 @@
 import SwiftUI
 import AppKit
 import CoreAudio
+import Combine
 
 extension AppDelegate {
     private var mainWindowContentSize: NSSize {
@@ -77,7 +78,16 @@ extension AppDelegate {
     }
 
     func buildMenu() {
+        // Replacing a menu while AppKit tracks the pointer disrupts highlighting
+        // and can invalidate its open submenu. Coalesce updates until dismissal.
+        guard !isStatusMenuOpen else {
+            statusMenuNeedsRebuild = true
+            return
+        }
+        statusMenuNeedsRebuild = false
+        let availability = FeatureSettingsStore.availability()
         let menu = NSMenu()
+        menu.autoenablesItems = false
         menu.delegate = self
 
         let dashboardItem = NSMenuItem(title: AppLocalization.localizedString("Dashboard"), action: #selector(openDashboardFromMenu), keyEquivalent: "")
@@ -96,13 +106,9 @@ extension AppDelegate {
         featureItem.target = self
         menu.addItem(featureItem)
 
-        let notesItem = NSMenuItem(
-            title: AppLocalization.localizedString("Notes"),
-            action: #selector(openNotesHistoryFromMenu),
-            keyEquivalent: ""
-        )
-        notesItem.target = self
-        menu.addItem(notesItem)
+        let historyItem = NSMenuItem(title: AppLocalization.localizedString("History"), action: nil, keyEquivalent: "")
+        historyItem.submenu = buildHistoryMenu(availability: availability)
+        menu.addItem(historyItem)
 
         let dictionaryItem = NSMenuItem(
             title: AppLocalization.localizedString("Dictionary"),
@@ -146,12 +152,70 @@ extension AppDelegate {
         }
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: AppLocalization.localizedString("Quit Voxt"), action: #selector(quit), keyEquivalent: "q"))
+        let quitItem = NSMenuItem(title: AppLocalization.localizedString("Quit Voxt"), action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
         statusItem?.menu = menu
+    }
+
+    func startObservingStatusMenuHistory() {
+        statusMenuHistoryCancellable = historyStore.$entries
+            // Deliver after store mutations/persistence finish, and collapse bursts.
+            .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshStatusMenuHistory()
+            }
+    }
+
+    private func refreshStatusMenuHistory() {
+        statusMenuHistoryGeneration += 1
+        let generation = statusMenuHistoryGeneration
+        historyStore.loadRecentMenuEntries(limitPerKind: StatusMenuHistorySupport.recentLimit) { [weak self] entries in
+            guard let self, generation == self.statusMenuHistoryGeneration else { return }
+            guard entries != self.statusMenuRecentEntries else { return }
+            self.statusMenuRecentEntries = entries
+            self.buildMenu()
+        }
+    }
+
+    private func buildHistoryMenu(availability: FeatureAvailabilitySettings) -> NSMenu {
+        let submenu = NSMenu()
+        submenu.autoenablesItems = false
+        for filter in StatusMenuHistorySupport.filters(availability: availability) {
+            let item = NSMenuItem(title: filter.title, action: #selector(openHistoryFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = filter.rawValue
+            submenu.addItem(item)
+        }
+
+        submenu.addItem(.separator())
+        let heading = NSMenuItem(title: AppLocalization.localizedString("Recent Transcriptions"), action: nil, keyEquivalent: "")
+        heading.isEnabled = false
+        submenu.addItem(heading)
+        let entries = StatusMenuHistorySupport.recentEntries(from: statusMenuRecentEntries, availability: availability)
+        for entry in entries {
+            let kindTitle = entry.kind == .translation ? HistoryFilterTab.translation.title : HistoryFilterTab.transcription.title
+            let item = NSMenuItem(
+                title: "\(kindTitle): \(StatusMenuHistorySupport.previewTitle(for: entry))",
+                action: #selector(copyRecentHistoryFromMenu(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = entry.id.uuidString
+            item.toolTip = AppLocalization.localizedString("Click to copy full text")
+            submenu.addItem(item)
+        }
+        if entries.isEmpty {
+            let emptyItem = NSMenuItem(title: AppLocalization.localizedString("No recent transcriptions"), action: nil, keyEquivalent: "")
+            emptyItem.isEnabled = false
+            submenu.addItem(emptyItem)
+        }
+        return submenu
     }
 
     private func buildMicrophoneMenu() -> NSMenu {
         let submenu = NSMenu()
+        submenu.autoenablesItems = false
         let resolvedSelectedUID = selectedInputDeviceUID
 
         let autoSwitchItem = NSMenuItem(
@@ -172,7 +236,7 @@ extension AppDelegate {
             submenu.addItem(item)
         }
 
-        if submenu.items.isEmpty {
+        if inputDevicesSnapshot.isEmpty {
             let emptyItem = NSMenuItem(title: AppLocalization.localizedString("No microphone available"), action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false
             submenu.addItem(emptyItem)
@@ -326,15 +390,31 @@ extension AppDelegate {
         }
     }
 
-    @objc private func openNotesHistoryFromMenu() {
+    @objc private func openHistoryFromMenu(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let filter = HistoryFilterTab(rawValue: rawValue)
+        else { return }
         performAfterStatusMenuDismissal {
             self.openMainWindow(
                 target: SettingsNavigationTarget(
                     tab: .history,
                     section: .historyEntries,
-                    historyFilter: .note
+                    historyFilter: filter
                 )
             )
+        }
+    }
+
+    @objc private func copyRecentHistoryFromMenu(_ sender: NSMenuItem) {
+        guard let rawID = sender.representedObject as? String,
+              let id = UUID(uuidString: rawID)
+        else { return }
+        performAfterStatusMenuDismissal {
+            // Fetch the full, current text only on selection, never during hover.
+            self.historyStore.loadEntry(id: id) { [weak self] entry in
+                guard let self, let entry else { return }
+                _ = self.pasteboardTextWriter.write(entry.text, to: .general, restorePrevious: false)
+            }
         }
     }
 
@@ -711,11 +791,14 @@ extension AppDelegate: NSMenuDelegate {
         guard menu == statusItem?.menu else { return }
         isStatusMenuOpen = false
 
-        guard !pendingStatusMenuActions.isEmpty else { return }
         let actions = pendingStatusMenuActions
         pendingStatusMenuActions.removeAll()
 
-        DispatchQueue.main.async {
+        // Let AppKit finish unwinding menu tracking before replacing the menu.
+        DispatchQueue.main.async { [weak self] in
+            if let self, self.statusMenuNeedsRebuild {
+                self.buildMenu()
+            }
             actions.forEach { $0() }
         }
     }

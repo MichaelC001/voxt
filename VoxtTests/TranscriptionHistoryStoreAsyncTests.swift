@@ -214,6 +214,48 @@ final class TranscriptionHistoryStoreAsyncTests: XCTestCase {
         XCTAssertFalse(store.entries.contains { $0.id == externallyAddedEntry.id })
     }
 
+    func testRecentMenuEntriesAreIndependentOfVisibleHistoryPage() async throws {
+        let unrelated = (0..<45).map { makeEntry(index: $0, kind: .rewrite) }
+        let transcriptions = (50..<57).map { makeEntry(index: $0, kind: .normal) }
+        let translations = (60..<67).map { makeEntry(index: $0, kind: .translation) }
+        let repository = try makeFixture(entries: unrelated + transcriptions + translations)
+        let store = TranscriptionHistoryStore(repository: repository)
+        XCTAssertTrue(store.entries.allSatisfy { $0.kind == .rewrite })
+
+        let candidates = await recentMenuEntries(in: store)
+        XCTAssertEqual(candidates.count, 10)
+        XCTAssertEqual(Set(candidates.map(\.id)), Set((Array(transcriptions.prefix(5)) + Array(translations.prefix(5))).map(\.id)))
+
+        XCTAssertTrue(store.delete(id: transcriptions[0].id))
+        let refreshed = await recentMenuEntries(in: store)
+        XCTAssertFalse(refreshed.contains { $0.id == transcriptions[0].id })
+        XCTAssertTrue(refreshed.contains { $0.id == transcriptions[5].id })
+
+        store.clearAll()
+        let cleared = await recentMenuEntries(in: store)
+        XCTAssertTrue(cleared.isEmpty)
+    }
+
+    func testRecentMenuPreviewLoadsFullTextOnSelection() async throws {
+        let text = String(repeating: "完整文本\n", count: 200)
+        let entry = makeEntry(index: 0, text: text)
+        let repository = try makeFixture(entries: [entry])
+        let store = TranscriptionHistoryStore(repository: repository)
+        let candidates = await recentMenuEntries(in: store)
+        let candidate = try XCTUnwrap(candidates.first)
+        XCTAssertLessThan(candidate.previewText.count, text.count)
+        let loaded: TranscriptionHistoryEntry? = await withCheckedContinuation { continuation in
+            store.loadEntry(id: candidate.id) { continuation.resume(returning: $0) }
+        }
+        XCTAssertEqual(loaded?.text, text)
+    }
+
+    private func recentMenuEntries(in store: TranscriptionHistoryStore) async -> [TranscriptionHistoryListEntry] {
+        await withCheckedContinuation { continuation in
+            store.loadRecentMenuEntries(limitPerKind: 5) { continuation.resume(returning: $0) }
+        }
+    }
+
     private func makeFixture(entries: [TranscriptionHistoryEntry]) throws -> BlockingHistoryRepository {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("voxt-history-async-tests-\(UUID().uuidString)", isDirectory: true)
@@ -230,11 +272,12 @@ final class TranscriptionHistoryStoreAsyncTests: XCTestCase {
     private func makeEntry(
         index: Int,
         kind: TranscriptionHistoryKind = .normal,
-        createdAt: Date? = nil
+        createdAt: Date? = nil,
+        text: String? = nil
     ) -> TranscriptionHistoryEntry {
         TranscriptionHistoryEntry(
             id: UUID(),
-            text: "entry-\(index)",
+            text: text ?? "entry-\(index)",
             createdAt: createdAt ?? Date().addingTimeInterval(TimeInterval(-index)),
             transcriptionEngine: "engine",
             transcriptionModel: "model",

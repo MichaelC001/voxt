@@ -570,6 +570,14 @@ final class VoxtNoteCornerHoverMonitor {
     }
 
     private func samplePointer() {
+        // Menu tracking owns hover until dismissal. Keep an already-visible note
+        // panel in place, but avoid screen queries and timer churn on every move.
+        // The UI-state observer schedules a fresh sample when tracking ends.
+        guard !uiState.isMenuTracking else {
+            transitionTimer?.cancel()
+            transitionTimer = nil
+            return
+        }
         let location = NSEvent.mouseLocation
         let activeScreen = screen(containing: location)
         let corner = settingsState.value.corner

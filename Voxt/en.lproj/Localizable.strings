@@ -2,6 +2,9 @@
 "Feature" = "Feature";
 "Choose which features are available in Voxt." = "Choose which features are available in Voxt.";
 "History" = "History";
+"Recent Transcriptions" = "Recent Transcriptions";
+"No recent transcriptions" = "No recent transcriptions";
+"Click to copy full text" = "Click to copy full text";
 "Model" = "Model";
 "Hotkey" = "Hotkey";
 "About" = "About";
