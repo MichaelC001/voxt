@@ -20,7 +20,7 @@ extension RemoteLLMRuntimeClient {
                     request.setValue(value, forHTTPHeaderField: key)
                 }
 
-                let (data, response) = try await VoxtNetworkSession.active.data(for: request)
+                let (data, response) = try await networkSession.data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200..<300).contains(httpResponse.statusCode),
                       let object = try? JSONSerialization.jsonObject(with: data)

@@ -254,7 +254,8 @@ struct FeatureModelCatalogBuilder {
         entries.append(contentsOf: mlxModelManager.displayModelsIncludingInstalled().map { model in
             let selectionID = FeatureModelSelectionID.mlx(model.id)
             let isInstalled = mlxModelManager.isModelDownloaded(repo: model.id)
-            let availability = Self.mlxSelectorAvailability(isInstalled: isInstalled)
+            let isChecking = mlxModelManager.isCheckingInstallation(repo: model.id)
+            let availability = Self.localSelectorAvailability(isInstalled: isInstalled, isChecking: isChecking)
             return FeatureModelSelectorEntry(
                 selectionID: selectionID,
                 title: model.title,
@@ -276,7 +277,7 @@ struct FeatureModelCatalogBuilder {
                     configured: true,
                     selectionID: selectionID
                 ),
-                statusText: isInstalled ? localized("Installed") : localized("Not installed"),
+                statusText: isChecking ? localized("Loading…") : (isInstalled ? localized("Installed") : localized("Not installed")),
                 usageLocations: usageLabels(for: selectionID),
                 badgeText: ModelCatalogBadgeSupport.recommendedBadgeText(forMLXRepo: model.id),
                 isSelectable: availability.isSelectable,
@@ -324,10 +325,10 @@ struct FeatureModelCatalogBuilder {
         return entries
     }
 
-    static func mlxSelectorAvailability(isInstalled: Bool) -> (isSelectable: Bool, disabledReason: String?) {
+    static func localSelectorAvailability(isInstalled: Bool, isChecking: Bool = false) -> (isSelectable: Bool, disabledReason: String?) {
         (
-            isSelectable: isInstalled,
-            disabledReason: isInstalled ? nil : localized("Install this model in Model settings first.")
+            isSelectable: isInstalled && !isChecking,
+            disabledReason: isChecking ? localized("Loading…") : (isInstalled ? nil : localized("Install this model in Model settings first."))
         )
     }
 
@@ -363,6 +364,8 @@ struct FeatureModelCatalogBuilder {
         entries.append(contentsOf: customLLMDisplayModelsIncludingFeatureSelections().map { model in
             let selectionID = FeatureModelSelectionID.localLLM(model.id)
             let isInstalled = customLLMManager.isModelDownloaded(repo: model.id)
+            let isChecking = customLLMManager.isCheckingInstallation(repo: model.id)
+            let availability = Self.localSelectorAvailability(isInstalled: isInstalled, isChecking: isChecking)
             return FeatureModelSelectorEntry(
                 selectionID: selectionID,
                 title: model.title,
@@ -382,11 +385,11 @@ struct FeatureModelCatalogBuilder {
                     configured: true,
                     selectionID: selectionID
                 ),
-                statusText: isInstalled ? localized("Installed") : localized("Not installed"),
+                statusText: isChecking ? localized("Loading…") : (isInstalled ? localized("Installed") : localized("Not installed")),
                 usageLocations: usageLabels(for: selectionID),
                 badgeText: nil,
-                isSelectable: isInstalled,
-                disabledReason: isInstalled ? nil : localized("Install this model in Model settings first.")
+                isSelectable: availability.isSelectable,
+                disabledReason: availability.disabledReason
             )
         })
 

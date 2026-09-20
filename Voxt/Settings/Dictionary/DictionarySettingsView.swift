@@ -543,20 +543,6 @@ struct DictionarySettingsView: View {
         dictionaryToastMessage = ""
     }
 
-    private func scopeLabel(for entry: DictionaryEntry) -> String {
-        guard entry.groupID != nil else {
-            return AppLocalization.localizedString("Global")
-        }
-        return entry.groupNameSnapshot ?? AppLocalization.localizedString("Missing Group")
-    }
-
-    private func suggestionScopeLabel(for suggestion: DictionarySuggestion) -> String {
-        guard suggestion.groupID != nil else {
-            return AppLocalization.localizedString("Global")
-        }
-        return suggestion.groupNameSnapshot ?? AppLocalization.localizedString("Missing Group")
-    }
-
     private func groupName(for groupID: UUID?) -> String? {
         guard let groupID else { return nil }
         return appBranchGroups.first(where: { $0.id == groupID })?.name
@@ -592,16 +578,5 @@ struct DictionarySettingsView: View {
         AppLocalization.localizedString("Cancel requested. Stopping after the current batch.")
     }
 
-    private func historyScanSummaryText(lastRunAt: Date) -> String {
-        let relative = RelativeDateTimeFormatter()
-        relative.unitsStyle = .short
-        let timeText = relative.localizedString(for: lastRunAt, relativeTo: Date())
-        let progress = historyScanProgress
-        return AppLocalization.format(
-            "Last scan %@ processed %d history records and added %d dictionary terms.",
-            timeText,
-            progress.lastProcessedCount,
-            progress.lastNewSuggestionCount
-        )
-    }
+
 }

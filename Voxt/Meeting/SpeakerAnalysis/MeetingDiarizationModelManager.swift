@@ -216,7 +216,7 @@ final class MeetingDiarizationModelManager: ObservableObject {
             let sampler = Task { [weak self] in
                 let startTime = Date()
                 while !Task.isCancelled {
-                    let inFlight = CustomLLMModelDownloadSupport.inFlightBytes(
+                    let inFlight = ModelDownloadProgress.inFlightBytes(
                         progress: progress,
                         expectedFileBytes: expectedBytes,
                         startTime: startTime

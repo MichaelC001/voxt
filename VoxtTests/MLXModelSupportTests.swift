@@ -5,6 +5,24 @@ import XCTest
 @testable import Voxt
 
 final class MLXModelSupportTests: XCTestCase {
+    func testDownloadValidationSizeIsBoundToRequestedRepo() throws {
+        let smallRepo = "mlx-community/Qwen3-ASR-0.6B-4bit"
+        let largeRepo = "beshkenadze/cohere-transcribe-03-2026-mlx-fp16"
+        let small = try XCTUnwrap(MLXModelCatalog.fallbackRemoteSizeInfo(repo: smallRepo))
+        let large = try XCTUnwrap(MLXModelCatalog.fallbackRemoteSizeInfo(repo: largeRepo))
+        XCTAssertNotEqual(small.bytes, large.bytes)
+        XCTAssertEqual(MLXModelDownloadSupport.validationSizeState(for: smallRepo), .ready(bytes: small.bytes, text: small.text))
+        XCTAssertEqual(MLXModelDownloadSupport.validationSizeState(for: largeRepo), .ready(bytes: large.bytes, text: large.text))
+        XCTAssertEqual(MLXModelDownloadSupport.validationSizeState(for: smallRepo), .ready(bytes: small.bytes, text: small.text))
+    }
+
+    func testDownloadValidationSizeResolvesLegacyAlias() {
+        XCTAssertEqual(
+            MLXModelDownloadSupport.validationSizeState(for: "mlx-community/Qwen3-ASR-0.6B-bf16"),
+            MLXModelDownloadSupport.validationSizeState(for: "mlx-community/Qwen3-ASR-0.6B-4bit")
+        )
+    }
+
     func testCanonicalModelRepoMapsLegacyRepos() {
         XCTAssertEqual(
             MLXModelCatalog.canonicalModelRepo("mlx-community/Parakeet-0.6B"),

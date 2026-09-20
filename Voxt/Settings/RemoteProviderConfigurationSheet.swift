@@ -27,9 +27,7 @@ struct RemoteProviderConfigurationSheet: View {
     @State var editedCredentialFields: Set<RemoteProviderConfiguration.CredentialField> = []
     @State var searchEnabled = false
     @State var openAIChunkPseudoRealtimeEnabled = false
-    @State var openAIReasoningEffort = OpenAIReasoningEffort.automatic.rawValue
     @State var openAITextVerbosity = OpenAITextVerbosity.automatic.rawValue
-    @State var openAIMaxOutputTokensText = ""
     @State var generationMaxOutputTokensText = ""
     @State var generationTemperatureText = ""
     @State var generationTopPText = ""
@@ -76,10 +74,7 @@ struct RemoteProviderConfigurationSheet: View {
     @State var codexAuthFileBookmark: Data?
     @State var codexFastModeEnabled = false
     @State var codexAuthFileSelectionError: String?
-    @State var dynamicCodexModelOptions: [RemoteModelOption]?
-    @State var isTestingConnection = false
-    @State var testResultMessage: String?
-    @State var testResultIsSuccess = false
+    @StateObject var operations = RemoteProviderSheetOperations()
     @State var operationToastMessage = ""
     @State var operationToastDismissTask: Task<Void, Never>?
 
@@ -169,10 +164,10 @@ struct RemoteProviderConfigurationSheet: View {
 
             actionSection
 
-            if let testResultMessage, !testResultMessage.isEmpty {
-                Text(testResultMessage)
+            if let result = operations.connectionResult, !result.message.isEmpty {
+                Text(result.message)
                     .font(.caption)
-                    .foregroundStyle(testResultIsSuccess ? .green : .orange)
+                    .foregroundStyle(result.succeeded ? .green : .orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -187,7 +182,20 @@ struct RemoteProviderConfigurationSheet: View {
             }
         }
         .animation(.easeInOut(duration: 0.16), value: operationToastMessage)
+        .onChange(of: operations.modelOptions) { _, options in
+            if let options, options == operations.modelOptions, !pickerModelOptionIDs.contains(selectedProviderModel) {
+                configureModelSelection()
+            }
+        }
+        .onChange(of: operations.connectionResult) { _, result in
+            if let result, result == operations.connectionResult, !result.succeeded { showOperationToast(result.message) }
+        }
+        .onDisappear {
+            operations.cancel()
+            operationToastDismissTask?.cancel()
+        }
         .onAppear {
+            operations.activate()
             configureModelSelection()
             customModelID = configuration.model
             endpoint = initialEndpointValue()
@@ -197,9 +205,7 @@ struct RemoteProviderConfigurationSheet: View {
             editedCredentialFields.removeAll()
             searchEnabled = configuration.searchEnabled
             openAIChunkPseudoRealtimeEnabled = configuration.openAIChunkPseudoRealtimeEnabled
-            openAIReasoningEffort = configuration.openAIReasoningEffort
             openAITextVerbosity = configuration.openAITextVerbosity
-            openAIMaxOutputTokensText = configuration.openAIMaxOutputTokens.map(String.init) ?? ""
             configureGenerationSettingsState()
             doubaoDictionaryMode = configuration.doubaoDictionaryMode
             doubaoEnableRequestHotwords = configuration.doubaoEnableRequestHotwords
@@ -231,6 +237,7 @@ struct RemoteProviderConfigurationSheet: View {
     }
 
     func close() {
+        operations.cancel()
         operationToastDismissTask?.cancel()
         if let onClose {
             onClose()

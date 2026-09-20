@@ -2,6 +2,7 @@
 // Provides Voxt Log Redactor Tests for Voxt test coverage.
 
 import XCTest
+import Logging
 @testable import Voxt
 
 final class VoxtLogRedactorTests: XCTestCase {
@@ -21,6 +22,37 @@ final class VoxtLogRedactorTests: XCTestCase {
         XCTAssertFalse(redacted.contains("query-secret"))
         XCTAssertTrue(redacted.contains("<redacted>"))
         XCTAssertTrue(redacted.contains("safe=1"))
+    }
+
+    func testStructuredMetadataRedactsSecretKeysWithoutValuePrefixes() {
+        let keys = ["apiKey", "API_KEY", "access-token", "Authorization", "password", "client_secret", "Cookie"]
+        for key in keys {
+            let metadata: Logger.Metadata = [key: .string("opaque-fixture-secret"), "tokenCount": "42"]
+            let result = VoxtLogRedactor.redactedMetadata(metadata)
+            XCTAssertEqual(result?[key], .string("<redacted>"), key)
+            XCTAssertEqual(result?["tokenCount"], .string("42"))
+        }
+    }
+
+    func testNestedMetadataAndArraysRedactSecretContainers() {
+        let metadata: Logger.Metadata = ["request": .dictionary([
+            "headers": .dictionary(["X-API-Key": "opaque-secret"]),
+            "items": .array([.dictionary(["refresh_token": "opaque-refresh", "status": "ok"])]),
+            "credentials": .array(["not formatted as key=value"])
+        ])]
+        let expected: Logger.Metadata = ["request": .dictionary([
+            "headers": .dictionary(["X-API-Key": "<redacted>"]),
+            "items": .array([.dictionary(["refresh_token": "<redacted>", "status": "ok"])]),
+            "credentials": "<redacted>"
+        ])]
+        XCTAssertEqual(VoxtLogRedactor.redactedMetadata(metadata), expected)
+    }
+
+    func testMetadataStillRedactsInlineSecretsUnderOrdinaryKeys() {
+        let result = VoxtLogRedactor.redactedMetadata(["detail": "apiKey=fixture-secret", "model": "model-name"])
+        XCTAssertEqual(result?["detail"], .string("apiKey=<redacted>"))
+        XCTAssertEqual(result?["model"], .string("model-name"))
+        XCTAssertNil(VoxtLogRedactor.redactedMetadata(nil))
     }
 
     func testPreviewRedactsAndTruncates() {

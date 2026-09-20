@@ -9,196 +9,11 @@ import MLXAudioCore
 import MLXAudioSTT
 import HuggingFace
 
-private struct SharedModelLoadValue: @unchecked Sendable {
-    let value: Any
-}
-
-private struct SharedModelLoadEntry {
-    let generation: UUID
-    let task: Task<SharedModelLoadValue, Error>
-    var waiterIDs: Set<UUID>
-}
-
-struct SharedModelLoadTask: Sendable {
-    fileprivate let task: Task<SharedModelLoadValue, Error>
-
-    func waitForCompletion() async {
-        _ = try? await task.value
-    }
-}
-
-@MainActor
-private final class SharedModelLoadStorage {
-    private var entries: [String: SharedModelLoadEntry] = [:]
-
-    var hasPendingLoad: Bool { !entries.isEmpty }
-
-    func value<Value: Sendable>(
-        for key: String,
-        start: @escaping @Sendable () async throws -> Value
-    ) async throws -> SharedModelLoadValue {
-        let waiterID = UUID()
-        let generation: UUID
-        let task: Task<SharedModelLoadValue, Error>
-        if var entry = entries[key] {
-            entry.waiterIDs.insert(waiterID)
-            entries[key] = entry
-            generation = entry.generation
-            task = entry.task
-        } else {
-            generation = UUID()
-            task = Task {
-                SharedModelLoadValue(value: try await start())
-            }
-            entries[key] = SharedModelLoadEntry(
-                generation: generation,
-                task: task,
-                waiterIDs: [waiterID]
-            )
-        }
-
-        let coordinator = self
-        return try await withTaskCancellationHandler {
-            defer { finishWaiter(waiterID, key: key, generation: generation) }
-            let value = try await task.value
-            try Task.checkCancellation()
-            guard entries[key]?.generation == generation else {
-                throw CancellationError()
-            }
-            return value
-        } onCancel: {
-            Task { @MainActor in
-                coordinator.cancelWaiter(waiterID, key: key, generation: generation)
-            }
-        }
-    }
-
-    @discardableResult
-    func cancelAll() -> [SharedModelLoadTask] {
-        let tasks = entries.values.map { SharedModelLoadTask(task: $0.task) }
-        entries.removeAll()
-        for task in tasks {
-            task.task.cancel()
-        }
-        return tasks
-    }
-
-    private func cancelWaiter(_ waiterID: UUID, key: String, generation: UUID) {
-        guard var entry = entries[key],
-              entry.generation == generation,
-              entry.waiterIDs.remove(waiterID) != nil
-        else { return }
-
-        if entry.waiterIDs.isEmpty {
-            entries[key] = nil
-            entry.task.cancel()
-        } else {
-            entries[key] = entry
-        }
-    }
-
-    private func finishWaiter(_ waiterID: UUID, key: String, generation: UUID) {
-        guard var entry = entries[key],
-              entry.generation == generation,
-              entry.waiterIDs.remove(waiterID) != nil
-        else { return }
-
-        entries[key] = entry.waiterIDs.isEmpty ? nil : entry
-    }
-}
-
-@MainActor
-struct SharedModelLoadCoordinator<Value: Sendable> {
-    private let storage = SharedModelLoadStorage()
-
-    var hasPendingLoad: Bool { storage.hasPendingLoad }
-
-    func value(
-        for key: String,
-        start: @escaping @Sendable () async throws -> Value
-    ) async throws -> Value {
-        let loadedValue = try await storage.value(for: key, start: start)
-        return loadedValue.value as! Value
-    }
-
-    @discardableResult
-    func cancelAll() -> [SharedModelLoadTask] {
-        storage.cancelAll()
-    }
-}
-
-struct MLXLoadedModelBox: @unchecked Sendable {
-    nonisolated(unsafe) let model: any STTGenerationModel
-}
-
-private nonisolated enum MLXSTTModelLoader {
-    static func load(repo: String, directory: URL) async throws -> MLXLoadedModelBox {
-        let model: any STTGenerationModel
-        // The manager resolves migration aliases before choosing a directory. Never
-        // infer an architecture from a repository name or load retired weights.
-        guard MLXModelCatalog.availableModels.contains(where: { $0.id == repo }) else {
-            throw NSError(
-                domain: "MLXModelManager",
-                code: 1001,
-                userInfo: [NSLocalizedDescriptionKey: "Unsupported local ASR model: \(repo)"]
-            )
-        }
-        switch MLXModelCatalog.capability(for: repo).family {
-        case .whisper:
-            model = try await WhisperModel.fromDirectory(directory)
-        case .senseVoice:
-            model = try SenseVoiceModel.fromDirectory(directory)
-        case .qwen3ASR:
-            model = try await Qwen3ASRMemoryEfficientLoader.load(from: directory)
-        case .mossTranscribeDiarize:
-            model = try await MossTranscribeDiarizeModel.fromModelDirectory(directory)
-        case .cohereTranscribe:
-            model = try CohereTranscribeModel.fromDirectory(directory)
-        case .parakeet:
-            model = try ParakeetModel.fromDirectory(directory)
-        case .nemotronASR:
-            model = try NemotronASRModel.fromDirectory(directory)
-        case .generic:
-            throw NSError(
-                domain: "MLXModelManager",
-                code: 1001,
-                userInfo: [NSLocalizedDescriptionKey: "Unsupported local ASR architecture."]
-            )
-        }
-
-        return MLXLoadedModelBox(model: model)
-    }
-}
-
 @MainActor
 class MLXModelManager: ObservableObject {
     static let defaultHubBaseURL = URL(string: "https://huggingface.co")!
     static let mirrorHubBaseURL = URL(string: "https://hf-mirror.com")!
     static let hubUserAgent = "Voxt/1.0 (MLXAudio)"
-    enum ModelState: Equatable {
-        case notDownloaded
-        case downloading(
-            progress: Double,
-            completed: Int64,
-            total: Int64,
-            currentFile: String?,
-            completedFiles: Int,
-            totalFiles: Int
-        )
-        case paused(
-            progress: Double,
-            completed: Int64,
-            total: Int64,
-            currentFile: String?,
-            completedFiles: Int,
-            totalFiles: Int
-        )
-        case downloaded
-        case loading
-        case ready
-        case error(String)
-    }
-
     private enum DownloadStopAction {
         case pause
         case cancel
@@ -209,54 +24,6 @@ class MLXModelManager: ObservableObject {
     nonisolated static let defaultModelRepo = MLXModelCatalog.defaultModelRepo
     nonisolated static let availableModels = MLXModelCatalog.availableModels
     nonisolated static let supportedModels = MLXModelCatalog.supportedModels
-
-    nonisolated enum ModelSizeState: Equatable, Sendable {
-        case unknown
-        case loading
-        case ready(bytes: Int64, text: String)
-        case error(String)
-    }
-
-    struct CatalogSnapshot: Equatable {
-        let repo: String
-        let isDownloaded: Bool
-        let hasResumableDownload: Bool
-        let state: ModelState
-        let pausedStatusMessage: String?
-        let hasActiveDownloadTask: Bool
-
-        var isDownloading: Bool {
-            if hasActiveDownloadTask {
-                return true
-            }
-            if case .downloading = state {
-                return true
-            }
-            return false
-        }
-
-        var isPaused: Bool {
-            if case .paused = state {
-                return true
-            }
-            return hasResumableDownload
-        }
-    }
-
-    struct TranscriptionBehavior: Equatable {
-        enum CorrectionMode: Equatable {
-            case incremental
-            case finalizationOnly
-        }
-
-        let correctionMode: CorrectionMode
-        let allowsQuickStopPass: Bool
-        let preloadsOnRecordingStart: Bool
-
-        var runsIntermediateCorrections: Bool {
-            correctionMode == .incremental
-        }
-    }
 
     @Published private(set) var state: ModelState = .notDownloaded
     private(set) var stateByRepo: [String: ModelState] = [:]
@@ -290,10 +57,8 @@ class MLXModelManager: ObservableObject {
     private let modelLoadingOverride: (@Sendable (String) async throws -> MLXLoadedModelBox)?
     private var downloadTasksByRepo: [String: Task<Void, Never>] = [:]
     private var downloadStopActionsByRepo: [String: DownloadStopAction] = [:]
-    private var sizeTask: Task<Void, Never>?
-    private var prefetchTask: Task<Void, Never>?
     private var idleUnloadTask: Task<Void, Never>?
-    private var applicationTerminationModelLoadTasks: [SharedModelLoadTask] = []
+    private var shutdownTask: Task<Void, Never>?
     private let downloadSizeTolerance: Double = 0.9
     private var activeUseCount = 0
     private var deletingRepos: Set<String> = []
@@ -337,6 +102,7 @@ class MLXModelManager: ObservableObject {
     var hasLoadedModel: Bool { loadedModel != nil }
     var hasActiveUse: Bool { activeUseCount > 0 }
     var hasPendingModelLoad: Bool { modelLoadCoordinator.hasPendingLoad }
+    var hasOutstandingModelLoad: Bool { modelLoadCoordinator.hasOutstandingLoad }
 
     func refreshMemoryOptimizationPolicy() {
         guard loadedModel != nil else {
@@ -345,32 +111,6 @@ class MLXModelManager: ObservableObject {
         }
         guard activeUseCount == 0 else { return }
         scheduleIdleUnloadIfNeeded()
-    }
-
-    func displayTitle(for repo: String) -> String {
-        MLXModelCatalog.displayTitle(for: repo)
-    }
-
-    nonisolated static func fallbackRemoteSizeText(repo: String) -> String? {
-        MLXModelCatalog.fallbackRemoteSizeText(repo: repo)
-    }
-
-    nonisolated static func ratingText(for repo: String) -> String {
-        MLXModelCatalog.ratingText(for: repo)
-    }
-
-    nonisolated static func catalogTagKeys(for repo: String) -> [String] {
-        MLXModelCatalog.catalogTagKeys(for: repo)
-    }
-
-    nonisolated static func isMultilingualModelRepo(_ repo: String) -> Bool {
-        MLXModelCatalog.isMultilingualModelRepo(repo)
-    }
-
-    /// Auxiliary VAD artifacts share download/storage handling, not the ASR
-    /// catalog or STT loader. Never reopen arbitrary retired repo loading.
-    nonisolated static func isManagedArtifactRepo(_ repo: String) -> Bool {
-        repo == SileroVADModelSupport.repo || availableModels.contains { $0.id == repo }
     }
 
     func isModelDownloaded(repo: String) -> Bool {
@@ -545,34 +285,6 @@ class MLXModelManager: ObservableObject {
         Memory.clearCache()
         checkExistingModel()
         fetchRemoteSize()
-    }
-
-    nonisolated static func canonicalModelRepo(_ repo: String) -> String {
-        MLXModelCatalog.canonicalModelRepo(repo)
-    }
-
-    nonisolated static func isAvailableModelRepo(_ repo: String) -> Bool {
-        MLXModelCatalog.isAvailableModelRepo(repo)
-    }
-
-    func displayModelsIncludingInstalled() -> [ModelOption] {
-        Self.availableModels
-    }
-
-    nonisolated static func isRealtimeCapableModelRepo(_ repo: String) -> Bool {
-        MLXModelCatalog.isRealtimeCapableModelRepo(repo)
-    }
-
-    nonisolated static func liveMode(for repo: String) -> MLXLiveMode {
-        MLXModelCatalog.liveMode(for: repo)
-    }
-
-    nonisolated static func transcriptionBehavior(for _: String) -> TranscriptionBehavior {
-        TranscriptionBehavior(
-            correctionMode: .incremental,
-            allowsQuickStopPass: true,
-            preloadsOnRecordingStart: true
-        )
     }
 
     var currentTranscriptionBehavior: TranscriptionBehavior {
@@ -799,7 +511,7 @@ class MLXModelManager: ObservableObject {
                 try await MLXModelDownloadSupport.validateDownloadedModelInBackground(
                     at: modelDir,
                     repo: canonicalRepo,
-                    sizeState: sizeState,
+                    sizeState: MLXModelDownloadSupport.validationSizeState(for: canonicalRepo),
                     downloadSizeTolerance: downloadSizeTolerance,
                     fileManager: .default
                 )
@@ -874,9 +586,7 @@ class MLXModelManager: ObservableObject {
     }
 
     func cancelPendingModelLoadForApplicationTermination() {
-        applicationTerminationModelLoadTasks.append(
-            contentsOf: invalidatePendingModelLoad(reason: "application-terminating")
-        )
+        invalidatePendingModelLoad(reason: "application-terminating")
     }
 
     func loadModel() async throws -> any STTGenerationModel {
@@ -947,31 +657,21 @@ class MLXModelManager: ObservableObject {
     }
 
     func shutdownForApplicationTermination() async {
-        guard !isShuttingDownForApplicationTermination else {
-            let loadTasks = applicationTerminationModelLoadTasks
-            for task in loadTasks {
-                await task.waitForCompletion()
-            }
-            await waitForActiveUsesToFinish()
-            return
-        }
+        if let shutdownTask { await shutdownTask.value; return }
         isShuttingDownForApplicationTermination = true
+        let task = Task { @MainActor [self] in await performApplicationTerminationShutdown() }
+        shutdownTask = task
+        await task.value
+    }
+
+    private func performApplicationTerminationShutdown() async {
         installationCache.invalidateAll()
 
         let downloadTasks = Array(downloadTasksByRepo.values)
         for repo in Array(downloadTasksByRepo.keys) {
             pauseDownload(repo: repo)
         }
-        applicationTerminationModelLoadTasks.append(
-            contentsOf: invalidatePendingModelLoad(reason: "application-terminating")
-        )
-        let loadTasks = applicationTerminationModelLoadTasks
-        let pendingSizeTask = sizeTask
-        sizeTask?.cancel()
-        sizeTask = nil
-        let pendingPrefetchTask = prefetchTask
-        prefetchTask?.cancel()
-        prefetchTask = nil
+        let loadTasks = invalidatePendingModelLoad(reason: "application-terminating")
         cancelIdleUnloadTask()
 
         for task in downloadTasks {
@@ -980,9 +680,6 @@ class MLXModelManager: ObservableObject {
         for task in loadTasks {
             await task.waitForCompletion()
         }
-        applicationTerminationModelLoadTasks.removeAll()
-        await pendingSizeTask?.value
-        await pendingPrefetchTask?.value
         await waitForActiveUsesToFinish()
 
         loadedModel = nil
@@ -1320,27 +1017,12 @@ class MLXModelManager: ObservableObject {
     }
 
     private func fetchRemoteSize() {
-        sizeTask?.cancel()
-        let repo = modelRepo
-        if let fallback = MLXModelCatalog.fallbackRemoteSizeInfo(repo: repo) {
-            sizeState = .ready(bytes: fallback.bytes, text: fallback.text)
-        } else {
-            sizeState = .error("Size unavailable")
-        }
+        sizeState = MLXModelDownloadSupport.validationSizeState(for: modelRepo)
     }
 
     func remoteSizeText(repo: String) -> String {
         let canonicalRepo = Self.canonicalModelRepo(repo)
         return Self.fallbackRemoteSizeText(repo: canonicalRepo) ?? "Unknown"
-    }
-
-    func ensureRemoteSizeLoaded(repo: String) {
-        _ = repo
-    }
-
-    func prefetchAllModelSizes() {
-        prefetchTask?.cancel()
-        prefetchTask = nil
     }
 
     private func fallbackHubBaseURL(from baseURL: URL) -> URL? {
@@ -1396,7 +1078,7 @@ class MLXModelManager: ObservableObject {
         )
 
         var lastError: Error?
-        for candidate in downloadAttemptCandidates(from: selection) {
+        for candidate in selection.attemptCandidates {
             try Task.checkCancellation()
             do {
                 return try await performDownload(using: candidate.url, for: repo)
@@ -1418,20 +1100,6 @@ class MLXModelManager: ObservableObject {
             code: 1004,
             userInfo: [NSLocalizedDescriptionKey: "All MLX Audio download sources failed."]
         )
-    }
-
-    private func downloadAttemptCandidates(
-        from selection: ModelDownloadSourceSelection
-    ) -> [ModelDownloadSourceCandidate] {
-        guard !selection.reusedSavedSource, !selection.probeResults.isEmpty else {
-            return [selection.candidate]
-        }
-
-        let candidates = selection.probeResults
-            .filter(\.isReachable)
-            .sorted(by: { $0.elapsed < $1.elapsed })
-            .map(\.candidate)
-        return candidates.isEmpty ? [selection.candidate] : candidates
     }
 
     private func performDownload(using baseURL: URL, for repo: String) async throws -> URL {
@@ -1512,9 +1180,9 @@ class MLXModelManager: ObservableObject {
             let sampler = Task { [weak self] in
                 let startTime = Date()
                 while !Task.isCancelled {
-                    let effectiveInFlight = Self.inFlightBytes(
+                    let effectiveInFlight = ModelDownloadProgress.inFlightBytes(
                         progress: progress,
-                        expectedEntryBytes: expectedEntryBytes,
+                        expectedFileBytes: expectedEntryBytes,
                         startTime: startTime
                     )
                     let currentCompleted = min(baseCompletedBytes + effectiveInFlight, totalBytes)
@@ -1601,7 +1269,7 @@ class MLXModelManager: ObservableObject {
         try await MLXModelDownloadSupport.validateDownloadedModelInBackground(
             at: tempDir,
             repo: repo,
-            sizeState: sizeState,
+            sizeState: MLXModelDownloadSupport.validationSizeState(for: repo),
             downloadSizeTolerance: downloadSizeTolerance,
             fileManager: .default
         )
@@ -1713,22 +1381,6 @@ class MLXModelManager: ObservableObject {
             totalFiles: totalFiles
         )
         setState(nextState, for: canonicalRepo)
-    }
-
-    private static func inFlightBytes(
-        progress: Progress,
-        expectedEntryBytes: Int64,
-        startTime: Date
-    ) -> Int64 {
-        let reported = max(progress.completedUnitCount, 0)
-        guard reported == 0 else { return reported }
-
-        let elapsed = Date().timeIntervalSince(startTime)
-        let expectedForTenMinutes = Double(expectedEntryBytes) / (10 * 60)
-        let fallbackRate = max(expectedForTenMinutes, 256 * 1024)
-        let estimated = Int64(elapsed * fallbackRate)
-        let cap = Int64(Double(expectedEntryBytes) * 0.95)
-        return min(max(estimated, 0), max(cap, 0))
     }
 
     private func downloadErrorMessage(for error: Error, repo: String) -> String {
@@ -1933,35 +1585,5 @@ class MLXModelManager: ObservableObject {
                 bearerToken: bearerToken
             )
         }
-    }
-}
-
-extension FileManager {
-    nonisolated func directoryContainsRegularFiles(at url: URL) -> Bool {
-        guard let enumerator = self.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return false
-        }
-
-        for case let fileURL as URL in enumerator {
-            let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey])
-            if values?.isRegularFile == true {
-                return true
-            }
-        }
-        return false
-    }
-
-    nonisolated func allocatedSizeOfDirectory(at url: URL) throws -> UInt64 {
-        var totalSize: UInt64 = 0
-        let enumerator = self.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey])
-        while let fileURL = enumerator?.nextObject() as? URL {
-            let resourceValues = try fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey])
-            totalSize += UInt64(resourceValues.totalFileAllocatedSize ?? resourceValues.fileAllocatedSize ?? 0)
-        }
-        return totalSize
     }
 }

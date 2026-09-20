@@ -496,18 +496,7 @@ final class FeatureModelCatalogBuilderTests: XCTestCase {
         )
     }
 
-    private func makeSelectorEntry(
-        selectionID: FeatureModelSelectionID,
-        title: String,
-        engine: String
-    ) -> FeatureModelSelectorEntry {
-        FeatureModelSelectorEntry(
-            selectionID: selectionID, title: title, engine: engine, sizeText: "1 GB", ratingText: "4.8",
-            filterTags: [AppLocalization.localizedString("Local")],
-            displayTags: [AppLocalization.localizedString("Local")], statusText: "", usageLocations: [],
-            badgeText: nil, isSelectable: true, disabledReason: nil
-        )
-    }
+
 }
 
 @MainActor

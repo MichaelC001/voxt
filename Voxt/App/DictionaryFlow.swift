@@ -76,66 +76,6 @@ extension AppDelegate {
         case remoteLLM(provider: RemoteLLMProvider, configuration: RemoteProviderConfiguration)
     }
 
-    func resolveDictionaryCorrection(for text: String) -> DictionaryCorrectionResult {
-        guard let result = dictionaryStore.correctionContext(
-            for: text,
-            activeGroupID: activeDictionaryGroupID()
-        ) else {
-            return DictionaryCorrectionResult(
-                text: text,
-                candidates: [],
-                correctedTerms: [],
-                correctionSnapshots: []
-            )
-        }
-
-        if result.text != text {
-            VoxtLog.dictionary("Dictionary auto-correction applied. inputChars=\(text.count), outputChars=\(result.text.count), matches=\(result.candidates.count)")
-        } else if !result.candidates.isEmpty {
-            VoxtLog.dictionary("Dictionary matches recorded without replacement. matches=\(result.candidates.count)")
-        }
-        return result
-    }
-
-    func resolveDictionaryMatches(for text: String) -> DictionaryCorrectionResult {
-        guard let result = dictionaryStore.matchContext(
-            for: text,
-            activeGroupID: activeDictionaryGroupID()
-        ) else {
-            return DictionaryCorrectionResult(
-                text: text,
-                candidates: [],
-                correctedTerms: [],
-                correctionSnapshots: []
-            )
-        }
-
-        if !result.candidates.isEmpty {
-            VoxtLog.dictionary("Dictionary matches recorded without local replacement. matches=\(result.candidates.count)")
-        }
-        return result
-    }
-
-    func previewDictionarySuggestions(
-        for text: String,
-        candidates: [DictionaryMatchCandidate],
-        correctedTerms: [String]
-    ) -> [DictionarySuggestionDraft] {
-        _ = text
-        _ = candidates
-        _ = correctedTerms
-        return []
-    }
-
-    func persistDictionaryEvidence(
-        candidates: [DictionaryMatchCandidate],
-        suggestions: [DictionarySuggestionDraft],
-        historyEntryID: UUID?
-    ) {
-        dictionaryStore.recordMatches(candidates)
-        dictionarySuggestionStore.applyDiscoveredSuggestions(suggestions, historyEntryID: historyEntryID)
-    }
-
     func activeDictionaryGroupID() -> UUID? {
         if let matchedGroupID = lastEnhancementPromptContext?.matchedGroupID {
             return matchedGroupID
@@ -145,10 +85,6 @@ extension AppDelegate {
 
     func startDictionaryHistorySuggestionScan() {
         startDictionaryHistorySuggestionScan(request: nil, persistSettings: false)
-    }
-
-    func scheduleAutomaticDictionaryHistorySuggestionScanIfNeeded() {
-        // Automatic dictionary ingestion has been removed in favor of explicit one-click ingestion.
     }
 
     func availableDictionaryHistoryScanModelOptions() -> [DictionaryHistoryScanModelOption] {
@@ -302,7 +238,6 @@ extension AppDelegate {
                 duplicateCount: duplicateCount,
                 checkpointEntry: lastProcessedEntry
             )
-            scheduleAutomaticDictionaryHistorySuggestionScanIfNeeded()
         } catch is CancellationError {
             VoxtLog.dictionary("Dictionary history scan cancelled.")
             dictionarySuggestionStore.cancelHistoryScan(

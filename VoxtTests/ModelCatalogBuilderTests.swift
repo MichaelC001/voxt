@@ -564,15 +564,6 @@ final class ModelCatalogBuilderTests: XCTestCase {
         )
     }
 
-    private func makeCatalogEntry(id: String, title: String, engine: String) -> ModelCatalogEntry {
-        ModelCatalogEntry(
-            id: id, title: title, engine: engine, sizeText: "1 GB", ratingText: "4.8",
-            filterTags: [AppLocalization.localizedString("Local")],
-            displayTags: [AppLocalization.localizedString("Local")], statusText: "", usageLocations: [],
-            badgeText: nil, primaryAction: nil, secondaryActions: []
-        )
-    }
-
     private func makeFeatureSettings(
         transcriptionASR: FeatureModelSelectionID? = nil,
         translationASR: FeatureModelSelectionID? = nil,

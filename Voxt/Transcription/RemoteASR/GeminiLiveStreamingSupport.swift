@@ -44,9 +44,9 @@ extension RemoteASRTranscriber {
         let context = GeminiLiveStreamingContext(
             session: managedSocket.session,
             ws: ws,
-            responseState: GeminiLiveResponseState { [weak self] error in
+            responseState: GeminiLiveResponseState { [weak self, generationID = self.recordingGenerationID] error in
                 Task { @MainActor [weak self] in
-                    self?.notifyRuntimeFailure(error)
+                    self?.notifyRuntimeFailure(error, generationID: generationID)
                 }
             },
             generationID: recordingGenerationID
@@ -204,7 +204,7 @@ extension RemoteASRTranscriber {
         }
         audioEngine.reset()
 
-        let inputNode = audioEngine.inputNode
+        let inputNode = acquireStreamingInputNode()
         let didApplyPreferredInputDevice = preferredInputDeviceID != nil
             ? applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
             : false
@@ -218,6 +218,7 @@ extension RemoteASRTranscriber {
         )
         streamingInputSampleRate = inputFormat.sampleRate
         inputNode.removeTap(onBus: 0)
+        let captureGeneration = recordingGenerationID
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
             guard let pcmData = Self.makeDoubaoPCM16MonoData(from: buffer) else { return }
@@ -225,7 +226,7 @@ extension RemoteASRTranscriber {
                 self.sampleStore.append(samples)
             }
             Task { @MainActor in
-                guard self.isRecording,
+                guard self.isCurrentGeneration(captureGeneration), self.isRecording,
                       let context = self.geminiLiveStreamingContext,
                       !context.isClosed
                 else { return }
@@ -244,9 +245,7 @@ extension RemoteASRTranscriber {
     }
 
     func stopGeminiLiveAudioCapture() {
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
-        audioLevel = 0
+        stopStreamingAudioCapture()
     }
 
     private func sendGeminiLiveAudio(_ pcmData: Data, context: GeminiLiveStreamingContext) {
