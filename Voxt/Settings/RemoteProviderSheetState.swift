@@ -322,7 +322,7 @@ extension RemoteProviderConfigurationSheet {
 
     var providerModelOptions: [RemoteModelOption] {
         if isCodexLLMProvider,
-           let dynamicCodexModelOptions,
+           let dynamicCodexModelOptions = operations.modelOptions,
            !dynamicCodexModelOptions.isEmpty {
             return dynamicCodexModelOptions
         }
@@ -480,7 +480,6 @@ extension RemoteProviderConfigurationSheet {
             codexAuthFileBookmark = try SecurityScopedBookmarkSupport.createBookmark(for: selectedURL)
             codexAuthFilePath = selectedURL.path
             codexAuthFileSelectionError = nil
-            dynamicCodexModelOptions = nil
             loadCodexModelOptionsIfNeeded()
         } catch {
             codexAuthFileSelectionError = AppLocalization.format(
@@ -494,7 +493,6 @@ extension RemoteProviderConfigurationSheet {
         codexAuthFilePath = ""
         codexAuthFileBookmark = nil
         codexAuthFileSelectionError = nil
-        dynamicCodexModelOptions = nil
         loadCodexModelOptionsIfNeeded()
     }
 
@@ -503,14 +501,8 @@ extension RemoteProviderConfigurationSheet {
         var snapshot = currentConfigurationSnapshot
         snapshot.endpoint = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        Task {
-            let options = await RemoteLLMRuntimeClient().codexModelOptions(configuration: snapshot)
-            await MainActor.run {
-                dynamicCodexModelOptions = options
-                if !pickerModelOptionIDs.contains(selectedProviderModel) {
-                    configureModelSelection()
-                }
-            }
+        operations.loadModels {
+            await RemoteLLMRuntimeClient().codexModelOptions(configuration: snapshot)
         }
     }
 
@@ -525,17 +517,13 @@ extension RemoteProviderConfigurationSheet {
         case .success:
             close()
         case .failure(let error):
-            testResultIsSuccess = false
-            testResultMessage = error.localizedDescription
-            showOperationToast(error.localizedDescription)
+            operations.showFailure(error.localizedDescription)
         }
     }
 
     func validatedCurrentConfigurationSnapshot() -> RemoteProviderConfiguration? {
         if let message = validationMessage() {
-            testResultIsSuccess = false
-            testResultMessage = message
-            showOperationToast(message)
+            operations.showFailure(message)
             return nil
         }
         return currentConfigurationSnapshot
@@ -568,36 +556,27 @@ extension RemoteProviderConfigurationSheet {
         modelForLog: String,
         snapshot: RemoteProviderConfiguration
     ) {
-        isTestingConnection = true
-        testResultMessage = nil
-        testResultIsSuccess = false
+        let providerID = configuration.providerID
         VoxtLog.settings(
             "Remote provider test started. target=\(RemoteProviderConfigurationPolicy.testTargetLogName(target)), provider=\(configuration.providerID), model=\(modelForLog), endpoint=\(sanitizedEndpointForLog(snapshot.endpoint)), proxyMode=\(VoxtNetworkSession.modeDescription), hasAPIKey=\(!snapshot.apiKey.isEmpty), hasAppID=\(!snapshot.appID.isEmpty), hasAccessToken=\(!snapshot.accessToken.isEmpty)"
         )
 
-        Task {
+        operations.testConnection {
             do {
                 let tester = RemoteProviderConnectivityTester(testTarget: target)
                 let message = try await tester.run(configuration: snapshot)
-                await MainActor.run {
-                    isTestingConnection = false
-                    testResultIsSuccess = true
-                    testResultMessage = message
-                    VoxtLog.settings(
-                        "Remote provider test succeeded. target=\(RemoteProviderConfigurationPolicy.testTargetLogName(target)), provider=\(configuration.providerID), model=\(modelForLog), message=\(message)"
-                    )
-                }
+                try Task.checkCancellation()
+                VoxtLog.settings(
+                    "Remote provider test succeeded. target=\(RemoteProviderConfigurationPolicy.testTargetLogName(target)), provider=\(providerID), model=\(modelForLog), message=\(message)"
+                )
+                return message
             } catch {
-                await MainActor.run {
-                    isTestingConnection = false
-                    testResultIsSuccess = false
-                    let message = VoxtNetworkSession.directModeConflictMessage(for: error) ?? error.localizedDescription
-                    testResultMessage = message
-                    showOperationToast(message)
-                    VoxtLog.settingsWarning(
-                        "Remote provider test failed. target=\(RemoteProviderConfigurationPolicy.testTargetLogName(target)), provider=\(configuration.providerID), model=\(modelForLog), error=\(message)"
-                    )
-                }
+                try Task.checkCancellation()
+                let message = VoxtNetworkSession.directModeConflictMessage(for: error) ?? error.localizedDescription
+                VoxtLog.settingsWarning(
+                    "Remote provider test failed. target=\(RemoteProviderConfigurationPolicy.testTargetLogName(target)), provider=\(providerID), model=\(modelForLog), error=\(message)"
+                )
+                throw error
             }
         }
     }

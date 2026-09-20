@@ -731,7 +731,7 @@ extension RemoteProviderConfigurationSheet {
 
     var actionSection: some View {
         SettingsDialogActionRow {
-            if isTestingConnection {
+            if operations.isTestingConnection {
                 ProgressView()
                     .controlSize(.small)
             }
@@ -739,7 +739,7 @@ extension RemoteProviderConfigurationSheet {
                 testConnection()
             }
             .buttonStyle(SettingsPillButtonStyle())
-            .disabled(isTestingConnection)
+            .disabled(operations.isTestingConnection)
 
         } trailing: {
             Button(AppLocalization.localizedString("Cancel")) {

@@ -24,22 +24,6 @@ enum CustomLLMModelDownloadSupport {
         return mirrorBaseURL
     }
 
-    nonisolated static func inFlightBytes(
-        progress: Progress,
-        expectedFileBytes: Int64,
-        startTime: Date
-    ) -> Int64 {
-        let reported = max(progress.completedUnitCount, 0)
-        guard reported == 0 else { return reported }
-
-        let elapsed = Date().timeIntervalSince(startTime)
-        let expectedForTenMinutes = Double(expectedFileBytes) / (10 * 60)
-        let fallbackRate = max(expectedForTenMinutes, 256 * 1024)
-        let estimated = Int64(elapsed * fallbackRate)
-        let cap = Int64(Double(expectedFileBytes) * 0.95)
-        return min(max(estimated, 0), max(cap, 0))
-    }
-
     static func makeDownloadContext(
         repo: String,
         baseURL: URL,

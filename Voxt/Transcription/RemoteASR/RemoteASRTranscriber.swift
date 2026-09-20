@@ -54,14 +54,12 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     var stepFunStreamingContext: StepFunStreamingContext?
     var geminiLiveStreamingContext: GeminiLiveStreamingContext?
     private var meterTimer: Timer?
-    private var openAIPreviewTask: Task<Void, Never>?
-    private var openAIPreviewInFlight = false
-    private var openAIPreviewLastText = ""
+    private let openAIPreview = RemoteASRPreviewController()
     private var recordingFileURL: URL?
     private var completedAudioArchiveURL: URL?
     let sampleStore = AudioSampleStore()
     var streamingInputSampleRate: Double = HistoryAudioArchiveSupport.targetSampleRate
-    private var transcribeTask: Task<Void, Never>?
+    private let transcriptionTasks = TrackedTaskStore()
     var stopRequested = false
     var activeProvider: RemoteASRProvider?
     var activeConfiguration: RemoteProviderConfiguration?
@@ -369,7 +367,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         }
 
         isRequesting = true
-        transcribeTask = Task { [weak self] in
+        transcriptionTasks.start { [weak self] in
             guard let self else { return }
             let uploadPreparation = await self.prepareUploadAudioForRemoteASR(
                 originalFileURL: fileURL,
@@ -504,7 +502,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         generationID: UUID,
         result: @escaping @Sendable () async -> String
     ) {
-        transcribeTask = Task { [weak self] in
+        transcriptionTasks.start { [weak self] in
             guard let self else { return }
             let finalText = await result()
             guard !Task.isCancelled else { return }
@@ -659,7 +657,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 hintPayload: hintPayload
             )
         } catch {
-            let message = userVisibleRemoteErrorMessage(for: error)
+            let message = RemoteASRErrorPresentation.message(for: error)
             throw NSError(
                 domain: "Voxt.RemoteASR",
                 code: (error as NSError).code,
@@ -669,173 +667,6 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 ]
             )
         }
-    }
-
-    func resolvedHintPayload(
-        for provider: RemoteASRProvider,
-        configuration: RemoteProviderConfiguration
-    ) -> ResolvedASRHintPayload {
-        let settingsRaw = UserDefaults.standard.string(forKey: AppPreferenceKey.asrHintSettings)
-        let settings = ASRHintSettingsStore.resolvedSettings(
-            for: ASRHintTarget.from(engine: .remote, remoteProvider: provider),
-            rawValue: settingsRaw
-        )
-        let userLanguageCodes = UserMainLanguageOption.storedSelection(
-            from: UserDefaults.standard.string(forKey: AppPreferenceKey.userMainLanguageCodes)
-        )
-        return ASRHintResolver.resolve(
-            target: ASRHintTarget.from(engine: .remote, remoteProvider: provider),
-            settings: settings,
-            userLanguageCodes: userLanguageCodes,
-            mlxModelRepo: configuration.model,
-            dictionaryTerms: resolvedDictionaryTermsTemplateValue()
-        )
-    }
-
-    private func resolvedDictionaryTermsTemplateValue() -> String {
-        DictionaryEntryCollection.asrPromptTermsText(from: dictionaryEntryProvider?() ?? [])
-    }
-
-    func doubaoRequestPayload(
-        configuration: RemoteProviderConfiguration,
-        hintPayload: ResolvedASRHintPayload,
-        requestID: String,
-        userID: String,
-        audioFormat: String,
-        enableNonstream: Bool = false
-    ) -> [String: Any] {
-        let dictionaryPayload = DoubaoDictionaryRequestPayloadBuilder.build(
-            configuration: configuration,
-            entries: doubaoDictionaryEntryProvider?() ?? [],
-            dictionaryEnabled: true
-        )
-        return DoubaoASRConfiguration.fullRequestPayload(
-            requestID: requestID,
-            userID: userID,
-            language: hintPayload.language,
-            chineseOutputVariant: hintPayload.chineseOutputVariant,
-            audioFormat: audioFormat,
-            enableNonstream: enableNonstream,
-            dictionaryPayload: dictionaryPayload
-        )
-    }
-
-    func inputCaptureTapFormat(
-        inputNode: AVAudioInputNode,
-        activeInputDeviceID: AudioDeviceID?,
-        logContext: String
-    ) -> AVAudioFormat {
-        let nodeOutputFormat = inputNode.outputFormat(forBus: 0)
-        let hardwareSampleRate = AudioInputDeviceManager.nominalSampleRate(for: activeInputDeviceID)
-        let tapFormat = AudioInputDeviceManager.captureTapFormat(
-            nodeOutputFormat: nodeOutputFormat,
-            hardwareSampleRate: hardwareSampleRate
-        )
-
-        if abs(tapFormat.sampleRate - nodeOutputFormat.sampleRate) > 1 {
-            VoxtLog.warning(
-                "\(logContext) adjusted input tap format. deviceID=\(activeInputDeviceID.map(String.init(describing:)) ?? "default"), hardwareSampleRate=\(hardwareSampleRate.map { String(Int($0.rounded())) } ?? "unknown"), nodeSampleRate=\(Int(nodeOutputFormat.sampleRate.rounded())), tapSampleRate=\(Int(tapFormat.sampleRate.rounded()))"
-            )
-        }
-
-        return tapFormat
-    }
-
-    @discardableResult
-    func applyPreferredInputDeviceIfNeeded(inputNode: AVAudioInputNode) -> Bool {
-        guard let preferredInputDeviceID,
-              preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown),
-              AudioInputDeviceManager.isAvailableInputDevice(preferredInputDeviceID)
-        else {
-            return false
-        }
-        guard let audioUnit = inputNode.audioUnit else { return false }
-        var deviceID = preferredInputDeviceID
-        let status = AudioUnitSetProperty(
-            audioUnit,
-            kAudioOutputUnitProperty_CurrentDevice,
-            kAudioUnitScope_Global,
-            0,
-            &deviceID,
-            UInt32(MemoryLayout<AudioDeviceID>.size)
-        )
-        if status != noErr {
-            VoxtLog.asrWarning("Remote ASR failed to switch preferred input device. status=\(status)")
-            return false
-        }
-        return true
-    }
-
-    func audioLevelFromPCM16(_ data: Data) -> Float {
-        guard data.count >= 2 else { return 0 }
-        var sum: Float = 0
-        var count: Float = 0
-        data.withUnsafeBytes { rawBuffer in
-            let samples = rawBuffer.bindMemory(to: Int16.self)
-            for sample in samples {
-                let normalized = Float(sample) / Float(Int16.max)
-                sum += normalized * normalized
-                count += 1
-            }
-        }
-        guard count > 0 else { return 0 }
-        let rms = sqrt(sum / count)
-        return min(max(rms * 2.4, 0), 1)
-    }
-
-    nonisolated static func makeDoubaoPCM16MonoData(from buffer: AVAudioPCMBuffer) -> Data? {
-        let frameCount = Int(buffer.frameLength)
-        guard frameCount > 0 else { return nil }
-
-        let inputRate = max(buffer.format.sampleRate, 1)
-        let targetRate = 16000.0
-        let step = max(inputRate / targetRate, 1)
-        let outputCount = max(Int(Double(frameCount) / step), 1)
-        var output = Data(count: outputCount * MemoryLayout<Int16>.size)
-
-        switch buffer.format.commonFormat {
-        case .pcmFormatInt16:
-            guard let channelData = buffer.int16ChannelData?[0] else { return nil }
-            output.withUnsafeMutableBytes { rawBuffer in
-                let out = rawBuffer.bindMemory(to: Int16.self)
-                for index in 0..<outputCount {
-                    let sourceIndex = min(Int(Double(index) * step), frameCount - 1)
-                    out[index] = channelData[sourceIndex]
-                }
-            }
-        case .pcmFormatFloat32:
-            guard let channelData = buffer.floatChannelData?[0] else { return nil }
-            output.withUnsafeMutableBytes { rawBuffer in
-                let out = rawBuffer.bindMemory(to: Int16.self)
-                for index in 0..<outputCount {
-                    let sourceIndex = min(Int(Double(index) * step), frameCount - 1)
-                    let clamped = max(-1.0, min(1.0, channelData[sourceIndex]))
-                    out[index] = Int16(clamped * Float(Int16.max))
-                }
-            }
-        default:
-            return nil
-        }
-
-        return output
-    }
-
-    nonisolated static func makePCM16MonoData(from samples: [Float], inputSampleRate: Double) -> Data? {
-        guard !samples.isEmpty, inputSampleRate > 0 else { return nil }
-        let targetRate = 16000.0
-        let ratio = targetRate / inputSampleRate
-        let outputCount = max(Int(Double(samples.count) * ratio), 1)
-        var data = Data(count: outputCount * MemoryLayout<Int16>.size)
-        data.withUnsafeMutableBytes { rawBuffer in
-            let out = rawBuffer.bindMemory(to: Int16.self)
-            for index in 0..<outputCount {
-                let sourcePosition = Double(index) / ratio
-                let sourceIndex = min(Int(sourcePosition.rounded(.down)), samples.count - 1)
-                let clamped = max(-1.0, min(1.0, samples[sourceIndex]))
-                out[index] = Int16(clamped * Float(Int16.max))
-            }
-        }
-        return data
     }
 
     private func startMeteringTimer() {
@@ -946,8 +777,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     }
 
     private func cleanupActiveUploadTask() {
-        transcribeTask?.cancel()
-        transcribeTask = nil
+        transcriptionTasks.cancelAll()
         stopOpenAIPreviewLoop()
         isRequesting = false
     }
@@ -969,8 +799,6 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
     func shutdownForApplicationTermination() async {
         let tasks = [
-            transcribeTask,
-            openAIPreviewTask,
             intermediateTranscriptionPublishTask,
             doubaoCaptureStartupWatchdogTask
         ].compactMap { $0 }
@@ -978,6 +806,8 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         onStartFailure = nil
         onRuntimeFailure = nil
         discardPendingSessionOutput()
+        await transcriptionTasks.waitForAll()
+        await openAIPreview.waitForIdle()
         for task in tasks {
             await task.value
         }
@@ -987,26 +817,21 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     }
 
     private func startOpenAIPreviewLoop(configuration: RemoteProviderConfiguration) {
-        stopOpenAIPreviewLoop()
-        openAIPreviewLastText = ""
-        openAIPreviewTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(for: .seconds(1.4))
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled else { return }
-                await self.runOpenAIPreviewPass(configuration: configuration)
-            }
-        }
+        let generationID = recordingGenerationID
+        openAIPreview.start(
+            shouldRun: { [weak self] in
+                guard let self else { return false }
+                return self.isRecording && self.isCurrentGeneration(generationID)
+            },
+            transcribe: { [weak self] in
+                await self?.runOpenAIPreviewPass(configuration: configuration)
+            },
+            publish: { [weak self] in self?.publishIntermediateTranscription($0) }
+        )
     }
 
     private func stopOpenAIPreviewLoop() {
-        openAIPreviewTask?.cancel()
-        openAIPreviewTask = nil
-        openAIPreviewInFlight = false
+        openAIPreview.cancel()
     }
 
     private func removeCompletedAudioArchiveIfNeeded() {
@@ -1044,14 +869,8 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         }
     }
 
-    private func runOpenAIPreviewPass(configuration: RemoteProviderConfiguration) async {
-        guard isRecording else { return }
-        guard selectedProvider == .openAIWhisper else { return }
-        guard !openAIPreviewInFlight else { return }
-        guard let sourceURL = recordingFileURL else { return }
-
-        openAIPreviewInFlight = true
-        defer { openAIPreviewInFlight = false }
+    private func runOpenAIPreviewPass(configuration: RemoteProviderConfiguration) async -> String? {
+        guard isRecording, selectedProvider == .openAIWhisper, let sourceURL = recordingFileURL else { return nil }
 
         let snapshotURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("voxt-openai-preview-\(UUID().uuidString)")
@@ -1066,10 +885,10 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
             let attrs = try FileManager.default.attributesOfItem(atPath: snapshotURL.path)
             if let size = attrs[.size] as? Int64, size < 6_000 {
-                return
+                return nil
             }
 
-            normalizeWAVHeaderForSnapshot(at: snapshotURL)
+            RemoteASRPreviewAudio.normalizeWAVHeader(at: snapshotURL)
 
             let hintPayload = resolvedHintPayload(for: .openAIWhisper, configuration: configuration)
             let preview = try await transcribeOpenAI(
@@ -1078,21 +897,19 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 hintPayload: hintPayload
             )
             let normalized = preview.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !normalized.isEmpty else { return }
+            guard !normalized.isEmpty else { return nil }
             let visibleText = RecordingSessionSupport.textAfterSuppressingPromptEcho(
                 normalized,
                 prompt: hintPayload.prompt
             )
             guard !visibleText.isEmpty else {
                 VoxtLog.asrWarning("OpenAI preview transcription suppressed because it matched ASR prompt guidance.")
-                return
+                return nil
             }
-            if normalized != openAIPreviewLastText {
-                openAIPreviewLastText = visibleText
-                publishIntermediateTranscription(visibleText)
-            }
+            return visibleText
         } catch {
             // Preview failures are expected while recorder header is still mutating.
+            return nil
         }
     }
 
@@ -1123,30 +940,6 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         pendingIntermediateTranscription = nil
     }
 
-    private func normalizeWAVHeaderForSnapshot(at fileURL: URL) {
-        guard var data = try? Data(contentsOf: fileURL), data.count >= 44 else { return }
-        guard String(data: data[0..<4], encoding: .ascii) == "RIFF",
-              String(data: data[8..<12], encoding: .ascii) == "WAVE" else {
-            return
-        }
-
-        let fileSize = UInt32(data.count)
-        let riffChunkSize = fileSize > 8 ? fileSize - 8 : 0
-        let dataChunkSize = fileSize > 44 ? fileSize - 44 : 0
-
-        writeLittleEndianUInt32(riffChunkSize, into: &data, at: 4)
-        writeLittleEndianUInt32(dataChunkSize, into: &data, at: 40)
-        try? data.write(to: fileURL, options: .atomic)
-    }
-
-    private func writeLittleEndianUInt32(_ value: UInt32, into data: inout Data, at offset: Int) {
-        guard data.count >= offset + 4 else { return }
-        let bytes = value.littleEndian
-        withUnsafeBytes(of: bytes) { raw in
-            data.replaceSubrange(offset..<(offset + 4), with: raw)
-        }
-    }
-
     private nonisolated static func telemetrySeconds(_ value: TimeInterval?) -> String {
         guard let value, value.isFinite else { return "nil" }
         return String(format: "%.3f", value)
@@ -1171,89 +964,17 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     }
 
     private func notifyStartFailure(_ error: Error) {
-        let message = userVisibleRemoteErrorMessage(for: error)
+        let message = RemoteASRErrorPresentation.message(for: error)
         guard !message.isEmpty else { return }
         onStartFailure?(message)
     }
 
     func notifyRuntimeFailure(_ error: Error, generationID: UUID? = nil) {
         if let generationID, !isCurrentGeneration(generationID) { return }
-        let message = userVisibleRemoteErrorMessage(for: error)
+        let message = RemoteASRErrorPresentation.message(for: error)
         guard !message.isEmpty, message != lastPresentedRuntimeErrorMessage else { return }
         lastPresentedRuntimeErrorMessage = message
         onRuntimeFailure?(message)
     }
 
-    private func userVisibleRemoteErrorMessage(for error: Error) -> String {
-        if let conflictMessage = VoxtNetworkSession.directModeConflictMessage(for: error) {
-            return conflictMessage
-        }
-        if let proxyUnavailableMessage = VoxtNetworkSession.activeProxyUnavailableMessage(for: error) {
-            return proxyUnavailableMessage
-        }
-        let nsError = error as NSError
-        let description = nsError.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedDescription = description.lowercased()
-        if nsError.domain == NSURLErrorDomain {
-            switch nsError.code {
-            case NSURLErrorNotConnectedToInternet:
-                return AppLocalization.localizedString("Network appears to be offline. Check your connection and try again.")
-            case NSURLErrorTimedOut:
-                return AppLocalization.localizedString("Remote ASR timed out. Please try again.")
-            case NSURLErrorCannotConnectToHost, NSURLErrorNetworkConnectionLost, NSURLErrorCannotFindHost:
-                return AppLocalization.localizedString("Couldn't reach the remote ASR service. Check your network and proxy settings.")
-            default:
-                break
-            }
-        }
-        switch nsError.code {
-        case 401:
-            return AppLocalization.localizedString("Remote ASR authentication failed. Check the provider credentials and try again.")
-        case 402:
-            return AppLocalization.localizedString("Remote ASR billing or quota is unavailable. Check the provider account balance and limits.")
-        case 403:
-            return AppLocalization.localizedString("Remote ASR access was denied. Check the provider permissions, region, or endpoint.")
-        case 408, 504:
-            return AppLocalization.localizedString("Remote ASR timed out. Please try again.")
-        case 409, 429:
-            return AppLocalization.localizedString("Remote ASR is busy or has reached its quota. Please wait a moment and try again.")
-        case 500 ... 599:
-            return AppLocalization.localizedString("Remote ASR is temporarily unavailable. Please try again later.")
-        default:
-            break
-        }
-        if normalizedDescription.contains("exceededconcurrentquota")
-            || normalizedDescription.contains("quota")
-            || normalizedDescription.contains("rate limit")
-            || normalizedDescription.contains("too many requests")
-            || normalizedDescription.contains("concurrent") {
-            return AppLocalization.localizedString("Remote ASR is busy or has reached its quota. Please wait a moment and try again.")
-        }
-        if normalizedDescription.contains("billing")
-            || normalizedDescription.contains("insufficient")
-            || normalizedDescription.contains("balance")
-            || normalizedDescription.contains("arrears")
-            || normalizedDescription.contains("欠费")
-            || normalizedDescription.contains("余额")
-            || normalizedDescription.contains("费用") {
-            return AppLocalization.localizedString("Remote ASR billing or quota is unavailable. Check the provider account balance and limits.")
-        }
-        if normalizedDescription.contains("unauthorized")
-            || normalizedDescription.contains("forbidden")
-            || normalizedDescription.contains("access token")
-            || normalizedDescription.contains("api key")
-            || normalizedDescription.contains("鉴权")
-            || normalizedDescription.contains("权限") {
-            return AppLocalization.localizedString("Remote ASR authentication failed. Check the provider credentials and try again.")
-        }
-        if normalizedDescription.contains("network")
-            || normalizedDescription.contains("socket is not connected")
-            || normalizedDescription.contains("proxy")
-            || normalizedDescription.contains("vpn") {
-            return AppLocalization.localizedString("Couldn't reach the remote ASR service. Check your network and proxy settings.")
-        }
-        return description.isEmpty
-            ? AppLocalization.localizedString("Remote ASR request failed.")
-            : description
-    }
 }

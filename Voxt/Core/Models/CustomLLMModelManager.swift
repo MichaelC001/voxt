@@ -955,7 +955,7 @@ class CustomLLMModelManager: ObservableObject {
                 while !Task.isCancelled {
                     await MainActor.run {
                         guard !Task.isCancelled, let self else { return }
-                        let effectiveCurrentFileCompleted = CustomLLMModelDownloadSupport.inFlightBytes(
+                        let effectiveCurrentFileCompleted = ModelDownloadProgress.inFlightBytes(
                             progress: progress,
                             expectedFileBytes: expectedFileBytes,
                             startTime: startTime

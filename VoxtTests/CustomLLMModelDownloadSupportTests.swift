@@ -96,7 +96,7 @@ final class CustomLLMModelDownloadSupportTests: XCTestCase {
         let progress = Progress(totalUnitCount: 100)
         progress.completedUnitCount = 42
 
-        let current = CustomLLMModelDownloadSupport.inFlightBytes(
+        let current = ModelDownloadProgress.inFlightBytes(
             progress: progress,
             expectedFileBytes: 1_024,
             startTime: Date().addingTimeInterval(-5)
@@ -109,7 +109,7 @@ final class CustomLLMModelDownloadSupportTests: XCTestCase {
         let progress = Progress(totalUnitCount: 100)
         progress.completedUnitCount = 0
 
-        let current = CustomLLMModelDownloadSupport.inFlightBytes(
+        let current = ModelDownloadProgress.inFlightBytes(
             progress: progress,
             expectedFileBytes: 20 * 1024 * 1024,
             startTime: Date().addingTimeInterval(-10)

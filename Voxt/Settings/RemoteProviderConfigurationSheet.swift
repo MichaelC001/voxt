@@ -74,10 +74,7 @@ struct RemoteProviderConfigurationSheet: View {
     @State var codexAuthFileBookmark: Data?
     @State var codexFastModeEnabled = false
     @State var codexAuthFileSelectionError: String?
-    @State var dynamicCodexModelOptions: [RemoteModelOption]?
-    @State var isTestingConnection = false
-    @State var testResultMessage: String?
-    @State var testResultIsSuccess = false
+    @StateObject var operations = RemoteProviderSheetOperations()
     @State var operationToastMessage = ""
     @State var operationToastDismissTask: Task<Void, Never>?
 
@@ -167,10 +164,10 @@ struct RemoteProviderConfigurationSheet: View {
 
             actionSection
 
-            if let testResultMessage, !testResultMessage.isEmpty {
-                Text(testResultMessage)
+            if let result = operations.connectionResult, !result.message.isEmpty {
+                Text(result.message)
                     .font(.caption)
-                    .foregroundStyle(testResultIsSuccess ? .green : .orange)
+                    .foregroundStyle(result.succeeded ? .green : .orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -185,7 +182,20 @@ struct RemoteProviderConfigurationSheet: View {
             }
         }
         .animation(.easeInOut(duration: 0.16), value: operationToastMessage)
+        .onChange(of: operations.modelOptions) { _, options in
+            if options != nil, !pickerModelOptionIDs.contains(selectedProviderModel) {
+                configureModelSelection()
+            }
+        }
+        .onChange(of: operations.connectionResult) { _, result in
+            if let result, !result.succeeded { showOperationToast(result.message) }
+        }
+        .onDisappear {
+            operations.cancel()
+            operationToastDismissTask?.cancel()
+        }
         .onAppear {
+            operations.activate()
             configureModelSelection()
             customModelID = configuration.model
             endpoint = initialEndpointValue()
@@ -227,6 +237,7 @@ struct RemoteProviderConfigurationSheet: View {
     }
 
     func close() {
+        operations.cancel()
         operationToastDismissTask?.cancel()
         if let onClose {
             onClose()

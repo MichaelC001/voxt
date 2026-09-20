@@ -16,11 +16,8 @@ extension RemoteProviderConnectivityTester {
         RemoteProviderConnectivityTestLogging.logHTTPRequest(context: "Aliyun ASR realtime WebSocket test", request: request, bodyPreview: "run-task + finish-task")
 
         let managedSocket = VoxtNetworkSession.makeWebSocketTask(with: request)
-        let ws = managedSocket.task
-        ws.resume()
-        defer {
-            ws.cancel(with: .goingAway, reason: nil)
-        }
+        let ws = ConnectivityWebSocketSession(managedSocket: managedSocket)
+        defer { ws.close() }
 
         let taskID = AliyunRemoteASRConfiguration.makeRealtimeTaskID()
         let runPayload = AliyunRemoteASRConfiguration.funRealtimeControlPayload(
@@ -47,7 +44,7 @@ extension RemoteProviderConnectivityTester {
         try await ws.send(.string(finishText))
 
         for _ in 0..<6 {
-            let message = try await receiveWebSocketMessage(task: ws, timeoutSeconds: 3)
+            let message = try await ws.receive(timeoutSeconds: 3)
             guard case .string(let text) = message,
                   let data = text.data(using: .utf8),
                   let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -90,11 +87,8 @@ extension RemoteProviderConnectivityTester {
         RemoteProviderConnectivityTestLogging.logHTTPRequest(context: "Aliyun ASR Qwen realtime WebSocket test", request: request, bodyPreview: "session.update + session.finish")
 
         let managedSocket = VoxtNetworkSession.makeWebSocketTask(with: request)
-        let ws = managedSocket.task
-        ws.resume()
-        defer {
-            ws.cancel(with: .goingAway, reason: nil)
-        }
+        let ws = ConnectivityWebSocketSession(managedSocket: managedSocket)
+        defer { ws.close() }
 
         let updatePayload = AliyunQwenRealtimePayloadSupport.sessionUpdatePayload(
             kind: kind,
@@ -123,7 +117,7 @@ extension RemoteProviderConnectivityTester {
 
         do {
             for _ in 0..<6 {
-                let message = try await receiveWebSocketMessage(task: ws, timeoutSeconds: 3)
+                let message = try await ws.receive(timeoutSeconds: 3)
                 guard case .string(let text) = message,
                       let data = text.data(using: .utf8),
                       let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -184,11 +178,8 @@ extension RemoteProviderConnectivityTester {
         )
 
         let managedSocket = VoxtNetworkSession.makeWebSocketTask(with: request)
-        let ws = managedSocket.task
-        ws.resume()
-        defer {
-            ws.cancel(with: .goingAway, reason: nil)
-        }
+        let ws = ConnectivityWebSocketSession(managedSocket: managedSocket)
+        defer { ws.close() }
 
         let setupPayload = GeminiLivePayloadSupport.setupPayload(
             model: model,
@@ -211,7 +202,7 @@ extension RemoteProviderConnectivityTester {
 
         do {
             for _ in 0..<6 {
-                let message = try await receiveWebSocketMessage(task: ws, timeoutSeconds: 3)
+                let message = try await ws.receive(timeoutSeconds: 3)
                 let text: String?
                 switch message {
                 case .string(let value):

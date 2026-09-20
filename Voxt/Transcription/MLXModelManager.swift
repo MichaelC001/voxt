@@ -511,7 +511,7 @@ class MLXModelManager: ObservableObject {
                 try await MLXModelDownloadSupport.validateDownloadedModelInBackground(
                     at: modelDir,
                     repo: canonicalRepo,
-                    sizeState: sizeState,
+                    sizeState: MLXModelDownloadSupport.validationSizeState(for: canonicalRepo),
                     downloadSizeTolerance: downloadSizeTolerance,
                     fileManager: .default
                 )
@@ -1017,12 +1017,7 @@ class MLXModelManager: ObservableObject {
     }
 
     private func fetchRemoteSize() {
-        let repo = modelRepo
-        if let fallback = MLXModelCatalog.fallbackRemoteSizeInfo(repo: repo) {
-            sizeState = .ready(bytes: fallback.bytes, text: fallback.text)
-        } else {
-            sizeState = .error("Size unavailable")
-        }
+        sizeState = MLXModelDownloadSupport.validationSizeState(for: modelRepo)
     }
 
     func remoteSizeText(repo: String) -> String {
@@ -1185,9 +1180,9 @@ class MLXModelManager: ObservableObject {
             let sampler = Task { [weak self] in
                 let startTime = Date()
                 while !Task.isCancelled {
-                    let effectiveInFlight = Self.inFlightBytes(
+                    let effectiveInFlight = ModelDownloadProgress.inFlightBytes(
                         progress: progress,
-                        expectedEntryBytes: expectedEntryBytes,
+                        expectedFileBytes: expectedEntryBytes,
                         startTime: startTime
                     )
                     let currentCompleted = min(baseCompletedBytes + effectiveInFlight, totalBytes)
@@ -1274,7 +1269,7 @@ class MLXModelManager: ObservableObject {
         try await MLXModelDownloadSupport.validateDownloadedModelInBackground(
             at: tempDir,
             repo: repo,
-            sizeState: sizeState,
+            sizeState: MLXModelDownloadSupport.validationSizeState(for: repo),
             downloadSizeTolerance: downloadSizeTolerance,
             fileManager: .default
         )
@@ -1386,22 +1381,6 @@ class MLXModelManager: ObservableObject {
             totalFiles: totalFiles
         )
         setState(nextState, for: canonicalRepo)
-    }
-
-    private static func inFlightBytes(
-        progress: Progress,
-        expectedEntryBytes: Int64,
-        startTime: Date
-    ) -> Int64 {
-        let reported = max(progress.completedUnitCount, 0)
-        guard reported == 0 else { return reported }
-
-        let elapsed = Date().timeIntervalSince(startTime)
-        let expectedForTenMinutes = Double(expectedEntryBytes) / (10 * 60)
-        let fallbackRate = max(expectedForTenMinutes, 256 * 1024)
-        let estimated = Int64(elapsed * fallbackRate)
-        let cap = Int64(Double(expectedEntryBytes) * 0.95)
-        return min(max(estimated, 0), max(cap, 0))
     }
 
     private func downloadErrorMessage(for error: Error, repo: String) -> String {

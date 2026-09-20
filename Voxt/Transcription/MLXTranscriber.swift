@@ -26,12 +26,12 @@ private enum MLXCaptureStartError: LocalizedError {
 }
 
 /// Lets the non-`Sendable` `AVAudioEngine` be handed to a detached task so the blocking
-/// `start()` call can run off the main actor. Start/stop are serialized by `MLXTranscriber`,
-/// which never touches the engine concurrently, so this is safe.
+/// `start()` call can run off the main actor. Only one start is admitted by the
+/// recording-start barrier. Timeout/cancellation may request stop from another
+/// thread; completion still waits for the native start to return.
 private struct MLXAudioEngineBox: @unchecked Sendable {
-    // `nonisolated(unsafe)` lets the detached start/stop run off the main actor under
-    // `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`. Safe because MLXTranscriber never touches
-    // the engine concurrently with the single in-flight start.
+    // CoreAudio's start/stop cancellation behavior requires device acceptance;
+    // this box does not turn cancellation into an awaitable native-exit API.
     nonisolated(unsafe) let engine: AVAudioEngine
 }
 
@@ -84,6 +84,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     private var earlyPrewarmTask: Task<Void, Never>?
     private var captureWatchdogTask: Task<Void, Never>?
     private let liveSessionSetupTasks = TrackedTaskStore()
+    private let sessionTasks = TrackedTaskStore()
+    private let prewarmTasks = TrackedTaskStore()
     private let correctionPasses = MLXCorrectionPassCoordinator()
     private var activeLiveMode = MLXModelManager.liveMode(for: MLXModelManager.defaultModelRepo)
     private let nativeLiveRuntime = MLXNativeLiveRuntime()
@@ -230,7 +232,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             if MLXTranscriptionPlanning.isNativeLiveMode(activeLiveMode) {
                 startNativeLiveSession(revision: revision)
             } else if activeSessionBehavior.runsIntermediateCorrections {
-                correctionLoopTask = Task { [weak self] in
+                correctionLoopTask = sessionTasks.start { [weak self] in
                     await self?.runIntermediateCorrectionLoop(revision: revision)
                 }
             } else {
@@ -296,7 +298,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
 
         isFinalizingTranscription = true
         finalizationTask?.cancel()
-        finalizationTask = Task { [weak self] in
+        finalizationTask = sessionTasks.start { [weak self] in
             await self?.runFinalizationPipeline(revision: revision, sampleRate: sampleRate)
         }
     }
@@ -316,7 +318,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         isRecording = false
         isFinalizingTranscription = false
         cancelActiveTasks()
-        earlyPrewarmTask?.cancel()
+        prewarmTasks.cancelAll()
         self.earlyPrewarmTask = nil
         unpinModelForSessionIfNeeded()
 
@@ -328,6 +330,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         for task in setupTasks { await task.value }
         _ = await correctionPassTask?.value
         await nativeLiveRuntime.waitForRetirement()
+        await sessionTasks.waitForAll()
+        await prewarmTasks.waitForAll()
 
         sampleStore.clear()
         voiceActivityFrameStore.clear()
@@ -346,7 +350,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     @discardableResult
     func releaseIdleResources() -> Bool {
         guard !isRecording, !isFinalizingTranscription, !correctionPasses.hasPendingWork,
-              liveSessionSetupTasks.isEmpty, !nativeLiveRuntime.hasPendingWork else { return false }
+              liveSessionSetupTasks.isEmpty, sessionTasks.isEmpty, prewarmTasks.isEmpty,
+              !nativeLiveRuntime.hasPendingWork else { return false }
 
         sessionRevision += 1
         stopAudioEngine()
@@ -380,7 +385,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         else { return }
         let revision = sessionRevision
         let sampleRate = inputSampleRate
-        Task { [weak self] in
+        sessionTasks.start { [weak self] in
             _ = await self?.runManagedCorrectionPass(
                 stage: .intermediate,
                 revision: revision,
@@ -877,24 +882,32 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     /// against a timeout. On timeout the engine is stopped so the start call unwinds promptly.
     private func startConfiguredEngineWithTimeout(timeoutSeconds: Double) async throws {
         let engineBox = MLXAudioEngineBox(engine: audioEngine)
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask {
-                // Detached so the blocking start can never run on the main actor.
-                try await Task.detached(priority: .userInitiated) {
-                    try engineBox.engine.start()
-                }.value
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    // Detached so the blocking start can never run on the main actor.
+                    try await Task.detached(priority: .userInitiated) {
+                        try engineBox.engine.start()
+                    }.value
+                    if Task.isCancelled { engineBox.engine.stop() }
+                    try Task.checkCancellation()
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(timeoutSeconds))
+                    engineBox.engine.stop()
+                    throw MLXCaptureStartError.engineStartTimedOut(timeoutSeconds)
+                }
+                defer { group.cancelAll() }
+                _ = try await group.next()
             }
-            group.addTask {
-                try await Task.sleep(for: .seconds(timeoutSeconds))
-                engineBox.engine.stop()
-                throw MLXCaptureStartError.engineStartTimedOut(timeoutSeconds)
-            }
-            defer { group.cancelAll() }
-            _ = try await group.next()
+        } onCancel: {
+            engineBox.engine.stop()
         }
     }
 
     private func cancelActiveTasks() {
+        sessionTasks.cancelAll()
         correctionLoopTask?.cancel()
         correctionLoopTask = nil
         finalizationTask?.cancel()
@@ -1338,7 +1351,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         }
         guard earlyPrewarmTask == nil else { return }
 
-        earlyPrewarmTask = Task { [weak self] in
+        earlyPrewarmTask = prewarmTasks.start { [weak self] in
             guard let self else { return }
             let startedAt = Date()
             do {
@@ -1377,7 +1390,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         }
 
         preloadTask?.cancel()
-        preloadTask = Task { [weak self] in
+        preloadTask = sessionTasks.start { [weak self] in
             guard let self else { return }
             let startedAt = Date()
             do {
@@ -1413,7 +1426,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
 
     private func scheduleCaptureStartupWatchdog(revision: Int) {
         captureWatchdogTask?.cancel()
-        captureWatchdogTask = Task { [weak self] in
+        captureWatchdogTask = sessionTasks.start { [weak self] in
             do {
                 try await Task.sleep(for: .seconds(1.2))
             } catch {
@@ -1545,135 +1558,18 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         for stage: MLXCorrectionPassKind,
         audioDurationSeconds: Double? = nil
     ) -> ResolvedInferenceConfiguration {
-        let hintPayload = resolvedHintPayload()
-        let tuningSettings = resolvedLocalTuningSettings()
-        let mossSettings = tuningSettings.mossSettings(for: transcriptionPurpose.mossUsageScope)
-        let mossGenerationOutputMode = MossASRPromptSupport.generationOutputMode(
-            requestedOutputMode: mossSettings.outputMode,
-            scope: transcriptionPurpose.mossUsageScope
-        )
-        let userLanguageCodes = UserMainLanguageOption.storedSelection(
-            from: UserDefaults.standard.string(forKey: AppPreferenceKey.userMainLanguageCodes)
-        )
-        let capability = MLXModelCatalog.capability(for: modelManager.currentModelRepo)
-        let family = capability.family
-        let dictionaryTerms = resolvedDictionaryTermsTemplateValue()
-        var chunkDuration: Float
-        var minChunkDuration: Float
-        if capability.configurationCapabilities.contains(.recognitionPreset) {
-            switch tuningSettings.preset {
-            case .balanced:
-                chunkDuration = 1200
-                minChunkDuration = 1
-            case .accuracyFirst:
-                chunkDuration = 90
-                minChunkDuration = 2.5
-            }
-        } else {
-            // Models without recognitionPreset (for example Whisper's fixed window) ignore
-            // leftover preset values so stale settings cannot change decoding windows.
-            chunkDuration = 1200
-            minChunkDuration = 1
-        }
-        if stage == .postStopFinal {
-            chunkDuration = MLXTranscriptionPlanning.postStopFinalChunkDuration(
-                presetChunkDuration: chunkDuration
-            )
-            minChunkDuration = min(minChunkDuration, 1)
-        }
-
-        var languageHint = hintPayload.language
-        switch family {
-        case .mossTranscribeDiarize, .parakeet:
-            languageHint = nil
-        default:
-            break
-        }
-
-        let stageMaxTokens: Int
-        switch stage {
-        case .intermediate:
-            stageMaxTokens = 1024
-        case .postStopQuick:
-            stageMaxTokens = sessionAllowsRealtimeTextDisplay ? 1024 : 512
-        case .postStopFinal:
-            if let audioDurationSeconds {
-                stageMaxTokens = MLXTranscriptionPlanning.postStopFinalMaxTokens(
-                    audioDurationSeconds: audioDurationSeconds
-                )
-            } else {
-                stageMaxTokens = 8192
-            }
-        }
-        let maxTokens: Int
-        let temperature: Float
-        let usePunctuation: Bool?
-        switch family {
-        case .cohereTranscribe:
-            // P3: Cohere keeps tuning budget on all stages (including Final).
-            maxTokens = tuningSettings.cohereMaxTokens
-            temperature = Float(tuningSettings.cohereTemperature)
-            usePunctuation = tuningSettings.cohereUsePunctuation
-        default:
-            maxTokens = stageMaxTokens
-            temperature = family == .whisper ? Float(tuningSettings.whisperTemperature) : 0.0
-            usePunctuation = nil
-        }
-
-        let kvCachePolicy: MLXASRKVCachePolicy?
-        if stage == .postStopFinal {
-            kvCachePolicy = MLXTranscriptionPlanning.postStopFinalKVCachePolicy(
-                family: family,
-                catalogPolicy: capability.kvCachePolicy
-            )
-        } else {
-            kvCachePolicy = capability.kvCachePolicy
-        }
-
-        return ResolvedInferenceConfiguration(
-            family: family,
-            generationParameters: STTGenerateParameters(
-                maxTokens: maxTokens,
-                temperature: temperature,
-                topP: 0.95,
-                topK: 0,
-                verbose: false,
-                language: languageHint,
-                usePunctuation: usePunctuation,
-                chunkDuration: chunkDuration,
-                minChunkDuration: minChunkDuration,
-                kvBits: kvCachePolicy?.bits,
-                kvGroupSize: kvCachePolicy?.groupSize ?? 64,
-                quantizedKVStart: kvCachePolicy?.quantizedStart ?? 0
+        MLXInferenceConfiguration.resolve(
+            for: stage,
+            audioDurationSeconds: audioDurationSeconds,
+            hintPayload: resolvedHintPayload(),
+            tuningSettings: resolvedLocalTuningSettings(),
+            transcriptionPurpose: transcriptionPurpose,
+            userLanguageCodes: UserMainLanguageOption.storedSelection(
+                from: UserDefaults.standard.string(forKey: AppPreferenceKey.userMainLanguageCodes)
             ),
-            languageHint: languageHint,
-            timingGranularity: capability.timingGranularity,
-            qwenContextBias: resolvedBiasTemplate(
-                tuningSettings.qwenContextBias,
-                userLanguageCodes: userLanguageCodes,
-                dictionaryTerms: dictionaryTerms
-            ),
-            senseVoiceUseITN: tuningSettings.senseVoiceUseITN,
-            cohereLongFormStrategy: tuningSettings.cohereLongFormStrategy,
-            mossPrompt: family == .mossTranscribeDiarize
-                ? MossASRPromptSupport.resolvedPrompt(
-                    requestedOutputMode: mossSettings.outputMode,
-                    scope: transcriptionPurpose.mossUsageScope,
-                    customPrompt: resolvedBiasTemplate(
-                        mossSettings.customPrompt,
-                        userLanguageCodes: userLanguageCodes,
-                        dictionaryTerms: dictionaryTerms
-                    ),
-                    hotwords: MLXTranscriptionPlanning.shouldIncludeMOSSHotwords(for: stage)
-                        ? resolvedBiasTemplate(
-                            mossSettings.hotwords,
-                            userLanguageCodes: userLanguageCodes,
-                            dictionaryTerms: dictionaryTerms
-                        )
-                        : ""
-                )
-                : nil,
-            mossOutputMode: mossGenerationOutputMode
+            capability: MLXModelCatalog.capability(for: modelManager.currentModelRepo),
+            dictionaryTerms: resolvedDictionaryTermsTemplateValue(),
+            sessionAllowsRealtimeTextDisplay: sessionAllowsRealtimeTextDisplay
         )
     }
 
@@ -1707,19 +1603,6 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         case .postStopQuick: return "post-stop quick"
         case .postStopFinal: return "post-stop final"
         }
-    }
-
-    private func resolvedBiasTemplate(
-        _ template: String,
-        userLanguageCodes: [String],
-        dictionaryTerms: String
-    ) -> String {
-        ASRHintResolver.resolveTemplateVariables(
-            in: template,
-            userLanguageCodes: userLanguageCodes,
-            dictionaryTerms: dictionaryTerms
-        )
-        .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func resolvedDictionaryTermsTemplateValue() -> String {

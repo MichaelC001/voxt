@@ -1,12 +1,12 @@
 import Foundation
 
-enum DictionarySuggestionSourceContext: String, Codable {
+nonisolated enum DictionarySuggestionSourceContext: String, Codable, Sendable {
     case history
     case correction
     case repeatObservation
 }
 
-enum DictionarySuggestionStatus: String, Codable {
+nonisolated enum DictionarySuggestionStatus: String, Codable, Sendable {
     case pending
     case dismissed
     case added
@@ -23,7 +23,7 @@ struct DictionarySuggestionSnapshot: Identifiable, Codable, Hashable {
     }
 }
 
-struct DictionarySuggestion: Identifiable, Codable, Hashable {
+nonisolated struct DictionarySuggestion: Identifiable, Codable, Hashable, Sendable {
     let id: UUID
     var term: String
     var normalizedTerm: String

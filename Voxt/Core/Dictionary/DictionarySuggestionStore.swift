@@ -13,66 +13,60 @@ final class DictionarySuggestionStore: ObservableObject {
     private let defaults: UserDefaults
     private let fileManager: FileManager
     private let legacySuggestionsURL: URL?
+    private let readLegacySuggestions: @Sendable (URL) throws -> [DictionarySuggestion]
     private var reloadGeneration = 0
     private let evidenceLimit = 3
 
     init(
         defaults: UserDefaults = .standard,
         fileManager: FileManager = .default,
-        legacySuggestionsURL: URL? = nil
+        legacySuggestionsURL: URL? = nil,
+        readLegacySuggestions: @escaping @Sendable (URL) throws -> [DictionarySuggestion] = DictionarySuggestionStore.readLegacyFile
     ) {
         self.defaults = defaults
         self.fileManager = fileManager
         self.legacySuggestionsURL = legacySuggestionsURL
+        self.readLegacySuggestions = readLegacySuggestions
         reload()
     }
 
     func reload() {
+        // Synchronous refresh also supersedes every earlier asynchronous read.
+        reloadGeneration += 1
         filterSettings = loadFilterSettings()
-        do {
-            let url = try suggestionsFileURL()
-            guard fileManager.fileExists(atPath: url.path) else {
-                applyReloadedSuggestions([])
-                return
-            }
-            let data = try Data(contentsOf: url)
-            let decoded = try JSONDecoder().decode([DictionarySuggestion].self, from: data)
-            applyReloadedSuggestions(decoded)
-        } catch {
-            applyReloadedSuggestions([])
-        }
+        applyReadResult(Result { try readLegacySuggestions(suggestionsFileURL()) })
     }
 
-    func reloadAsync() {
+    @discardableResult
+    func reloadAsync() -> Task<Void, Never> {
         reloadGeneration += 1
         let generation = reloadGeneration
         filterSettings = loadFilterSettings()
-
-        let url: URL?
-        do {
-            url = try suggestionsFileURL()
-        } catch {
-            applyReloadedSuggestions([])
-            return
+        let location = Result { try suggestionsFileURL() }
+        let read = readLegacySuggestions
+        // File I/O is not interruptible. Keep awaiting it, but never publish a
+        // cancelled/superseded result or retain the store while it is blocked.
+        let work = Task.detached(priority: .utility) {
+            Result { try read(location.get()) }
         }
+        return Task { @MainActor [weak self] in
+            let result = await work.value
+            guard !Task.isCancelled, let self, generation == self.reloadGeneration else { return }
+            self.applyReadResult(result)
+        }
+    }
 
-        DispatchQueue.global(qos: .utility).async { [weak self, url] in
-            let decodedSuggestions: [DictionarySuggestion]
-            if let url, FileManager.default.fileExists(atPath: url.path) {
-                do {
-                    let data = try Data(contentsOf: url)
-                    decodedSuggestions = try JSONDecoder().decode([DictionarySuggestion].self, from: data)
-                } catch {
-                    decodedSuggestions = []
-                }
-            } else {
-                decodedSuggestions = []
-            }
+    nonisolated static func readLegacyFile(_ url: URL) throws -> [DictionarySuggestion] {
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+        return try JSONDecoder().decode([DictionarySuggestion].self, from: Data(contentsOf: url))
+    }
 
-            DispatchQueue.main.async {
-                guard let self, generation == self.reloadGeneration else { return }
-                self.applyReloadedSuggestions(decodedSuggestions)
-            }
+    private func applyReadResult(_ result: Result<[DictionarySuggestion], Error>) {
+        switch result {
+        case .success(let decoded):
+            applyReloadedSuggestions(decoded)
+        case .failure:
+            VoxtLog.dictionary("Legacy suggestion reload failed; preserving the current snapshot and file.")
         }
     }
 

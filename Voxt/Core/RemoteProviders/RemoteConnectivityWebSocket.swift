@@ -29,11 +29,8 @@ extension RemoteProviderConnectivityTester {
 
         do {
             let managedSocket = VoxtNetworkSession.makeWebSocketTask(with: request)
-            let ws = managedSocket.task
-            ws.resume()
-            defer {
-                ws.cancel(with: .goingAway, reason: nil)
-            }
+            let ws = ConnectivityWebSocketSession(managedSocket: managedSocket)
+            defer { ws.close() }
 
             let reqID = UUID().uuidString.lowercased()
             let payloadObject = DoubaoASRConfiguration.fullRequestPayload(
@@ -64,7 +61,7 @@ extension RemoteProviderConnectivityTester {
             )))
 
             for index in 1...4 {
-                let message = try await receiveWebSocketMessage(task: ws, timeoutSeconds: 3)
+                let message = try await ws.receive(timeoutSeconds: 3)
                 guard case .data(let packetData) = message else { continue }
                 let parsed = try DoubaoConnectivityTestSupport.parseServerPacket(packetData)
                 VoxtLog.network(
@@ -99,28 +96,6 @@ extension RemoteProviderConnectivityTester {
                 throw detailedError
             }
             throw error
-        }
-    }
-
-    func receiveWebSocketMessage(
-        task: URLSessionWebSocketTask,
-        timeoutSeconds: TimeInterval
-    ) async throws -> URLSessionWebSocketTask.Message {
-        try await withThrowingTaskGroup(of: URLSessionWebSocketTask.Message.self) { group in
-            group.addTask {
-                try await task.receive()
-            }
-            group.addTask {
-                try await Task.sleep(for: .seconds(timeoutSeconds))
-                throw NSError(
-                    domain: "Voxt.Settings",
-                    code: -121,
-                    userInfo: [NSLocalizedDescriptionKey: "Doubao test timed out waiting for server packet."]
-                )
-            }
-            let result = try await group.next()!
-            group.cancelAll()
-            return result
         }
     }
 

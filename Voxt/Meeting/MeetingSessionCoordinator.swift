@@ -58,6 +58,7 @@ final class MeetingSessionCoordinator {
     private(set) var hasCapturedAudio = false
     private var preferredInputDeviceIDProvider: () -> AudioDeviceID?
     private let audioSubmissionTasks = TrackedTaskStore()
+    private let vadPreparationTasks = TrackedTaskStore()
     private var cleanupTask: Task<Void, Never>?
     private var cleanupID = UUID()
     private var sessionRevision = UUID()
@@ -116,7 +117,7 @@ final class MeetingSessionCoordinator {
     }
 
     func releaseIdleVADResources() async {
-        guard !isActive, cleanupTask == nil, audioSubmissionTasks.isEmpty else { return }
+        guard !isActive, cleanupTask == nil, audioSubmissionTasks.isEmpty, vadPreparationTasks.isEmpty else { return }
         let idleResources = vadResources.replaceForIdleReclamation()
         await idleResources.streaming.releaseResources()
         await idleResources.offline.releaseResources()
@@ -178,6 +179,15 @@ final class MeetingSessionCoordinator {
         let revision = sessionRevision
         do {
             await cleanupTask?.value
+            guard revision == sessionRevision else { return nil }
+            try Task.checkCancellation()
+            let detector = voiceActivityDetector
+            let preparation = vadPreparationTasks.start {
+                await detector.refreshFromPreferences()
+                guard !Task.isCancelled else { return }
+                await detector.reset()
+            }
+            await preparation.value
             guard revision == sessionRevision else { return nil }
             try Task.checkCancellation()
             await MeetingLocalInferenceCoordinator.shared.setRecordingActive(true)
@@ -265,7 +275,7 @@ final class MeetingSessionCoordinator {
         if let stopFinalizationTask { return stopFinalizationTask }
         guard isActive else { return nil }
         isStopping = true
-        let visibleSnapshotSegments = finalizedSegments(from: overlayState.segments)
+        let visibleSnapshotSegments = MeetingLiveTranscriptPresentation.finalizedSegments(from: overlayState.segments)
         overlayState.isRecording = false
         overlayState.isPaused = false
         overlayState.isModelInitializing = false
@@ -274,7 +284,6 @@ final class MeetingSessionCoordinator {
 
         finalizeCurrentRecordingSlice()
         stopCaptures()
-        Task { await MeetingLocalInferenceCoordinator.shared.setRecordingActive(false) }
         let engineContext = activeEngineContext ?? resolvedEngineContext()
         let context = MeetingFinalizationContext(
             sessionID: UUID(),
@@ -288,6 +297,7 @@ final class MeetingSessionCoordinator {
 
         let finalizationTask = Task { [weak self] in
             guard let self else { return }
+            await MeetingLocalInferenceCoordinator.shared.setRecordingActive(false)
             if shouldFlushPendingAudio {
                 await self.flushPendingAudio()
                 await self.finishLiveSessionsIfNeeded()
@@ -305,7 +315,7 @@ final class MeetingSessionCoordinator {
             let captureMode = context.captureMode
             let archivedAudioURL = shouldFlushPendingAudio ? (try? await self.persistMeetingAudioArchive()) : nil
             let finalSegmentsBeforeSpeakerAnalysis = await MainActor.run {
-                self.finalizedSegments(from: self.overlayState.segments)
+                MeetingLiveTranscriptPresentation.finalizedSegments(from: self.overlayState.segments)
             }
             if shouldFlushPendingAudio {
                 await MeetingFinalizationCheckpointStore.shared.save(
@@ -813,6 +823,7 @@ final class MeetingSessionCoordinator {
         let retiredTranscriber = transcriber
         let retiredSessions = liveSessions.removeAll()
         let retiringAudioTasks = audioSubmissionTasks.cancelAll()
+        let retiringVADTasks = vadPreparationTasks.cancelAll()
         let retiredLocalEngine = activeLocalEngine
         activeLocalEngine = nil
         let cleanupID = UUID()
@@ -821,6 +832,7 @@ final class MeetingSessionCoordinator {
         // otherwise cancel the next meeting and reset its archive/schedulers.
         cleanupTask = Task { @MainActor [self] in
             await previousCleanup?.value
+            for task in retiringVADTasks { await task.value }
             await retiredTranscriber?.cancelPendingWork()
             for entry in retiredSessions { await entry.session.cancel() }
             for task in retiringAudioTasks { await task.value }
@@ -1262,16 +1274,6 @@ final class MeetingSessionCoordinator {
         }
     }
 
-    private func finalizedSegments(from segments: [MeetingTranscriptSegment]) -> [MeetingTranscriptSegment] {
-        segments.map { segment in
-            guard segment.isTranslationPending else { return segment }
-            return segment.updatingTranslation(
-                translatedText: segment.translatedText,
-                isTranslationPending: false
-            )
-        }
-    }
-
     private func updateSegment(
         _ segmentID: UUID,
         transform: (MeetingTranscriptSegment) -> MeetingTranscriptSegment
@@ -1298,7 +1300,7 @@ final class MeetingSessionCoordinator {
         }
 
         var finalizedSegmentsForTranslation: [MeetingTranscriptSegment] = []
-        for normalizedEvent in normalizedTranscriptEvents(for: event) {
+        for normalizedEvent in MeetingLiveTranscriptPresentation.events(for: event, captureMode: overlayState.captureMode, segments: overlayState.segments) {
             let result = MeetingTranscriptAssembler.apply(normalizedEvent, to: overlayState.segments)
             for segmentID in result.supersededSegmentIDs {
                 cancelTranslationTask(for: segmentID)
@@ -1331,24 +1333,6 @@ final class MeetingSessionCoordinator {
         localLivePendingAudio[speaker] = nil
     }
 
-    private func normalizedTranscriptEvents(for event: MeetingTranscriptEvent) -> [MeetingTranscriptEvent] {
-        let event = meetingDisplayNormalizedEvent(event)
-        guard case .final(let segment) = event else {
-            return [event]
-        }
-        if let mergedEvent = liveOverlayMergedShortFinalEvent(for: segment) {
-            return [mergedEvent]
-        }
-        let readableSegments = MeetingTranscriptPostProcessor.process(
-            [segment],
-            options: .liveOverlay
-        )
-        guard readableSegments.count > 1 else {
-            return [event]
-        }
-        return readableSegments.map(MeetingTranscriptEvent.final)
-    }
-
     private func inferredAudioSource(for speaker: MeetingSpeaker) -> TranscriptAudioSource {
         switch speaker {
         case .me:
@@ -1358,90 +1342,9 @@ final class MeetingSessionCoordinator {
         }
     }
 
-    private func meetingDisplayNormalizedEvent(_ event: MeetingTranscriptEvent) -> MeetingTranscriptEvent {
-        guard overlayState.captureMode == .meeting else { return event }
-
-        func normalizedSegment(_ segment: MeetingTranscriptSegment) -> MeetingTranscriptSegment {
-            return segment.updatingSpeakerAnalysis(
-                speaker: segment.speaker,
-                speakerID: nil,
-                speakerDisplayName: nil,
-                audioSource: segment.audioSource,
-                speakerConfidence: nil
-            )
-        }
-
-        switch event {
-        case .partial(let segment):
-            return .partial(normalizedSegment(segment))
-        case .final(let segment):
-            return .final(normalizedSegment(segment))
-        case .failed, .finished:
-            return event
-        }
-    }
-
-    private func liveOverlayMergedShortFinalEvent(for segment: MeetingTranscriptSegment) -> MeetingTranscriptEvent? {
-        let options = MeetingTranscriptPostProcessor.Options.liveOverlay
-        guard let previous = overlayState.segments.last,
-              previous.id != segment.id,
-              previous.speakerIdentityKey == segment.speakerIdentityKey
-        else {
-            return nil
-        }
-
-        let previousEnd = previous.endSeconds ?? previous.startSeconds
-        let segmentEnd = segment.endSeconds ?? segment.startSeconds
-        let gap = segment.startSeconds - previousEnd
-        guard segment.startSeconds >= previous.startSeconds,
-              gap >= -0.05,
-              gap <= options.maxSameSpeakerMergeGapSeconds
-        else {
-            return nil
-        }
-
-        let previousText = MeetingTranscriptTextPostProcessor.normalizedFinalText(previous.text)
-        let segmentText = MeetingTranscriptTextPostProcessor.normalizedFinalText(segment.text)
-        guard !previousText.isEmpty, !segmentText.isEmpty else { return nil }
-
-        let mergedText = MeetingTranscriptTextPostProcessor.mergedTextRemovingOverlap(previousText, segmentText)
-        let shouldMergeShortFragment =
-            previousText.count < options.minSegmentTextCharacters ||
-            segmentText.count < options.minSegmentTextCharacters
-        guard shouldMergeShortFragment,
-              mergedText.count <= options.maxSegmentTextCharacters,
-              max(previousEnd, segmentEnd) - previous.startSeconds <= options.maxMergedDurationSeconds
-        else {
-            return nil
-        }
-
-        let merged = MeetingTranscriptSegment(
-            id: previous.id,
-            speaker: previous.speaker,
-            speakerID: previous.speakerID ?? segment.speakerID,
-            speakerDisplayName: previous.speakerDisplayName ?? segment.speakerDisplayName,
-            audioSource: previous.audioSource ?? segment.audioSource,
-            speakerConfidence: [previous.speakerConfidence, segment.speakerConfidence]
-                .compactMap { $0 }
-                .max(),
-            startSeconds: previous.startSeconds,
-            endSeconds: max(previousEnd, segmentEnd),
-            text: mergedText,
-            translatedText: nil,
-            isTranslationPending: false,
-            preventsAdjacentMerge: true
-        )
-        return .final(merged)
-    }
-
     private func reconfigureAccumulators(for profile: MeetingChunkingProfile) {
         micAccumulator = MeetingChunkAccumulator(speaker: .me, speechThreshold: Self.micSpeechThreshold, profile: profile)
         systemAccumulator = MeetingChunkAccumulator(speaker: .them, speechThreshold: Self.systemSpeechThreshold, profile: profile)
-        let voiceActivityDetector = self.voiceActivityDetector
-        Task {
-            await voiceActivityDetector.refreshFromPreferences()
-            await voiceActivityDetector.reset()
-        }
     }
 
     private func optimizedFinalTranscriptSegments(
