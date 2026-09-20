@@ -246,7 +246,6 @@ enum MLXModelDownloadSupport {
         return url
     }
 
-    @concurrent
     /// Validation belongs to the downloaded repo, never the UI's selected repo.
     nonisolated static func validationSizeState(for repo: String) -> MLXModelManager.ModelSizeState {
         guard let size = MLXModelCatalog.fallbackRemoteSizeInfo(repo: repo) else {
@@ -255,6 +254,7 @@ enum MLXModelDownloadSupport {
         return .ready(bytes: size.bytes, text: size.text)
     }
 
+    @concurrent
     nonisolated static func validateDownloadedModelInBackground(
         at url: URL,
         repo: String? = nil,

@@ -15,6 +15,7 @@ extension RemoteLLMRuntimeClient {
         openAICompatibleResponseFormat: OpenAICompatibleResponseFormat? = nil,
         onPartialText: (@Sendable (String) -> Void)? = nil
     ) async throws -> String {
+        try Task.checkCancellation()
         let runtimeConfiguration = try RemoteModelConfigurationStore.runtimeConfiguration(for: configuration)
         let configuration = runtimeConfiguration.value
         try validateEndpointSecurity(provider: provider, configuration: configuration)
@@ -82,6 +83,7 @@ extension RemoteLLMRuntimeClient {
                         }
                         return trimmed
                     } catch let streamingFailure as StreamingFailure where streamingFailure.emittedChunkCount == 0 {
+                        try Task.checkCancellation()
                         VoxtLog.llmWarning(
                             "Remote LLM streaming unavailable, retrying non-streaming. provider=\(provider.rawValue), endpoint=\(endpointValue), attempt=\(index + 1)/\(endpoints.count), detail=\(streamingFailure.underlying.localizedDescription)"
                         )
@@ -119,7 +121,7 @@ extension RemoteLLMRuntimeClient {
                         tuning: tuning
                     )
                 )
-                let (data, response) = try await VoxtNetworkSession.active.data(for: request)
+                let (data, response) = try await networkSession.data(for: request)
                 let responseElapsedMs = Int(Date().timeIntervalSince(requestStartedAt) * 1000)
                 guard let http = response as? HTTPURLResponse else {
                     throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
@@ -218,7 +220,7 @@ extension RemoteLLMRuntimeClient {
         let repetitionGuard = LLMOutputRepetitionGuard()
         var didStopForRepetition = false
         do {
-            let (bytes, response) = try await VoxtNetworkSession.active.bytes(for: request)
+            let (bytes, response) = try await networkSession.bytes(for: request)
             guard let http = response as? HTTPURLResponse else {
                 throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
             }
@@ -282,6 +284,7 @@ extension RemoteLLMRuntimeClient {
             }
 
             for try await line in bytes.lines {
+                try Task.checkCancellation()
                 let trimmedLine = line.trimmingCharacters(in: .newlines)
                 if trimmedLine.isEmpty {
                     if !bufferedEventLines.isEmpty {
@@ -349,6 +352,7 @@ extension RemoteLLMRuntimeClient {
             if !trailingText.isEmpty {
                 try publish(trailingText)
             }
+            try Task.checkCancellation()
             publishAggregated(force: true)
 
             let totalElapsedMs = Int(Date().timeIntervalSince(requestStartedAt) * 1000)
@@ -364,6 +368,11 @@ extension RemoteLLMRuntimeClient {
             )
             return aggregated
         } catch {
+            try Task.checkCancellation()
+            let nsError = error as NSError
+            if error is CancellationError || (nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled) {
+                throw CancellationError()
+            }
             throw StreamingFailure(
                 underlying: error,
                 partialText: aggregated,

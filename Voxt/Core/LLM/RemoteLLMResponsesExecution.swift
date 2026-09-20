@@ -22,6 +22,7 @@ extension RemoteLLMRuntimeClient {
         onPartialText: (@Sendable (String) -> Void)? = nil,
         onResponseID: ((String) -> Void)? = nil
     ) async throws -> ResponsesStreamingResult {
+        try Task.checkCancellation()
         let runtimeConfiguration = try RemoteModelConfigurationStore.runtimeConfiguration(for: configuration)
         let configuration = runtimeConfiguration.value
         try validateEndpointSecurity(provider: provider, configuration: configuration)
@@ -81,6 +82,7 @@ extension RemoteLLMRuntimeClient {
                     onResponseID: onResponseID
                 )
             } catch let streamingFailure as StreamingFailure where streamingFailure.emittedChunkCount == 0 {
+                try Task.checkCancellation()
                 if requiresStreaming {
                     throw streamingFailure.underlying
                 }
@@ -121,7 +123,7 @@ extension RemoteLLMRuntimeClient {
             )
         )
 
-        let (data, response) = try await VoxtNetworkSession.active.data(for: request)
+        let (data, response) = try await networkSession.data(for: request)
         let responseElapsedMs = Int(Date().timeIntervalSince(requestStartedAt) * 1000)
         guard let http = response as? HTTPURLResponse else {
             throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
@@ -228,7 +230,7 @@ extension RemoteLLMRuntimeClient {
         var didStopForRepetition = false
 
         do {
-            let (bytes, response) = try await VoxtNetworkSession.active.bytes(for: request)
+            let (bytes, response) = try await networkSession.bytes(for: request)
             guard let http = response as? HTTPURLResponse else {
                 throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
             }
@@ -292,6 +294,7 @@ extension RemoteLLMRuntimeClient {
             }
 
             for try await line in bytes.lines {
+                try Task.checkCancellation()
                 let trimmedLine = line.trimmingCharacters(in: .newlines)
                 if trimmedLine.isEmpty {
                     if !bufferedEventLines.isEmpty {
@@ -339,6 +342,7 @@ extension RemoteLLMRuntimeClient {
             if !didStopForRepetition, !bufferedEventLines.isEmpty {
                 try publish(bufferedEventLines.joined(separator: "\n"))
             }
+            try Task.checkCancellation()
             publishAggregated(force: true)
 
             let totalElapsedMs = Int(Date().timeIntervalSince(requestStartedAt) * 1000)
@@ -354,6 +358,11 @@ extension RemoteLLMRuntimeClient {
             )
             return ResponsesStreamingResult(text: aggregated, responseID: responseID)
         } catch {
+            try Task.checkCancellation()
+            let nsError = error as NSError
+            if error is CancellationError || (nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled) {
+                throw CancellationError()
+            }
             throw StreamingFailure(
                 underlying: error,
                 partialText: aggregated,

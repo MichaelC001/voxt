@@ -5,7 +5,13 @@ import Foundation
 // Protocol execution and payload mapping live in sibling extensions. Shared helpers
 // are internal for cross-file use; callers should use these task entry points.
 struct RemoteLLMRuntimeClient {
-    nonisolated init() {}
+    private let sessionOverride: URLSession?
+
+    nonisolated init(session: URLSession? = nil) {
+        self.sessionOverride = session
+    }
+
+    var networkSession: URLSession { sessionOverride ?? VoxtNetworkSession.active }
 
     enum OpenAICompatibleResponseFormat: Equatable {
         case jsonObject
@@ -84,7 +90,7 @@ struct RemoteLLMRuntimeClient {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        let (_, response) = try await VoxtNetworkSession.active.data(for: request)
+        let (_, response) = try await networkSession.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else { return }
         guard (200..<500).contains(httpResponse.statusCode) else {
             throw NSError(
