@@ -19,7 +19,7 @@
 | 远程设置 | `RemoteProviderSheetOperations` 独立持有请求代次、结果和在途任务；替换/关闭使旧结果失效，SwiftUI 延后回调复核结果身份 | 不是完整窗口/UI 自动化 |
 | WebSocket 探测 | 专属 socket/session 成对关闭；超时先关闭传输，再等待 losing receive；取消同样覆盖 send，关闭幂等 | 不代替真实代理/TLS/provider 测试 |
 | 词典旧文件 | 同步 reload 也废止旧异步读取；失败保留当前快照和原文件，丢弃取消/迟到结果；等待真实文件读取退出 | 不提供跨进程文件写入 CAS |
-| Remote ASR | 预览循环各自持有去重状态；取消/新会话后不发布；完成任务和退休预览均保留到退出，临时快照收尾覆盖复制失败 | 不改变识别模型或分包/采样参数 |
+| Remote ASR | 预览循环各自持有去重状态；取消/新会话后不发布；完成任务和退休预览均保留到退出，临时快照收尾覆盖复制失败；清理只触及真正采集过的 input node，不为清理懒初始化硬件；排队的 tap 回调也复核录音代次 | 不改变识别模型或分包/采样参数 |
 | MLX 会话 | 跟踪取消后尚未退出的循环、finalization、preload、watchdog/prewarm；关机等待、空闲回收检查在途任务；启动取消请求停止引擎 | AVAudioEngine/native 调用没有可证明的硬退出期限 |
 | 会议 | VAD 准备在旧 cleanup 后执行，并被取消/退出屏障追踪；停止的 recording-active 更新纳入 finalization 顺序 | 真实双音源、睡眠唤醒、设备切换仍需验收 |
 | 模型下载 | 校验大小绑定下载 repo，而非 UI 当前选中模型；Custom LLM 在 metadata await 前固定目录并检查取消；复用显示进度估计并防整数转换溢出 | 进度估计不是下载字节校验，也不是性能收益 |
@@ -48,6 +48,8 @@ Tests 工作流现在保存 `validation-evidence`（7 天保留）：
 
 - `VoxtTests.xcresult`、`test-summary.json`、`test-discovery.json`；
 - `debug-test.log`、`release-build.log`，包含 `/usr/bin/time -l` 的原始命令资源统计与 Xcode build timing summary。
+
+`68701e5` 的 run `35479399460` 已确认 1,740 项通过、23 项模型门禁跳过、0 失败；Release 随后触发 Swift 6.3.2 泛型析构优化器崩溃，已调整 Entry 类型边界，后续必须重新验证，不能把该 run 算作完整门禁通过。CI 现在也限定单测试默认 120 秒、最多 300 秒，避免硬件意外初始化或死等待无界阻塞。
 
 必须核对 HEAD SHA、所有新增 suite 的发现/执行及 skip 数。**模型门禁 skip 不是模型通过；构建命令的 RSS 不是整个应用/Metal 的峰值内存。**
 

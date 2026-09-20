@@ -55,7 +55,7 @@ final class RemoteASRCompletionTests: XCTestCase {
     func testLateFailureCannotReportIntoNewGeneration() {
         let transcriber = RemoteASRTranscriber()
         let oldGeneration = transcriber.recordingGenerationID
-        transcriber.recordingGenerationID = UUID()
+        transcriber.discardPendingSessionOutput()
         var failures = 0
         transcriber.onRuntimeFailure = { _ in failures += 1 }
         transcriber.notifyRuntimeFailure(URLError(.timedOut), generationID: oldGeneration)
@@ -65,9 +65,11 @@ final class RemoteASRCompletionTests: XCTestCase {
     }
 
     func testLateCompletionCannotDeliverIntoNewGeneration() {
+        // No capture is prepared here. Completing a cold instance must not
+        // create an input node or initialize microphone hardware during cleanup.
         let transcriber = RemoteASRTranscriber()
         let oldGeneration = transcriber.recordingGenerationID
-        transcriber.recordingGenerationID = UUID()
+        transcriber.discardPendingSessionOutput()
         var delivered: [String] = []
         transcriber.onTranscriptionFinished = { delivered.append($0) }
         transcriber.finish(with: "stale", generationID: oldGeneration)

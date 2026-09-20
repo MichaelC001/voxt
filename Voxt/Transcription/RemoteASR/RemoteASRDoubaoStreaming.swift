@@ -262,7 +262,7 @@ extension RemoteASRTranscriber {
         }
         audioEngine.reset()
 
-        let inputNode = audioEngine.inputNode
+        let inputNode = acquireStreamingInputNode()
         let shouldUsePreferredInputDevice = usePreferredInputDevice ?? (preferredInputDeviceID != nil)
         doubaoCaptureUsesPreferredInputDevice = shouldUsePreferredInputDevice
         let didApplyPreferredInputDevice = shouldUsePreferredInputDevice
@@ -276,6 +276,7 @@ extension RemoteASRTranscriber {
         )
         streamingInputSampleRate = inputFormat.sampleRate
         inputNode.removeTap(onBus: 0)
+        let captureGeneration = recordingGenerationID
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
             guard let pcmData = Self.makeDoubaoPCM16MonoData(from: buffer) else { return }
@@ -283,7 +284,7 @@ extension RemoteASRTranscriber {
                 self.sampleStore.append(samples)
             }
             Task { @MainActor in
-                guard self.isRecording,
+                guard self.isCurrentGeneration(captureGeneration), self.isRecording,
                       let context = self.doubaoStreamingContext,
                       !context.isClosed
                 else { return }
@@ -304,9 +305,7 @@ extension RemoteASRTranscriber {
     func stopDoubaoAudioCapture() {
         doubaoCaptureStartupWatchdogTask?.cancel()
         doubaoCaptureStartupWatchdogTask = nil
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
-        audioLevel = 0
+        stopStreamingAudioCapture()
     }
 
     private func ensureDoubaoAudioCaptureStarted(

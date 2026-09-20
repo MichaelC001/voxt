@@ -48,6 +48,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
     private var recorder: AVAudioRecorder?
     let audioEngine = AVAudioEngine()
+    private var streamingInputNode: AVAudioInputNode?
     var doubaoStreamingContext: DoubaoStreamingContext?
     var aliyunStreamingContext: AliyunFunStreamingContext?
     var aliyunQwenStreamingContext: AliyunQwenStreamingContext?
@@ -75,6 +76,21 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     let doubaoCaptureStartupWatchdogDelay: Duration = .seconds(1.2)
     let aliyunRealtimeStopDrainDelay: Duration = .milliseconds(180)
     let realtimePendingAudioByteLimit = 1_024_000
+
+    func acquireStreamingInputNode() -> AVAudioInputNode {
+        let node = audioEngine.inputNode
+        streamingInputNode = node
+        return node
+    }
+
+    func stopStreamingAudioCapture() {
+        if audioEngine.isRunning { audioEngine.stop() }
+        // inputNode is lazy and may initialize hardware. Cleanup must only
+        // touch a node acquired by an actual capture attempt, including failure.
+        streamingInputNode?.removeTap(onBus: 0)
+        streamingInputNode = nil
+        audioLevel = 0
+    }
 
     func setPreferredInputDevice(_ deviceID: AudioDeviceID?) {
         preferredInputDeviceID = deviceID

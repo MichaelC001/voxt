@@ -9,6 +9,7 @@ on:
 
 jobs:
   macos-tests:
+    timeout-minutes: 60
     runs-on: macos-26
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
@@ -66,6 +67,9 @@ jobs:
             -skipPackagePluginValidation \
             -derivedDataPath "$RUNNER_TEMP/VoxtDerivedData" \
             -resultBundlePath "$RUNNER_TEMP/VoxtTests.xcresult" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            -maximum-test-execution-time-allowance 300 \
             -showBuildTimingSummary \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/debug-test.log"
 

@@ -11,15 +11,20 @@ nonisolated struct SharedModelLoadTask: Sendable {
     func waitForCompletion() async { await wait() }
 }
 
+// Keep this value independent of the coordinator's generic actor context.
+// Swift 6.3.2's Release inliner crashes in the synthesized coordinator deinit
+// when Entry is a nested generic type. No type erasure or optimization bypass.
+nonisolated private struct SharedModelLoadEntry<Value: Sendable>: Sendable {
+    let generation: UUID
+    let task: Task<Value, Error>
+    var waiterIDs: Set<UUID>
+}
+
 /// Coalesces current waiters while retaining invalidated loads until they exit.
 /// A cancelled waiter is not evidence that native loading released its resources.
 @MainActor
 final class SharedModelLoadCoordinator<Value: Sendable> {
-    private struct Entry: Sendable {
-        let generation: UUID
-        let task: Task<Value, Error>
-        var waiterIDs: Set<UUID>
-    }
+    private typealias Entry = SharedModelLoadEntry<Value>
 
     private var entries: [String: Entry] = [:]
     private var outstanding: [UUID: Task<Value, Error>] = [:]
