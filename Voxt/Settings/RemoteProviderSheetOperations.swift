@@ -76,6 +76,7 @@ final class RemoteProviderSheetOperations: ObservableObject {
         connectionRequestID = UUID()
         modelTasks.cancelAll()
         connectionTasks.cancelAll()
+        modelOptions = nil
         isTestingConnection = false
         connectionResult = nil
     }

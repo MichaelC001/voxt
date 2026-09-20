@@ -10,7 +10,9 @@ Remote ASR transcriber implementations and streaming support for provider-backed
 
 ## Runtime boundaries
 
-- `RemoteASRTranscriber`: recording orchestration, generation IDs, capture and final delivery.
+- `RemoteASRTranscriber`: recording orchestration, generation IDs, capture and final delivery; completion tasks stay tracked through cancellation and exit.
+- `RemoteASRPreviewController`: per-invocation polling/deduplication with generation and recording checks before publication; retired requests remain waitable.
+- `RemoteASRCaptureSupport`, `RemoteASRRequestContext`, `RemoteASRPreviewAudio`, `RemoteASRErrorPresentation`: capture conversion, provider hint context, temporary WAV handling and user-facing errors.
 - `RemoteASRFileRequests`, `RemoteASRAliyunStreaming`, `RemoteASRDoubaoStreaming`: request and provider implementations on the existing transcriber, not additional session owners.
 - `RemoteASRStreamingContexts`: socket/capture contexts and a bounded, cancellable handshake gate.
 - `RemoteASRResponseStates`: provider-specific text accumulators; terminal results are frozen and waits propagate cancellation.

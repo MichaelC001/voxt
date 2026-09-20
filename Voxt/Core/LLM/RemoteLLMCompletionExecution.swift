@@ -221,6 +221,7 @@ extension RemoteLLMRuntimeClient {
         var didStopForRepetition = false
         do {
             let (bytes, response) = try await networkSession.bytes(for: request)
+            defer { bytes.task.cancel() }
             guard let http = response as? HTTPURLResponse else {
                 throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
             }

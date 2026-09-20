@@ -875,13 +875,14 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let snapshotURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("voxt-openai-preview-\(UUID().uuidString)")
             .appendingPathExtension("wav")
+        // Also remove a partially created destination if copyItem itself fails.
+        defer { try? FileManager.default.removeItem(at: snapshotURL) }
 
         do {
             if FileManager.default.fileExists(atPath: snapshotURL.path) {
                 try FileManager.default.removeItem(at: snapshotURL)
             }
             try FileManager.default.copyItem(at: sourceURL, to: snapshotURL)
-            defer { try? FileManager.default.removeItem(at: snapshotURL) }
 
             let attrs = try FileManager.default.attributesOfItem(atPath: snapshotURL.path)
             if let size = attrs[.size] as? Int64, size < 6_000 {

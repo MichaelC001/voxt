@@ -183,12 +183,12 @@ struct RemoteProviderConfigurationSheet: View {
         }
         .animation(.easeInOut(duration: 0.16), value: operationToastMessage)
         .onChange(of: operations.modelOptions) { _, options in
-            if options != nil, !pickerModelOptionIDs.contains(selectedProviderModel) {
+            if let options, options == operations.modelOptions, !pickerModelOptionIDs.contains(selectedProviderModel) {
                 configureModelSelection()
             }
         }
         .onChange(of: operations.connectionResult) { _, result in
-            if let result, !result.succeeded { showOperationToast(result.message) }
+            if let result, result == operations.connectionResult, !result.succeeded { showOperationToast(result.message) }
         }
         .onDisappear {
             operations.cancel()

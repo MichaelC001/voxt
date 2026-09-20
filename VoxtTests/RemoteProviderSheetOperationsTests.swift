@@ -79,6 +79,18 @@ final class RemoteProviderSheetOperationsTests: XCTestCase {
         XCTAssertNil(owner.modelOptions)
     }
 
+    func testClosingClearsPublishedResultsBeforeDeferredViewCallbacks() async {
+        let owner = RemoteProviderSheetOperations()
+        await owner.loadModels { [.init(id: "model", title: "Model")] }?.value
+        await owner.testConnection { "done" }?.value
+        XCTAssertNotNil(owner.modelOptions)
+        XCTAssertNotNil(owner.connectionResult)
+        owner.cancel()
+        XCTAssertNil(owner.modelOptions)
+        XCTAssertNil(owner.connectionResult)
+        XCTAssertFalse(owner.isTestingConnection)
+    }
+
     func testCurrentFailurePublishesOnceAndClearsBusyState() async {
         let owner = RemoteProviderSheetOperations()
         await owner.testConnection { throw NSError(domain: "fixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "failed"]) }?.value

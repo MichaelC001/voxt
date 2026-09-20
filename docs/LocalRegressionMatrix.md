@@ -27,6 +27,8 @@ Stage 6C adds queued-injection and pasteboard-ownership tests, lifecycle output-
 
 Stage 6D adds `DictionarySuggestionStoreTests` and the existing `RemoteProviderConfigurationPolicyTests` to `refactor`. The store uses isolated defaults and temporary legacy files to check compatibility, merge/write-back, direct dictionary insertion and scan checkpoints; provider cases target current generation/schema validation rather than a retired OpenAI wrapper. These do not replace asynchronous reload/network or UI acceptance.
 
+The concentrated closeout adds scoped sheet tasks, WebSocket close/deadline, stale reload, ASR preview, corrupt hotkey preference, bounded progress, inference planning and meeting presentation suites. `RemoteLLMRuntimeClientFailureTests` uses isolated URLProtocol sessions for actual streaming execution/fallback/cancellation without provider accounts. CI now builds Release after tests and archives xcresult/discovery plus command timing/resource logs. See [closeout](RefactoringCloseout.zh-CN.md) for remaining manual/native/model and performance acceptance; a build RSS observation is not application/Metal memory validation.
+
 The old `whisper` / `diagnostic` groups were removed because their dedicated Whisper test classes no longer exist. This does not remove MLX Whisper model support or migration coverage. Unknown groups fail rather than selecting nonexistent suites. The `all` / `full` groups avoid rerunning VAD suites already selected by core.
 
 See [test-suite organization](../VoxtTests/README.md) and the [phased refactoring record](RefactoringProgress.zh-CN.md).

@@ -12,11 +12,11 @@ ASR model construction is in `MLXSTTModelLoader`. Catalog/state values and reusa
 
 ## MLX boundaries
 
-`MLXTranscriber` owns recording tasks, revision checks, model leases and capture-buffer instances. Pure policy is in `MLXTranscriptionPlanning`, `MLXTranscriptMerging`, and `MLXLiveTextPreview`. Shared values, buffers, detached inference and structured segment conversion live in their correspondingly named files.
+`MLXTranscriber` owns recording tasks, revision checks, model leases and capture-buffer instances. Pure policy is in `MLXTranscriptionPlanning`, `MLXInferenceConfiguration`, `MLXTranscriptMerging`, and `MLXLiveTextPreview`. Shared values, buffers, detached inference and structured segment conversion live in their correspondingly named files.
 
 `MLXCorrectionPassCoordinator` owns the one in-flight correction pass. Cancelling a pass does not free its slot until the task has exited; final passes wait for retiring intermediate work. The transcriber still owns session revision and model leases, and verifies them after asynchronous inference/archive work.
 
-`MLXNativeLiveRuntime` owns an installed native stream, event/feed tasks and its transferred model use. Replacement/retirement keeps old tasks separate from the new stream, and releases the use once Voxt's tasks exit; abandoned owners also cancel and retire their stream. Setup uses the tracked-task store so cancelled loaders remain visible during shutdown.
+`MLXNativeLiveRuntime` owns an installed native stream, event/feed tasks and its transferred model use. Replacement/retirement keeps old tasks separate from the new stream, and releases the use once Voxt's tasks exit; abandoned owners also cancel and retire their stream. Setup, session loops/finalization/preload/watchdogs and early prewarm use tracked-task stores so cancelled work remains visible during shutdown and blocks idle reclamation until exit. Audio-engine startup cancellation requests stop, but still waits for the native start call; this is not a hard native-exit deadline.
 
 This is not a native decode/Metal completion barrier: the dependency's synchronous `cancel()` has no awaitable internal-worker completion API. Verify actual model memory/cancellation behavior separately.
 

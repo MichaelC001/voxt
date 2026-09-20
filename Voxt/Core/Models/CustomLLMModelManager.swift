@@ -892,6 +892,15 @@ class CustomLLMModelManager: ObservableObject {
         let canonicalRepo = Self.canonicalModelRepo(repo)
         let token = ProcessInfo.processInfo.environment["HF_TOKEN"]
             ?? Bundle.main.object(forInfoDictionaryKey: "HF_TOKEN") as? String
+        // Capture the destination before metadata suspends. A cancelled old-root
+        // request must not resolve its destination from a newly selected root.
+        guard let modelDir = writeCacheDirectory(for: canonicalRepo) else {
+            throw NSError(
+                domain: "Voxt.CustomLLM",
+                code: 1002,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid model cache directory."]
+            )
+        }
         let context = try await CustomLLMModelDownloadSupport.makeDownloadContext(
             repo: canonicalRepo,
             baseURL: baseURL,
@@ -903,13 +912,7 @@ class CustomLLMModelManager: ObservableObject {
         let totalFiles = context.entries.count
         var completedBytes: Int64 = 0
 
-        guard let modelDir = writeCacheDirectory(for: canonicalRepo) else {
-            throw NSError(
-                domain: "Voxt.CustomLLM",
-                code: 1002,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid model cache directory."]
-            )
-        }
+        try Task.checkCancellation()
         try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
 
         for (index, entry) in context.entries.enumerated() {

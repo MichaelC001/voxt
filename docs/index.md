@@ -15,6 +15,7 @@
 - [Architecture and source map](Architecture.md)
 - [全项目重构评估、清理依据与执行清单](RefactoringAssessment.zh-CN.md)
 - [分阶段实施记录与待验收门禁](RefactoringProgress.zh-CN.md)
+- [集中收尾、保留决策与最终验收清单](RefactoringCloseout.zh-CN.md)
 - [Test suites and focused checks](../VoxtTests/README.md)
 - [MLX dependency policy and current pins](MLXAudioDependency.md)
 - [Local regression matrix](LocalRegressionMatrix.md)

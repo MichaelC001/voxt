@@ -20,5 +20,6 @@ ASR and Custom LLM managers share one complete shutdown task per instance, so re
 - `GGUFTranslationRuntime`: llama backend/model/context/sampler ownership and UTF-8 accumulation, separate from download/install UI state.
 - `ResumableDownloadTypes`, `ResumableDownloadAttemptDelegate`, `ResumableModelDownloadSupport`: shared resumable transport, delegate synchronization, sidecar and retry handling for ASR/LLM/GGUF.
 - `ModelDownloadSourceSelection.attemptCandidates`: shared retry-source ordering; resumed downloads stay on the saved source.
+- `ModelDownloadProgress`: shared display estimates, clamped before integer conversion. ASR validation size comes from the downloaded repo, not whichever model the UI selects; Custom LLM captures its destination before suspending for metadata.
 
 Use compiled requests for enhancement/translation/rewrite. `enhance(userPrompt:repo:)` remains used for titles/debug and model integration coverage; dictionary history scanning keeps its dedicated array-output contract. The retired raw/system-prompt and translate/rewrite overloads are no longer entry points.

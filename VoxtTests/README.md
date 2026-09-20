@@ -87,6 +87,10 @@ Stage 6B retires four tests for unused local-LLM builders/size-cache helpers and
 
 Stage 6D adds eight `DictionarySuggestionStoreTests` and four provider-sheet validation cases. Legacy Codable/history fields, file merging, direct scan insertion, checkpoints and settings persistence use isolated defaults/temporary files. One old OpenAI-wrapper test now exercises the actual generation validation entry; existing tests are retained. The unused generic suggestion factory is removed; local legacy fixtures use explicit dates. Both suites are in `refactor`.
 
+The concentrated closeout adds 49 cases: sheet operations (7), WebSocket transport lifetime (7), dictionary reload (6), ASR preview (4), corrupt hotkey preferences (3), bounded progress (3), MLX inference policy (5), meeting presentation (5), repo-bound validation size (2) and LLM streaming fault injection (7). The latter uses a per-host URLProtocol registry on an injected URLSession; unregistered requests fail locally, never contacting provider hosts. No extra model checkpoint or real input permissions are required. Existing progress tests now call the shared helper.
+
+CI archives `validation-evidence` with xcresult, discovered tests, test summary and Debug/Release logs. Review skips independently, especially gated model tests. See the [closeout checklist](../docs/RefactoringCloseout.zh-CN.md).
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.

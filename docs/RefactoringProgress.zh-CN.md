@@ -19,12 +19,13 @@
 | 6A | Dictionary/History/MeetingDetail 拆分、孤儿调用链与 UI 清理 | 已实施 | `c55101a` macOS CI 通过；UI 待验收 |
 | 6B | 模型/续传/GGUF 与远程配置职责、退役本地 LLM API 清理 | 已实施 | `1b393a3` macOS CI 通过；模型/下载待人工验收 |
 | 6C | 文本交付代次/剪贴板所有权、历史/权限/连通性职责与孤儿链清理 | 已实施，净新增 20 个测试 | `2d62d99` macOS CI 通过；编辑器/UI 待验收 |
-| 6D | 词典建议退役链、持久化兼容与远程设置校验/快照 | 已实施，新增 12 个测试 | 等待本批 macOS CI；UI/扫描待验收 |
-| 6E / 最终验收 | 剩余有状态大类、进一步去重与性能/设备验证 | 待实施 | 仍有 7 个应用文件 >1,000 行，不标记全项目完成 |
+| 6D | 词典建议退役链、持久化兼容与远程设置校验/快照 | 已实施，新增 12 个测试 | `f1a1a0f` macOS CI 通过；UI/扫描待验收 |
+| 6E 集中收尾 | 剩余热点复审、异步/取消边界、流式故障注入与 Release 门禁 | 已实施，新增 49 个测试 | 本轮 HEAD 的 CI 待确认；首轮编译失败已修正，不能沿用旧绿色 |
+| 最终验收 | 真实设备/权限/provider/编辑器/模型与性能对比 | 外部验收未执行 | 见集中收尾清单；不标记全部已验收 |
 
 阶段 0–3 的 `fa087ed` 已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35433366619)。这是前一批的证据，不能替代阶段 4 新增行为的编译和测试，也不代表 Release 构建、模型回放及真实设备验收已完成。
 
-阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 的 `1b393a3` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35448285265)。阶段 6C 的 `2d62d99` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35452065137)。阶段 6D 仍需单独验证。
+阶段 4 的 `fd38d43` 也已通过 [macOS CI Tests 工作流](https://github.com/hehehai/voxt/actions/runs/35436703019)，日志包含 `TEST SUCCEEDED`。阶段 5A 的 `b771be1` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35438916477)，阶段 5B 的 `5936e62` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35440624827)。阶段 5C 的 `25776d2` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35443091401)。阶段 6A 的 `c55101a` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35445401328)。阶段 6B 的 `1b393a3` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35448285265)。阶段 6C 的 `2d62d99` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35452065137)。阶段 6D 的 `f1a1a0f` 已通过 [macOS CI](https://github.com/hehehai/voxt/actions/runs/35454152580)。集中收尾以当前 HEAD 的自动门禁为准。
 
 阶段 3 中不涉及行为的文件归位提前实施；这不表示存储及同步生命周期重构已完成。不得因为暂时没有 Mac 就把阶段 4–6 的风险或验收项删掉。
 
@@ -366,6 +367,36 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 - `DictionarySuggestionStore` **1,128 → 389**；`RemoteProviderSheetState` **1,149 → 623**。应用 **487 个 Swift 文件、149,596 行**，本批净减少 **400 行**；千行文件 **9 → 7**。测试 **206 个文件、41,725 行**，静态方法 **1,702 → 1,714**，所有测试文件低于千行。
 - 剩余千行热点为 MLXTranscriber、HotkeyManager、MeetingSessionCoordinator、MLXModelManager、HotkeySupport、CustomLLMModelManager、RemoteASRTranscriber。继续按实际所有权推进，不以文件行数证明性能收益。
 
+## 阶段 6E：集中代码收尾
+
+本轮不再把七个热点分别推迟到下一次“继续”。完成能够在当前环境实施的代码事项，建立 Release / 证据归档门禁，并明确真实 Mac 外部验收。完整处置理由及验收操作见 [集中收尾清单](RefactoringCloseout.zh-CN.md)。
+
+### 异步边界与修复
+
+- `RemoteProviderSheetOperations` 独立持有 Codex 模型列表/连接测试结果与任务代次。替换、关闭和本地校验失败使旧任务失效；取消后任务仍追踪至退出，延后 SwiftUI 回调复核结果身份。
+- `ConnectivityWebSocketSession` 成对拥有专属 socket/session，关闭幂等；超时先关闭接收传输再等待 task-group 退出，取消覆盖 send/receive。原 provider payload/解析不改，解决仅 cancel task group 可能等待不返回的接收任务。
+- 词典同步 reload 也更新代次；异步读取在后台进行并等待真实退出。取消/旧结果不发布，损坏/读取失败保留当前快照与原文件。旧文件模型显式声明值类型的 nonisolated/Sendable 边界，不改 Codable 字段。
+- `RemoteASRPreviewController` 为每次循环独立保留去重状态；请求返回后复核录音/代次/取消，旧预览不能清除新会话状态或发布结果。完成任务及退休预览均可由关机等待；临时快照清理也覆盖 copy 失败。
+- MLX 的 session/prewarm task store 保留取消后的旧循环、最终化、预加载与 watchdog；关机/空闲回收不只检查最新 task 槽位。采集启动取消请求 stop，但仍等待 native start 返回，不宣称硬超时退出。
+- 会议 VAD 准备在旧 cleanup 后执行，纳入取消和退出等待；停止的 recording-active 更新纳入 finalization 顺序，移除独立游离任务。
+- 下载大小校验绑定所下载 repo，避免 UI 切换模型后错用另一模型大小；Custom LLM 在 metadata await 前固定目录并检查取消。统一显示进度估计，整数转换前限幅；catalog 数值和校验容差不变。
+- 热键偏好转换使用有界整数转换；损坏的负数/超范围值不再导致迁移崩溃。有效编码、迁移键、预设和手势路由规则保持。
+- 为 `RemoteLLMRuntimeClient` 注入可选 URLSession，默认仍动态使用现有代理 session。隔离 URLProtocol 故障覆盖真实 Chat/Responses 执行入口；取消不再进入零 chunk 回退，partial 后失败不重试。
+
+### 职责与保留决定
+
+- 热键拆为值/匹配、左右修饰键、持久化/迁移及展示；仅跨文件必要的纯 canonical helper 调整访问级别，存量 Codable 正文核对不变。
+- MLX 提取明确输入的 `MLXInferenceConfiguration`，推理预算/语言/预设/MOSS/Cohere 规则正文保持；会议提取 `MeetingLiveTranscriptPresentation`，不迁走 session token/翻译任务。
+- Remote ASR 分离捕获格式/转换、request hint context、WAV 快照与错误展示；保留的捕获及上下文正文核对不变。
+- 应用目前 **500 个 Swift 文件、约 150k 行**，仍有 **5 个**千行有状态协调文件。它们经过评审后保留私有状态、锁和资源生命周期，不以全面开放状态或机械切片冒充完成。准确行数随修复变化，以源码和收尾记录为准。
+- 未变更依赖 pin、音频夹具、模型默认参数、持久化格式或签名配置。
+
+### 验证
+
+新增 49 项（设置 7、WebSocket 7、reload 6、ASR preview 4、热键 3、进度 3、推理规划 5、会议展示 5、repo 校验 2、LLM 故障 7），静态方法总数 **1,763**。聚焦脚本纳入新 suite；原回归覆盖不删。
+
+CI 增加 unsigned Release build、xcresult/discovery/summary 及 `/usr/bin/time -l` 原始资源记录。首个收尾 run `35478088469` 因 `@concurrent` 随新增 helper 错位导致编译失败；已恢复至原异步校验方法。第二轮 run `35478584544` 又发现说话人模型下载仍引用旧进度 helper，已改接通用实现并复查全部调用点。失败记录保留，后续以新 HEAD CI 为准，不能把这些失败或前批通过写成新代码通过。
+
 ## 验证与下一门禁
 
 Linux 已执行：
@@ -374,7 +405,7 @@ Linux 已执行：
 - Shell 语法检查、模型源码/锁文件审计、`git diff --check`：通过。
 - 保留函数/测试正文、目录移动内容、删除引用与 Markdown 链接的静态核对。
 
-阶段 6D 新提交仍需 macOS CI / Mac 验证；前几批绿色结果不能替代它。真实执行并记录结果：
+集中收尾仍需当前 HEAD 的 macOS CI 确认及真实 Mac 外部验收；前几批绿色结果不能替代它。真实执行并记录结果：
 
 ```bash
 xcodebuild build -project Voxt.xcodeproj -scheme Voxt -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
@@ -385,4 +416,4 @@ xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macO
 
 人工检查：六步引导的前进/后退/关闭、三种练习、权限和麦克风切换；设置导航、通知、反馈、历史/Note 编辑、词典一键扫描及远程 provider 保存/测试；会议远程启动配置；本地 ASR live/final/取消；延迟粘贴时取消/重启、关闭答案、正常结束后的 Auto Key、切换应用/窗口和连续用户复制。核对新 suite 的测试发现数量，不能只看 xcodebuild 退出码。
 
-阶段 4 已补充 ASR/会议协议契约，阶段 5A–5C 收敛了上述核心所有者。阶段 6 继续整理剩余职责与集成验收；远程 LLM 的流式重试故障注入仍需单独补齐。当前没有实测延迟、峰值内存和编译时间数据，不宣称性能已提升。
+阶段 4–6E 的已识别代码事项已集中处理，LLM 流式故障注入已补齐；五个大型 owner 按评审决定保留。最终设备/模型/编辑器验收和运行时性能前后数据仍缺失。构建命令资源统计不代表应用/Metal 峰值内存，不宣称性能已提升或所有验收已经结束。
