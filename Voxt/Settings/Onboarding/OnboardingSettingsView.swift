@@ -52,7 +52,6 @@ struct OnboardingSettingsView: View {
     @State var microphoneState = MicrophoneResolvedState.empty
     @State var modelStorageDisplayPath = ""
     @State var modelStorageSelectionError: String?
-    @State var systemAudioPermissionMessage: String?
     @State var isUserMainLanguageSheetPresented = false
     @State var isMicrophonePriorityDialogPresented = false
     @State var isPermissionsDialogPresented = false
@@ -259,10 +258,7 @@ struct OnboardingSettingsView: View {
                 featureSettings = FeatureSettingsStore.load(defaults: .standard)
                 prepareDemoPlayerIfNeeded(for: currentStep)
             })
-        let muteObserved = AnyView(appeared.onChange(of: muteSystemAudioWhileRecording) { _, newValue in
-                handleMuteSystemAudioChange(newValue)
-            })
-        let languageObserved = AnyView(muteObserved.onChange(of: interfaceLanguageRaw) { _, _ in
+        let languageObserved = AnyView(appeared.onChange(of: interfaceLanguageRaw) { _, _ in
                 syncLocalizedOnboardingSamples()
                 NotificationCenter.default.post(name: .voxtInterfaceLanguageDidChange, object: nil)
             })
@@ -578,30 +574,6 @@ struct OnboardingSettingsView: View {
             if !granted {
                 Task { @MainActor in
                     PermissionGuidance.openSettings(for: permission)
-                }
-            }
-        case .inputMonitoring:
-            let granted = EventListeningPermissionManager.requestInputMonitoring(prompt: true)
-            if !granted {
-                Task { @MainActor in
-                    PermissionGuidance.openSettings(for: permission)
-                }
-            }
-        case .screenCapture:
-            let granted = ScreenCapturePermission.requestAccess()
-            Task { @MainActor in
-                self.permissionRefreshRevision += 1
-                if !granted {
-                    PermissionGuidance.openSettings(for: permission)
-                }
-            }
-        case .systemAudioCapture:
-            SystemAudioCapturePermission.requestAccess { granted in
-                Task { @MainActor in
-                    self.permissionRefreshRevision += 1
-                    if !granted {
-                        PermissionGuidance.openSettings(for: permission)
-                    }
                 }
             }
         }

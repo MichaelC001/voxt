@@ -375,13 +375,9 @@ extension AppDelegate {
             return false
         }
 
-        if mode.usesSystemAudio && SystemAudioCapturePermission.authorizationStatus() != .authorized {
-            VoxtLog.meetingWarning("Meeting capture mode requires system audio permission. mode=\(mode.rawValue)")
-            showOverlayReminder(
-                AppLocalization.localizedString("System Audio Recording permission is required for Meeting Notes. Enable it in Settings > Permissions.")
-            )
-            return false
-        }
+        // Starting the public Core Audio tap after this user action triggers
+        // system-audio authorization. No private TCC preflight or cached grant
+        // can reliably determine access (including after revocation).
 
         return true
     }

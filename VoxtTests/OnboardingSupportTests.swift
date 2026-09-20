@@ -9,36 +9,33 @@ final class OnboardingSupportTests: XCTestCase {
         let permissions = OnboardingPermissionRequirementResolver.requiredPermissions(
             for: .transcription,
             context: OnboardingPermissionRequirementContext(
-                selectedEngine: .dictation,
-                muteSystemAudioWhileRecording: false
+                selectedEngine: .dictation
             )
         )
 
         XCTAssertEqual(
             permissions,
-            [.microphone, .accessibility, .inputMonitoring, .speechRecognition]
+            [.microphone, .accessibility, .speechRecognition]
         )
     }
 
-    func testTranscriptionPermissionsIncludeSystemAudioWhenMuteEnabled() {
+    func testTranscriptionRequiresOnlyMicrophoneAndAccessibility() {
         let permissions = OnboardingPermissionRequirementResolver.requiredPermissions(
             for: .transcription,
             context: OnboardingPermissionRequirementContext(
-                selectedEngine: .mlxAudio,
-                muteSystemAudioWhileRecording: true
+                selectedEngine: .mlxAudio
             )
         )
 
         XCTAssertEqual(
             permissions,
-            [.microphone, .accessibility, .inputMonitoring, .systemAudioCapture]
+            [.microphone, .accessibility]
         )
     }
 
     func testNonRecordingStepsDoNotRequirePermissions() {
         let context = OnboardingPermissionRequirementContext(
-            selectedEngine: .mlxAudio,
-            muteSystemAudioWhileRecording: true
+            selectedEngine: .mlxAudio
         )
 
         XCTAssertTrue(OnboardingPermissionRequirementResolver.requiredPermissions(for: .language, context: context).isEmpty)
@@ -47,19 +44,6 @@ final class OnboardingSupportTests: XCTestCase {
         XCTAssertTrue(OnboardingPermissionRequirementResolver.requiredPermissions(for: .rewrite, context: context).isEmpty)
         XCTAssertTrue(OnboardingPermissionRequirementResolver.requiredPermissions(for: .appEnhancement, context: context).isEmpty)
         XCTAssertTrue(OnboardingPermissionRequirementResolver.requiredPermissions(for: .finish, context: context).isEmpty)
-    }
-
-    func testRewritePermissionsIncludeScreenCaptureWhenRewriteScreenshotContextIsEnabled() {
-        let context = OnboardingPermissionRequirementContext(
-            selectedEngine: .mlxAudio,
-            muteSystemAudioWhileRecording: false,
-            rewriteScreenshotContextEnabled: true
-        )
-
-        XCTAssertEqual(
-            OnboardingPermissionRequirementResolver.requiredPermissions(for: .rewrite, context: context),
-            [.screenCapture]
-        )
     }
 
     func testFeatureSelectionResolverMapsASRSelections() {

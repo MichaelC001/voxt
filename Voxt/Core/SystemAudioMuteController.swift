@@ -1,247 +1,206 @@
-// SystemAudioMuteController.swift
-// Provides System Audio Mute Controller for core app behavior.
-
+// Device mute changes output state only; it never captures system audio.
 import Foundation
 import CoreAudio
 
+struct SystemAudioOutputDevice: Equatable {
+    let id: AudioDeviceID
+    let uid: String
+}
+
+@MainActor
+protocol SystemAudioMuteDeviceAccess: AnyObject {
+    func defaultOutputDevice() -> SystemAudioOutputDevice?
+    func muteState(of device: SystemAudioOutputDevice) -> Bool?
+    func setMuted(_ muted: Bool, on device: SystemAudioOutputDevice) -> Bool
+    func observe(device: SystemAudioOutputDevice?, onChange: @escaping @MainActor () -> Void)
+    func stopObserving()
+}
+
 @MainActor
 final class SystemAudioMuteController {
-    private enum MuteStrategy {
-        case bundleIDBased(String)
-        case processObjectBased(AudioObjectID)
-        case unavailable
+    private let devices: any SystemAudioMuteDeviceAccess
+    private var sessionID: UUID?
+    private var outputDevice: SystemAudioOutputDevice?
+    private var ownedMute: SystemAudioOutputDevice?
+
+    convenience init() {
+        self.init(devices: CoreAudioMuteDeviceAccess())
     }
 
-    private struct ProcessTapSession {
-        let tapID: AudioObjectID
-        let aggregateDeviceID: AudioObjectID
-        let ioProcID: AudioDeviceIOProcID
+    init(devices: any SystemAudioMuteDeviceAccess) {
+        self.devices = devices
     }
 
-    private var processTapSession: ProcessTapSession?
+    isolated deinit {
+        devices.stopObserving()
+        restoreOwnedMute()
+    }
 
     @discardableResult
     func muteSystemAudioIfNeeded() -> Bool {
-        if processTapSession != nil {
-            return true
+        if sessionID != nil {
+            return outputDevice.flatMap { devices.muteState(of: $0) } == true
         }
-        guard SystemAudioCapturePermission.authorizationStatus() == .authorized else {
-            return false
-        }
-
-        return activateProcessTapMuteIfPossible()
+        let id = UUID()
+        sessionID = id
+        let muted = adoptCurrentOutput()
+        observeOutput(sessionID: id)
+        return muted
     }
 
     func restoreSystemAudioIfNeeded() {
-        if let session = processTapSession {
-            AudioDeviceStop(session.aggregateDeviceID, session.ioProcID)
-            AudioDeviceDestroyIOProcID(session.aggregateDeviceID, session.ioProcID)
-            AudioHardwareDestroyAggregateDevice(session.aggregateDeviceID)
-            AudioHardwareDestroyProcessTap(session.tapID)
-            processTapSession = nil
-        }
+        sessionID = nil // Invalidates already queued property notifications.
+        devices.stopObserving()
+        restoreOwnedMute()
+        outputDevice = nil
     }
 
-    private func activateProcessTapMuteIfPossible() -> Bool {
-        guard let outputDeviceID = defaultOutputDeviceID(),
-              let outputUID = deviceUID(for: outputDeviceID)
-        else {
-            VoxtLog.warning("System audio mute unavailable: failed to resolve default output device.")
+    private func adoptCurrentOutput() -> Bool {
+        outputDevice = devices.defaultOutputDevice()
+        guard let device = outputDevice, let wasMuted = devices.muteState(of: device) else {
+            VoxtLog.warning("Output-device mute unavailable: mute state cannot be read.")
             return false
         }
-
-        switch resolvedMuteStrategy() {
-        case .bundleIDBased(let bundleID):
-            VoxtLog.info("System audio mute strategy=bundleIDBased", verbose: true)
-            return activateBundleIDProcessTapMute(bundleID: bundleID, outputUID: outputUID)
-        case .processObjectBased(let processObjectID):
-            VoxtLog.info("System audio mute strategy=processObjectBased", verbose: true)
-            return activateProcessObjectTapMute(processObjectID: processObjectID, outputUID: outputUID)
-        case .unavailable:
-            VoxtLog.warning("System audio mute unavailable: failed to resolve mute strategy.")
+        // Never take ownership of a user's pre-existing mute.
+        guard !wasMuted else { return true }
+        guard devices.setMuted(true, on: device) else {
+            VoxtLog.warning("Output-device mute unavailable: device has no writable mute control.")
             return false
         }
-    }
-
-    private func resolvedMuteStrategy() -> MuteStrategy {
-        if #available(macOS 26.0, *) {
-            if let bundleID = Bundle.main.bundleIdentifier, !bundleID.isEmpty {
-                return .bundleIDBased(bundleID)
-            }
-        }
-
-        if let processObjectID = currentProcessObjectID() {
-            return .processObjectBased(processObjectID)
-        }
-
-        return .unavailable
-    }
-
-    private func activateBundleIDProcessTapMute(bundleID: String, outputUID: String) -> Bool {
-        let tapDescription = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
-        tapDescription.uuid = UUID()
-        tapDescription.name = "Voxt System Audio Mute"
-        tapDescription.isPrivate = true
-        tapDescription.muteBehavior = .muted
-
-        if #available(macOS 26.0, *) {
-            tapDescription.isProcessRestoreEnabled = true
-            tapDescription.bundleIDs = [bundleID]
-        }
-
-        return startProcessTapSession(tapDescription: tapDescription, outputUID: outputUID)
-    }
-
-    private func activateProcessObjectTapMute(processObjectID: AudioObjectID, outputUID: String) -> Bool {
-        let tapDescription = CATapDescription(
-            stereoGlobalTapButExcludeProcesses: [processObjectID]
-        )
-        tapDescription.uuid = UUID()
-        tapDescription.name = "Voxt System Audio Mute"
-        tapDescription.isPrivate = true
-        tapDescription.muteBehavior = CATapMuteBehavior.muted
-
-        return startProcessTapSession(tapDescription: tapDescription, outputUID: outputUID)
-    }
-
-    private func startProcessTapSession(tapDescription: CATapDescription, outputUID: String) -> Bool {
-
-        var tapID = AudioObjectID(kAudioObjectUnknown)
-        let tapCreateStatus = AudioHardwareCreateProcessTap(tapDescription, &tapID)
-        guard tapCreateStatus == noErr, tapID != AudioObjectID(kAudioObjectUnknown) else {
-            VoxtLog.warning("System audio mute tap creation failed. status=\(tapCreateStatus)")
-            return false
-        }
-
-        let aggregateUID = "voxt-process-tap-\(tapDescription.uuid.uuidString)"
-        let aggregateDescription: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "VoxtProcessTap",
-            kAudioAggregateDeviceUIDKey: aggregateUID,
-            kAudioAggregateDeviceMainSubDeviceKey: outputUID,
-            kAudioAggregateDeviceIsPrivateKey: true,
-            kAudioAggregateDeviceIsStackedKey: false,
-            kAudioAggregateDeviceTapAutoStartKey: true,
-            kAudioAggregateDeviceSubDeviceListKey: [
-                [
-                    kAudioSubDeviceUIDKey: outputUID
-                ]
-            ],
-            kAudioAggregateDeviceTapListKey: [
-                [
-                    kAudioSubTapDriftCompensationKey: true,
-                    kAudioSubTapUIDKey: tapDescription.uuid.uuidString
-                ]
-            ]
-        ]
-
-        var aggregateDeviceID = AudioObjectID(kAudioObjectUnknown)
-        let aggregateStatus = AudioHardwareCreateAggregateDevice(aggregateDescription as CFDictionary, &aggregateDeviceID)
-        guard aggregateStatus == noErr, aggregateDeviceID != AudioObjectID(kAudioObjectUnknown) else {
-            AudioHardwareDestroyProcessTap(tapID)
-            VoxtLog.warning("System audio mute aggregate device creation failed. status=\(aggregateStatus)")
-            return false
-        }
-
-        var ioProcID: AudioDeviceIOProcID?
-        let ioProcStatus = AudioDeviceCreateIOProcIDWithBlock(
-            &ioProcID,
-            aggregateDeviceID,
-            DispatchQueue.global(qos: .userInitiated)
-        ) { _, _, _, _, _ in
-            // The tap remains active while this no-op IOProc is running.
-        }
-
-        guard ioProcStatus == noErr, let ioProcID else {
-            AudioHardwareDestroyAggregateDevice(aggregateDeviceID)
-            AudioHardwareDestroyProcessTap(tapID)
-            VoxtLog.warning("System audio mute IOProc creation failed. status=\(ioProcStatus)")
-            return false
-        }
-
-        let startStatus = AudioDeviceStart(aggregateDeviceID, ioProcID)
-        guard startStatus == noErr else {
-            AudioDeviceDestroyIOProcID(aggregateDeviceID, ioProcID)
-            AudioHardwareDestroyAggregateDevice(aggregateDeviceID)
-            AudioHardwareDestroyProcessTap(tapID)
-            VoxtLog.warning("System audio mute start failed. status=\(startStatus)")
-            return false
-        }
-
-        processTapSession = ProcessTapSession(
-            tapID: tapID,
-            aggregateDeviceID: aggregateDeviceID,
-            ioProcID: ioProcID
-        )
+        ownedMute = device
         return true
     }
 
-    private func currentProcessObjectID() -> AudioObjectID? {
-        var pid = getpid()
+    private func observeOutput(sessionID id: UUID) {
+        devices.observe(device: outputDevice) { [weak self] in
+            guard let self, self.sessionID == id else { return }
+            let current = self.devices.defaultOutputDevice()
+            if current != self.outputDevice {
+                self.devices.stopObserving()
+                self.restoreOwnedMute()
+                _ = self.adoptCurrentOutput()
+                self.observeOutput(sessionID: id)
+            } else if let owned = self.ownedMute,
+                      self.devices.muteState(of: owned) == false {
+                // Respect an observed external unmute; do not fight the user or
+                // later unmute a state they set themselves in this session.
+                self.ownedMute = nil
+            }
+        }
+    }
+
+    private func restoreOwnedMute() {
+        guard let owned = ownedMute else { return }
+        ownedMute = nil
+        // Access checks the UID as well as the ID: HAL may reuse an ID after
+        // unplugging. Unknown state must not be treated as our original device.
+        guard let isMuted = devices.muteState(of: owned) else {
+            VoxtLog.warning("Output-device mute could not be restored: device disconnected or state unavailable. Check output mute manually.")
+            return
+        }
+        if isMuted, !devices.setMuted(false, on: owned) {
+            VoxtLog.warning("Output-device mute restore failed. Check output mute manually.")
+        }
+    }
+}
+
+@MainActor
+private final class CoreAudioMuteDeviceAccess: SystemAudioMuteDeviceAccess {
+    private struct Observation {
+        let object: AudioObjectID
+        var address: AudioObjectPropertyAddress
+        let block: AudioObjectPropertyListenerBlock
+    }
+    private var observations: [Observation] = []
+
+    func defaultOutputDevice() -> SystemAudioOutputDevice? {
+        var address = Self.defaultOutputAddress
+        var id = AudioDeviceID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &id) == noErr,
+              id != kAudioObjectUnknown, let uid = deviceUID(id) else { return nil }
+        return SystemAudioOutputDevice(id: id, uid: uid)
+    }
+
+    func muteState(of device: SystemAudioOutputDevice) -> Bool? {
+        guard deviceUID(device.id) == device.uid else { return nil }
+        var address = Self.muteAddress
+        guard AudioObjectHasProperty(device.id, &address) else { return nil }
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(device.id, &address, 0, nil, &size, &value) == noErr else { return nil }
+        return value != 0
+    }
+
+    func setMuted(_ muted: Bool, on device: SystemAudioOutputDevice) -> Bool {
+        guard deviceUID(device.id) == device.uid else { return false }
+        var address = Self.muteAddress
+        var settable: DarwinBoolean = false
+        guard AudioObjectHasProperty(device.id, &address),
+              AudioObjectIsPropertySettable(device.id, &address, &settable) == noErr,
+              settable.boolValue else { return false }
+        var value: UInt32 = muted ? 1 : 0
+        return AudioObjectSetPropertyData(device.id, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value) == noErr
+    }
+
+    func observe(device: SystemAudioOutputDevice?, onChange: @escaping @MainActor () -> Void) {
+        stopObserving()
+        addObservation(object: AudioObjectID(kAudioObjectSystemObject), address: Self.defaultOutputAddress, onChange: onChange)
+        if let device {
+            addObservation(object: device.id, address: Self.muteAddress, onChange: onChange)
+        }
+    }
+
+    func stopObserving() {
+        for var observation in observations {
+            AudioObjectRemovePropertyListenerBlock(observation.object, &observation.address, .main, observation.block)
+        }
+        observations.removeAll()
+    }
+
+    private func addObservation(
+        object: AudioObjectID,
+        address: AudioObjectPropertyAddress,
+        onChange: @escaping @MainActor () -> Void
+    ) {
+        var address = address
+        let block: AudioObjectPropertyListenerBlock = { _, _ in
+            Task { @MainActor in onChange() }
+        }
+        guard AudioObjectAddPropertyListenerBlock(object, &address, .main, block) == noErr else {
+            VoxtLog.warning("Output-device mute observation unavailable.")
+            return
+        }
+        observations.append(Observation(object: object, address: address, block: block))
+    }
+
+    private func deviceUID(_ id: AudioDeviceID) -> String? {
         var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var processObjectID = AudioObjectID(kAudioObjectUnknown)
-        var dataSize = UInt32(MemoryLayout<AudioObjectID>.size)
-        let status = withUnsafePointer(to: &pid) { pidPointer in
-            AudioObjectGetPropertyData(
-                AudioObjectID(kAudioObjectSystemObject),
-                &address,
-                UInt32(MemoryLayout<pid_t>.size),
-                pidPointer,
-                &dataSize,
-                &processObjectID
-            )
-        }
-        guard status == noErr, processObjectID != AudioObjectID(kAudioObjectUnknown) else {
-            VoxtLog.warning("System audio mute process object lookup failed. status=\(status)")
-            return nil
-        }
-        return processObjectID
-    }
-
-    private func defaultOutputDeviceID() -> AudioDeviceID? {
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        var deviceID = AudioDeviceID(0)
-        var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize,
-            &deviceID
-        )
-        guard status == noErr, deviceID != 0 else { return nil }
-        return deviceID
-    }
-
-    private func deviceUID(for deviceID: AudioDeviceID) -> String? {
-        var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceUID,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
+        let storage = UnsafeMutablePointer<CFString?>.allocate(capacity: 1)
+        storage.initialize(to: nil)
+        defer { storage.deinitialize(count: 1); storage.deallocate() }
+        var size = UInt32(MemoryLayout<CFString?>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, storage) == noErr else { return nil }
+        return storage.pointee.map { $0 as String }
+    }
 
-        let valuePointer = UnsafeMutableRawPointer.allocate(
-            byteCount: MemoryLayout<CFString?>.size,
-            alignment: MemoryLayout<CFString?>.alignment
+    private static var muteAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
         )
-        defer { valuePointer.deallocate() }
+    }
 
-        valuePointer.initializeMemory(as: CFString?.self, repeating: nil, count: 1)
-        defer { valuePointer.assumingMemoryBound(to: CFString?.self).deinitialize(count: 1) }
-
-        var dataSize = UInt32(MemoryLayout<CFString?>.size)
-        let status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &dataSize, valuePointer)
-        guard status == noErr else { return nil }
-        guard let value = valuePointer.assumingMemoryBound(to: CFString?.self).pointee else { return nil }
-        return value as String
+    private static var defaultOutputAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
     }
 }

@@ -181,7 +181,6 @@ struct CustomLLMRequestPlan: Equatable {
     let prompt: String
     let inputCharacterCount: Int
     let maxTokensOverride: Int?
-    let attachments: [LLMInputAttachment]
     let conversationHistory: [RewriteConversationPromptTurn]
     let logMode: String?
     let contentLogSections: [CustomLLMLogSection]
@@ -233,7 +232,6 @@ enum CustomLLMRequestPlanBuilder {
             prompt: request.prompt,
             inputCharacterCount: request.inputCharacterCount,
             maxTokensOverride: request.outputTokenBudgetHint,
-            attachments: request.attachments,
             conversationHistory: request.conversationHistory,
             logMode: usesUserMessageMode ? "userMessage" : nil,
             contentLogSections: sections,
@@ -253,7 +251,6 @@ enum CustomLLMRequestPlanBuilder {
             prompt: prompt,
             inputCharacterCount: prompt.count,
             maxTokensOverride: nil,
-            attachments: [],
             conversationHistory: [],
             logMode: "userMessage",
             contentLogSections: [
@@ -278,7 +275,6 @@ enum CustomLLMRequestPlanBuilder {
             prompt: requestPrompt,
             inputCharacterCount: prompt.count,
             maxTokensOverride: nil,
-            attachments: [],
             conversationHistory: [],
             logMode: "dictionaryHistoryScan",
             contentLogSections: [
@@ -387,7 +383,7 @@ struct CustomLLMModelCatalog {
         Option(
             id: "lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit",
             title: "Qwen3 VL 4B Instruct (4bit)",
-            description: "Recommended Qwen3 multimodal model for local app screenshots and text context."
+            description: "Qwen3 VL architecture for local text generation."
         ),
         Option(
             id: "mlx-community/Qwen3.5-2B-4bit",
@@ -432,17 +428,17 @@ struct CustomLLMModelCatalog {
         Option(
             id: "mlx-community/gemma-4-e2b-it-4bit",
             title: "Gemma 4 E2B IT (4bit)",
-            description: "Official Gemma 4 compact multimodal model that can use both text and image context."
+            description: "Compact Gemma 4 model for local text generation."
         ),
         Option(
             id: "mlx-community/gemma-4-e4b-it-4bit",
             title: "Gemma 4 E4B IT (4bit)",
-            description: "Higher-capacity Gemma 4 multimodal option for stronger local text-and-image generation quality."
+            description: "Higher-capacity Gemma 4 option for stronger local text generation."
         ),
         Option(
             id: "mlx-community/gemma-4-12B-it-OptiQ-4bit",
             title: "Gemma 4 12B IT OptiQ (4bit)",
-            description: "High-end Gemma 4 unified multimodal model for stronger local quality on higher-memory Macs."
+            description: "High-end Gemma 4 model for stronger local text quality on higher-memory Macs."
         ),
     ]
 
@@ -453,14 +449,14 @@ struct CustomLLMModelCatalog {
     nonisolated static let supportedModels: [Option] = allModels
 
     nonisolated private static let presentationByRepo: [String: PresentationMetadata] = [
-        "lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit": PresentationMetadata(ratingText: "4.7", tagKeys: ["Balanced", "Vision"]),
+        "lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit": PresentationMetadata(ratingText: "4.7", tagKeys: ["Balanced"]),
         "mlx-community/Qwen3.5-4B-OptiQ-4bit": PresentationMetadata(ratingText: "4.8", tagKeys: ["Balanced"]),
         "mlx-community/Qwen3.5-9B-OptiQ-4bit": PresentationMetadata(ratingText: "4.9", tagKeys: ["Accurate"]),
         "mlx-community/GLM-4-9B-0414-4bit": PresentationMetadata(ratingText: "4.7", tagKeys: ["Accurate"]),
-        "mlx-community/Ministral-3-3B-Instruct-2512-4bit": PresentationMetadata(ratingText: "4.5", tagKeys: ["Balanced", "Vision"]),
-        "mlx-community/gemma-4-e2b-it-4bit": PresentationMetadata(ratingText: "4.3", tagKeys: ["Fast", "Vision"]),
-        "mlx-community/gemma-4-e4b-it-4bit": PresentationMetadata(ratingText: "4.6", tagKeys: ["Balanced", "Vision"]),
-        "mlx-community/gemma-4-12B-it-OptiQ-4bit": PresentationMetadata(ratingText: "4.8", tagKeys: ["Accurate", "Vision"]),
+        "mlx-community/Ministral-3-3B-Instruct-2512-4bit": PresentationMetadata(ratingText: "4.5", tagKeys: ["Balanced"]),
+        "mlx-community/gemma-4-e2b-it-4bit": PresentationMetadata(ratingText: "4.3", tagKeys: ["Fast"]),
+        "mlx-community/gemma-4-e4b-it-4bit": PresentationMetadata(ratingText: "4.6", tagKeys: ["Balanced"]),
+        "mlx-community/gemma-4-12B-it-OptiQ-4bit": PresentationMetadata(ratingText: "4.8", tagKeys: ["Accurate"]),
         "mlx-community/LFM2-1.2B-4bit": PresentationMetadata(ratingText: "4.0", tagKeys: ["Fast"]),
         "mlx-community/LFM2-8B-A1B-3bit-MLX": PresentationMetadata(ratingText: "4.4", tagKeys: ["Balanced"]),
         "mlx-community/Qwen3.6-27B-4bit": PresentationMetadata(ratingText: "4.9", tagKeys: ["Accurate"]),
@@ -528,7 +524,8 @@ struct CustomLLMModelCatalog {
         option(for: repo) != nil
     }
 
-    nonisolated static func supportsImageInput(repo: String) -> Bool {
+    /// Loading architecture, not an image-input capability. Voxt sends text only.
+    nonisolated static func requiresVLMFactory(repo: String) -> Bool {
         switch canonicalModelRepo(repo) {
         case "lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit",
              "mlx-community/Ministral-3-3B-Instruct-2512-4bit",

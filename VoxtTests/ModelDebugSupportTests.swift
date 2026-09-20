@@ -513,7 +513,7 @@ final class ModelDebugSupportTests: XCTestCase {
         XCTAssertEqual(resolved.requestMetadata?.sourceText, "")
     }
 
-    func testPromptResolverIncludesRewriteAppContextAndImageAttachmentInCompiledPreview() throws {
+    func testPromptResolverIgnoresRetiredContextPayload() throws {
         let preset = LLMDebugPresetOption(
             id: "builtin:rewrite",
             title: "Rewrite",
@@ -523,47 +523,24 @@ final class ModelDebugSupportTests: XCTestCase {
             variables: ModelSettingsPromptVariables.rewrite,
             defaultValues: [:]
         )
-        let payload = DebugRewriteAppContextPayload(
-            textContext: """
-            App: WeChat
-
-            Visible text:
-            - Alice: Can you send the update?
-            """,
-            attachments: [
-                .image(
-                    DebugRewriteImageAttachmentPayload(
-                        base64Data: Data("preview-image".utf8).base64EncodedString(),
-                        mimeType: "image/jpeg",
-                        detail: LLMImageAttachmentDetail.low.rawValue,
-                        filename: "wechat.jpg"
-                    )
-                )
-            ]
-        )
-        let payloadData = try XCTUnwrap(try? JSONEncoder().encode(payload))
-        let payloadString = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        let payloadString = #"{"textContext":"PRIVATE_WINDOW_CONTENT","attachments":[{"type":"image","image":{"base64Data":"AQID","filename":"wechat.jpg"}}]}"#
 
         let resolved = ModelDebugPromptResolver.resolve(
             preset: preset,
             values: [
                 "{{DICTATED_PROMPT}}": "make it warmer",
                 "{{SOURCE_TEXT}}": "Can you send the update by 5?",
-                ModelDebugRuntimeValueKey.rewriteAppContextCapture: payloadString
+                "__VOXT_DEBUG_REWRITE_APP_CONTEXT_CAPTURE__": payloadString
             ]
         )
 
         let compiled = try XCTUnwrap(resolved.compiledRequest)
-        XCTAssertContains(compiled.instructions, "### App context usage rules")
-        XCTAssertContains(compiled.instructions, "### Active app context")
-        XCTAssertContains(compiled.instructions, "App: WeChat")
-        XCTAssertEqual(compiled.attachments.count, 1)
-        XCTAssertContains(resolved.content, "[attachments]")
-        XCTAssertContains(resolved.content, "wechat.jpg")
-        XCTAssertEqual(resolved.requestMetadata?.appContextCharacterCount, payload.textContext.count)
-        XCTAssertEqual(resolved.requestMetadata?.imageAttachmentCount, 1)
-        XCTAssertEqual(resolved.requestMetadata?.imagePreviews.count, 1)
-        XCTAssertEqual(resolved.requestMetadata?.imagePreviews.first?.filename, "wechat.jpg")
+        XCTAssertFalse(compiled.instructions.contains("Active app context"))
+        XCTAssertFalse(resolved.content.contains("PRIVATE_WINDOW_CONTENT"))
+        XCTAssertFalse(resolved.content.contains("wechat.jpg"))
+        XCTAssertFalse(resolved.content.contains("[attachments]"))
+        XCTAssertContains(compiled.prompt, "Can you send the update by 5?")
+        XCTAssertEqual(resolved.requestMetadata?.spokenInstruction, "make it warmer")
     }
 
 }

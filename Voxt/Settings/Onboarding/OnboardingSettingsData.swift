@@ -76,9 +76,7 @@ extension OnboardingSettingsView {
 
     var currentPermissionContext: OnboardingPermissionRequirementContext {
         OnboardingPermissionRequirementContext(
-            selectedEngine: selectedEngine,
-            muteSystemAudioWhileRecording: muteSystemAudioWhileRecording,
-            rewriteScreenshotContextEnabled: featureSettings.rewrite.appContext.screenshotEnabled
+            selectedEngine: selectedEngine
         )
     }
 
@@ -99,25 +97,6 @@ extension OnboardingSettingsView {
 
     var shouldShowPermissionBadge: Bool {
         !currentStepMissingPermissions.isEmpty
-    }
-
-    func handleMuteSystemAudioChange(_ newValue: Bool) {
-        guard newValue else {
-            systemAudioPermissionMessage = nil
-            return
-        }
-
-        let status = SystemAudioCapturePermission.authorizationStatus()
-        if status == .authorized {
-            systemAudioPermissionMessage = nil
-            return
-        }
-
-        SystemAudioCapturePermission.requestAccess { granted in
-            systemAudioPermissionMessage = granted
-                ? AppLocalization.localizedString("System audio recording permission granted.")
-                : AppLocalization.localizedString("System audio recording permission is required for this feature. You can grant it in Settings > Permissions.")
-        }
     }
 
     func handleMLXRepoChange(_ newValue: String) {
@@ -190,13 +169,6 @@ extension OnboardingSettingsView {
         }
         if !OnboardingPermissionGrantResolver.isGranted(.accessibility) {
             messages.append(localized("Accessibility permission is required to insert text into other apps."))
-        }
-        if !OnboardingPermissionGrantResolver.isGranted(.inputMonitoring) {
-            messages.append(localized("Input Monitoring permission improves global shortcut capture. If fn shortcuts still conflict, change the macOS input source shortcut in Keyboard settings."))
-        }
-        if muteSystemAudioWhileRecording,
-           !OnboardingPermissionGrantResolver.isGranted(.systemAudioCapture) {
-            messages.append(localized("System audio recording permission is required when muting other media during recording."))
         }
         return messages
     }

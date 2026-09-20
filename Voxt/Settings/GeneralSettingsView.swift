@@ -43,7 +43,6 @@ struct GeneralSettingsView: View {
     @State private var isAdvancedExpanded = false
     @State private var isUserMainLanguageSheetPresented = false
     @State private var isMicrophonePriorityDialogPresented = false
-    @State private var systemAudioPermissionMessage: String?
     @State private var customProxyUsername = ""
     @State private var customProxyPassword = ""
     @State private var isLogsViewerPresented = false
@@ -148,7 +147,6 @@ struct GeneralSettingsView: View {
                 microphoneState: microphoneState,
                 interactionSoundsEnabled: $interactionSoundsEnabled,
                 muteSystemAudioWhileRecording: $muteSystemAudioWhileRecording,
-                systemAudioPermissionMessage: systemAudioPermissionMessage,
                 interactionSoundPreset: interactionSoundPresetSelection,
                 onTrySound: { interactionSoundPlayer.playPreview(preset: interactionSoundPreset) },
                 onManageMicrophones: { isMicrophonePriorityDialogPresented = true },
@@ -251,24 +249,6 @@ struct GeneralSettingsView: View {
         }
         .onChange(of: autoCheckForUpdates) { _, newValue in
             appUpdateManager.syncAutomaticallyChecksForUpdates(newValue)
-        }
-        .onChange(of: muteSystemAudioWhileRecording) { _, newValue in
-            guard newValue else {
-                systemAudioPermissionMessage = nil
-                return
-            }
-
-            let status = SystemAudioCapturePermission.authorizationStatus()
-            if status == .authorized {
-                systemAudioPermissionMessage = nil
-                return
-            }
-
-            SystemAudioCapturePermission.requestAccess { granted in
-                systemAudioPermissionMessage = granted
-                    ? AppLocalization.localizedString("System audio recording permission granted.")
-                    : AppLocalization.localizedString("System audio recording permission is required for this feature. You can grant it in Settings > Permissions.")
-            }
         }
     }
 

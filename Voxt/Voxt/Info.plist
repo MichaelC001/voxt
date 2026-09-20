@@ -29,7 +29,7 @@
     <key>NSAppleEventsUsageDescription</key>
     <string>Voxt needs automation access to read the active browser tab URL for app branch enhancement.</string>
     <key>NSAudioCaptureUsageDescription</key>
-    <string>Voxt needs system audio access to capture meeting audio and to temporarily mute other apps while recording.</string>
+    <string>Voxt needs system audio access to capture other apps' audio for meetings.</string>
     <key>NSHumanReadableCopyright</key>
     <string></string>
     <key>NSPrincipalClass</key>
@@ -38,8 +38,6 @@
 	<string>Voxt needs microphone access to transcribe your speech.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Voxt needs reminders access to sync notes into Apple Reminders.</string>
-	<key>NSScreenCaptureUsageDescription</key>
-	<string>Voxt captures the current app window screenshot to improve transcription enhancement when app context is enabled.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Voxt uses speech recognition for direct dictation.</string>
     <key>SUEnableInstallerLauncherService</key>

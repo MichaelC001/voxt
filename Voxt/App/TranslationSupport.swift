@@ -308,13 +308,9 @@ extension AppDelegate {
             let context = remoteContext ?? resolvedRemoteLLMContext(forRewrite: true)
             providerOverride = .remote(provider: context.provider, configuration: context.configuration)
         }
-        let appContextCapture = await captureRewriteAppContextIfNeeded(for: providerOverride)
-        let appContextAttachmentCost = appContextCapture?.attachments.estimatedPromptCharacterCost ?? 0
         let strategyInputText = directAnswerMode ? dictatedPrompt : sourceText
         var strategyPromptCharacterCount = promptResolution.content.count
         strategyPromptCharacterCount += promptResolution.dictionaryGlossary?.count ?? 0
-        strategyPromptCharacterCount += appContextCapture?.textContext.count ?? 0
-        strategyPromptCharacterCount += appContextAttachmentCost
         let providerCapabilities = llmProviderModelCapabilities(for: providerOverride)
         let strategy = TaskLLMStrategyResolver.resolve(
             taskKind: .rewrite,
@@ -328,7 +324,6 @@ extension AppDelegate {
             sourceText: sourceText,
             promptResolution: promptResolution,
             modelProvider: modelProvider,
-            appContextCapture: appContextCapture,
             conversationHistory: conversationHistoryForPlan,
             previousResponseID: shouldUseProviderManagedConversation ? previousConversationResponseID : nil,
             structuredAnswerOutput: structuredAnswerOutput,

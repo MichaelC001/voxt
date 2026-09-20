@@ -520,7 +520,6 @@ final class SettingsTypesTests: XCTestCase {
     func testPermissionRequirementResolverAggregatesFeatureSelections() {
         let context = SettingsPermissionRequirementContext(
             selectedEngine: .mlxAudio,
-            muteSystemAudioWhileRecording: true,
             featureSettings: FeatureSettings(
                 transcription: .init(
                     asrSelectionID: .mlx(MLXModelManager.defaultModelRepo),
@@ -546,7 +545,7 @@ final class SettingsTypesTests: XCTestCase {
         let permissions = SettingsPermissionRequirementResolver.requiredPermissions(context: context)
 
         XCTAssertTrue(permissions.contains(.speechRecognition))
-        XCTAssertTrue(permissions.contains(.systemAudioCapture))
+        XCTAssertEqual(permissions, [.microphone, .accessibility, .speechRecognition])
     }
 
     func testVoiceEndCommandPresetResolvesBuiltInCommands() {

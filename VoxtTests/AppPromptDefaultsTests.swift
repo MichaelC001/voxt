@@ -356,28 +356,20 @@ final class AppPromptDefaultsTests: XCTestCase {
         XCTAssertFalse(prompt.contains("<selected_source_text>"))
     }
 
-    func testRewriteDefaultPromptIncludesAppContextTargetingRules() {
-        let englishPrompt = AppPromptDefaults.text(for: .rewrite, language: .english)
-        let chinesePrompt = AppPromptDefaults.text(for: .rewrite, language: .chineseSimplified)
-        let japanesePrompt = AppPromptDefaults.text(for: .rewrite, language: .japanese)
-
-        XCTAssertContains(englishPrompt, "If source text exists, treat it as the primary rewrite target.")
-        XCTAssertContains(englishPrompt, "If source text does not exist, use the spoken instruction together with any provided app text context or screenshots")
-        XCTAssertContains(englishPrompt, "If the target can be identified from the available context")
-        XCTAssertContains(englishPrompt, "Do not invent details.")
-        XCTAssertContains(englishPrompt, "Do not mechanically copy visible UI text into the result")
-
-        XCTAssertContains(chinesePrompt, "如果存在源文本，应优先把它作为改写目标")
-        XCTAssertContains(chinesePrompt, "如果不存在源文本，但提供了当前 App 的文本上下文或截图")
-        XCTAssertContains(chinesePrompt, "不要复述用户指令")
-        XCTAssertContains(chinesePrompt, "不要编造细节")
-        XCTAssertContains(chinesePrompt, "不要机械抄写界面文本")
-
-        XCTAssertContains(japanesePrompt, "元テキストがある場合は、それを主要な変換対象として扱うこと")
-        XCTAssertContains(japanesePrompt, "現在の App テキストコンテキストやスクリーンショット")
-        XCTAssertContains(japanesePrompt, "最終的な返信またはリライト結果を直接出力すること")
-        XCTAssertContains(japanesePrompt, "詳細を作り込まないこと")
-        XCTAssertContains(japanesePrompt, "画面上の可視テキストを機械的に写さないこと")
+    func testRewriteDefaultsUseOnlySuppliedTextAndDoNotPretendToSeeTheScreen() {
+        let english = AppPromptDefaults.text(for: .rewrite, language: .english)
+        let chinese = AppPromptDefaults.text(for: .rewrite, language: .chineseSimplified)
+        let japanese = AppPromptDefaults.text(for: .rewrite, language: .japanese)
+        XCTAssertContains(english, "If source text exists, treat it as the primary rewrite target.")
+        XCTAssertContains(english, "You cannot see the user's screen")
+        XCTAssertContains(english, "select or provide that content")
+        XCTAssertFalse(english.contains("screenshots"))
+        XCTAssertContains(chinese, "你无法看到用户屏幕")
+        XCTAssertContains(chinese, "请用户选中或提供该内容")
+        XCTAssertFalse(chinese.contains("截图"))
+        XCTAssertContains(japanese, "画面や現在のアプリを読み取ることはできない")
+        XCTAssertContains(japanese, "選択または提供するよう")
+        XCTAssertFalse(japanese.contains("スクリーンショット"))
     }
 
     func testResolvedStoredTextTreatsLegacyEnhancementPromptAsKnownDefault() {

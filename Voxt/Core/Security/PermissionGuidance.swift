@@ -26,6 +26,10 @@ enum PermissionGuidance {
         _ = SystemSettings.open(.privacy(anchor: .privacyAutomation))
     }
 
+    static func openSystemAudioSettings() {
+        _ = SystemSettings.open(.privacy(anchor: .privacyAudioCapture))
+    }
+
     private static func openSettings(for target: Target) {
         switch target {
         case .pane(let pane):
@@ -47,12 +51,6 @@ enum PermissionGuidance {
             return .destination(.privacy(anchor: .privacySpeechRecognition))
         case .accessibility:
             return .pane(.accessibility)
-        case .inputMonitoring:
-            return .pane(.inputMonitoring)
-        case .screenCapture:
-            return .pane(.screenRecording)
-        case .systemAudioCapture:
-            return .destination(.privacy(anchor: .privacyAudioCapture))
         case .reminders:
             return .destination(.privacy(anchor: .privacyReminders))
         }
@@ -66,12 +64,6 @@ enum PermissionGuidance {
             return .destination(.privacy(anchor: .privacySpeechRecognition))
         case .accessibility:
             return .pane(.accessibility)
-        case .inputMonitoring:
-            return .pane(.inputMonitoring)
-        case .screenCapture:
-            return .pane(.screenRecording)
-        case .systemAudioCapture:
-            return .destination(.privacy(anchor: .privacyAudioCapture))
         }
     }
 

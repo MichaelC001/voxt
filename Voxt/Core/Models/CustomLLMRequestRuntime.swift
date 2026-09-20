@@ -1,7 +1,6 @@
 // Stateless request policy. The manager retains container lifetime, task tracking
 // and diagnostic publication; no mutable inference owner is introduced here.
 import Foundation
-import CoreImage
 import MLX
 import MLXLLM
 import MLXLMCommon
@@ -95,26 +94,6 @@ enum CustomLLMRequestRuntime {
             lines.append(VoxtLog.llmPreview(section.content))
         }
         return lines.joined(separator: "\n")
-    }
-
-
-    static func userInputImages(from attachments: [LLMInputAttachment]) -> [UserInput.Image] {
-        attachments.compactMap { attachment in
-            switch attachment {
-            case .image(let imageAttachment):
-                return userInputImage(from: imageAttachment)
-            }
-        }
-    }
-
-    private static func userInputImage(from attachment: LLMImageAttachment) -> UserInput.Image? {
-        guard let image = CIImage(data: attachment.data, options: [.applyOrientationProperty: true]) else {
-            VoxtLog.modelWarning(
-                "Custom LLM could not decode image attachment '\(attachment.filename)' for local VLM input."
-            )
-            return nil
-        }
-        return .ciImage(image)
     }
 
 

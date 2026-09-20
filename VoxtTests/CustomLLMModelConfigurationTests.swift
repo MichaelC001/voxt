@@ -168,14 +168,6 @@ final class CustomLLMModelConfigurationTests: MLXModelManagerTestCase {
     }
 
     func testCustomLLMCompiledPlanPreservesOutputTokenBudgetHint() {
-        let attachment = LLMInputAttachment.image(
-            LLMImageAttachment(
-                data: Data([0xFF, 0xD8, 0xFF]),
-                mimeType: "image/jpeg",
-                detail: .high,
-                filename: "capture.jpg"
-            )
-        )
         let compiled = LLMCompiledRequest(
             taskLabel: "enhancement",
             instructions: "system",
@@ -184,7 +176,6 @@ final class CustomLLMModelConfigurationTests: MLXModelManagerTestCase {
             fallbackText: "fallback",
             inputCharacterCount: 5,
             outputTokenBudgetHint: 321,
-            attachments: [attachment],
             conversationHistory: [],
             previousResponseID: nil,
             responseFormat: nil
@@ -196,7 +187,6 @@ final class CustomLLMModelConfigurationTests: MLXModelManagerTestCase {
         )
 
         XCTAssertEqual(plan.maxTokensOverride, 321)
-        XCTAssertEqual(plan.attachments, [attachment])
     }
 
     func testCustomLLMCompiledPlanPreservesRoleBasedConversationHistory() {
@@ -215,7 +205,6 @@ final class CustomLLMModelConfigurationTests: MLXModelManagerTestCase {
             fallbackText: "",
             inputCharacterCount: 1,
             outputTokenBudgetHint: nil,
-            attachments: [],
             conversationHistory: history,
             previousResponseID: nil,
             responseFormat: nil

@@ -192,7 +192,6 @@ enum FeatureSettingsStore {
                     kind: .enhancement,
                     language: promptLanguage
                 ),
-                appContext: .init(),
                 notes: TranscriptionNoteFeatureSettings(
                     enabled: true,
                     triggerShortcut: .defaultShortcut,
@@ -224,7 +223,6 @@ enum FeatureSettingsStore {
                     kind: .rewrite,
                     language: promptLanguage
                 ),
-                appContext: .init(),
                 appEnhancementEnabled: appEnhancementEnabled,
                 continueShortcut: .defaultShortcut
             ),
@@ -490,7 +488,6 @@ enum FeatureSettingsStore {
                     kind: .enhancement,
                     language: promptLanguage
                 ),
-                appContext: settings.transcription.appContext,
                 notes: notes
             ),
             translation: TranslationFeatureSettings(
@@ -519,7 +516,6 @@ enum FeatureSettingsStore {
                     kind: .rewrite,
                     language: promptLanguage
                 ),
-                appContext: settings.rewrite.appContext,
                 appEnhancementEnabled: availability.appEnhancementEnabled,
                 continueShortcut: sanitizedContinueShortcutSettings(settings.rewrite.continueShortcut)
             ),
@@ -620,7 +616,6 @@ enum FeatureSettingsStore {
                 llmSelectionID: settings.transcription.llmSelectionID,
                 prompt: AppPromptDefaults.canonicalStoredText(settings.transcription.prompt, kind: .enhancement),
                 promptPresetID: settings.transcription.promptPresetID,
-                appContext: settings.transcription.appContext,
                 notes: notes
             ),
             translation: TranslationFeatureSettings(
@@ -636,7 +631,6 @@ enum FeatureSettingsStore {
                 llmSelectionID: settings.rewrite.llmSelectionID,
                 prompt: AppPromptDefaults.canonicalStoredText(settings.rewrite.prompt, kind: .rewrite),
                 promptPresetID: settings.rewrite.promptPresetID,
-                appContext: settings.rewrite.appContext,
                 appEnhancementEnabled: settings.availability.appEnhancementEnabled,
                 continueShortcut: settings.rewrite.continueShortcut
             ),

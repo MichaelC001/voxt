@@ -15,7 +15,6 @@ struct GeneralAudioCard: View {
     let microphoneState: MicrophoneResolvedState
     @Binding var interactionSoundsEnabled: Bool
     @Binding var muteSystemAudioWhileRecording: Bool
-    let systemAudioPermissionMessage: String?
     @Binding var interactionSoundPreset: InteractionSoundPreset
     let onTrySound: () -> TimeInterval
     let onManageMicrophones: () -> Void
@@ -62,16 +61,11 @@ struct GeneralAudioCard: View {
             )
 
             GeneralToggleRow(
-                title: localizedKey("Mute other media audio while recording"),
-                description: localizedKey("Temporarily lowers other apps' media audio while you record so your speech stays clear."),
+                title: localizedKey("Mute output device while recording"),
+                description: localizedKey("Mutes all sounds on the current output device, including Voxt. Some devices do not support software mute. No system audio recording permission is needed."),
                 isOn: $muteSystemAudioWhileRecording
             )
 
-            if let systemAudioPermissionMessage {
-                Text(systemAudioPermissionMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
 
         }
     }

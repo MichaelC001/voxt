@@ -217,11 +217,25 @@ extension AppDelegate {
         pendingSystemAudioMuteTask?.cancel()
         pendingSystemAudioMuteTask = nil
 
+        let startSoundDuration = interactionSoundsEnabled ? interactionSoundPlayer.playStart() : 0
         if muteSystemAudioWhileRecording {
-            _ = systemAudioMuteController.muteSystemAudioIfNeeded()
-        }
-        if interactionSoundsEnabled {
-            interactionSoundPlayer.playStart()
+            let sessionID = activeRecordingSessionID
+            pendingSystemAudioMuteTask = Task { @MainActor [weak self] in
+                if startSoundDuration > 0 {
+                    do { try await Task.sleep(for: .seconds(startSoundDuration)) } catch { return }
+                }
+                guard !Task.isCancelled, let self, !self.isApplicationTerminating,
+                      self.activeRecordingSessionID == sessionID,
+                      self.isSessionActive, self.recordingStoppedAt == nil,
+                      self.muteSystemAudioWhileRecording else { return }
+                self.pendingSystemAudioMuteTask = nil
+                if !self.systemAudioMuteController.muteSystemAudioIfNeeded() {
+                    self.showOverlayStatus(
+                        AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
+                        clearAfter: 3
+                    )
+                }
+            }
         }
 
         if outputMode != .rewrite, transcriptionCaptureMode == .standard {

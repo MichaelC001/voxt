@@ -49,9 +49,6 @@ enum OnboardingContextualPermission: Hashable {
     case microphone
     case speechRecognition
     case accessibility
-    case inputMonitoring
-    case screenCapture
-    case systemAudioCapture
 
     var titleKey: LocalizedStringKey {
         switch self {
@@ -61,12 +58,6 @@ enum OnboardingContextualPermission: Hashable {
             return "Speech Recognition Permission"
         case .accessibility:
             return "Accessibility Permission"
-        case .inputMonitoring:
-            return "Input Monitoring Permission"
-        case .screenCapture:
-            return "Screen Recording Permission"
-        case .systemAudioCapture:
-            return "System Audio Recording Permission"
         }
     }
 
@@ -77,31 +68,13 @@ enum OnboardingContextualPermission: Hashable {
         case .speechRecognition:
             return "Required for Apple Direct Dictation engine."
         case .accessibility:
-            return "Required to paste transcription text into other apps."
-        case .inputMonitoring:
-            return "Required for reliable global modifier hotkeys (such as fn)."
-        case .screenCapture:
-            return "Required only when Screenshot Context is enabled for rewrite app context."
-        case .systemAudioCapture:
-            return "Required to capture system audio for Meeting and to mute other apps' media audio during recording."
+            return "Required for global shortcuts and inserting text into other apps."
         }
     }
 }
 
 struct OnboardingPermissionRequirementContext {
     let selectedEngine: TranscriptionEngine
-    let muteSystemAudioWhileRecording: Bool
-    let rewriteScreenshotContextEnabled: Bool
-
-    init(
-        selectedEngine: TranscriptionEngine,
-        muteSystemAudioWhileRecording: Bool,
-        rewriteScreenshotContextEnabled: Bool = false
-    ) {
-        self.selectedEngine = selectedEngine
-        self.muteSystemAudioWhileRecording = muteSystemAudioWhileRecording
-        self.rewriteScreenshotContextEnabled = rewriteScreenshotContextEnabled
-    }
 }
 
 enum OnboardingPermissionRequirementResolver {
@@ -113,19 +86,13 @@ enum OnboardingPermissionRequirementResolver {
         case .transcription:
             var permissions: [OnboardingContextualPermission] = [
                 .microphone,
-                .accessibility,
-                .inputMonitoring
+                .accessibility
             ]
             if context.selectedEngine == .dictation {
                 permissions.append(.speechRecognition)
             }
-            if context.muteSystemAudioWhileRecording {
-                permissions.append(.systemAudioCapture)
-            }
             return permissions
-        case .rewrite:
-            return context.rewriteScreenshotContextEnabled ? [.screenCapture] : []
-        case .language, .model, .translation, .meeting, .appEnhancement, .finish:
+        case .language, .model, .translation, .rewrite, .meeting, .appEnhancement, .finish:
             return []
         }
     }
@@ -140,15 +107,6 @@ enum OnboardingPermissionGrantResolver {
             return SFSpeechRecognizer.authorizationStatus() == .authorized
         case .accessibility:
             return AccessibilityPermissionManager.isTrusted()
-        case .inputMonitoring:
-            if #available(macOS 10.15, *) {
-                return CGPreflightListenEventAccess()
-            }
-            return true
-        case .screenCapture:
-            return ScreenCapturePermission.isGranted()
-        case .systemAudioCapture:
-            return SystemAudioCapturePermission.authorizationStatus() == .authorized
         }
     }
 }

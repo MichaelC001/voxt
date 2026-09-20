@@ -10,7 +10,7 @@ XCTest and Swift Testing coverage for Voxt app behavior, services, settings, tra
 
 ## Remote LLM suites
 
-The former combined streaming suite is split by behavior, preserving all 78 original test methods and assertions:
+The former combined streaming suite was split by behavior (78 methods at that refactoring baseline). Image-input tests were subsequently retired with context enhancement; pure-text request coverage remains:
 
 - `RemoteLLMRuntimeClientEndpointsTests`
 - `RemoteLLMRuntimeClientStreamingTests` (response parsing and stream payloads)
@@ -47,6 +47,12 @@ xcodebuild test -project Voxt.xcodeproj -scheme Voxt \
 ```
 
 Then run the full shared scheme. Test-method text preservation does not replace compilation and XCTest discovery checks.
+
+## Context removal and permission minimization
+
+`SettingsPermissionSupportTests`, `OnboardingSupportTests`, `FeatureSettingsStoreTests`, `RetiredRewritePromptTests`, `ModelDebugSupportTests` and `SystemAudioMuteControllerTests` cover requirements, upgrade compatibility, retired debug payloads and device-mute ownership without changing real audio devices. Also run the LLM compiler/messages and hotkey suites. Native XCTest and signed macOS TCC/device checks remain required.
+
+Static removal gates can run on Linux: `python3 -m unittest discover -s tools -p 'test_permission_minimization.py' -v`. These do not prove Swift compilation or runtime permissions.
 
 ## Other split suites
 
