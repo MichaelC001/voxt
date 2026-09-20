@@ -112,9 +112,6 @@ enum TestFactories {
         )
     }
 
-    static func makeURLItem(id: UUID = UUID(), pattern: String) -> BranchURLItem {
-        BranchURLItem(id: id, pattern: pattern)
-    }
 
 }
 

@@ -121,7 +121,9 @@ enum ModelConfigurationIssueResolver {
             return
         case .mlx(let repo):
             let canonicalRepo = MLXModelManager.canonicalModelRepo(repo)
-            if !mlxModelManager.isModelDownloaded(repo: canonicalRepo) {
+            // Unknown is a pending background scan, not evidence of a missing model.
+            if !mlxModelManager.isCheckingInstallation(repo: canonicalRepo),
+               !mlxModelManager.isModelDownloaded(repo: canonicalRepo) {
                 issues.append(.init(scope: .mlxModel(canonicalRepo), message: modelNeedsInstallMessage))
             }
         case .remote(let provider):
@@ -142,7 +144,8 @@ enum ModelConfigurationIssueResolver {
         case .appleIntelligence, .none:
             return
         case .localLLM(let repo):
-            if !customLLMManager.isModelDownloaded(repo: repo) {
+            if !customLLMManager.isCheckingInstallation(repo: repo),
+               !customLLMManager.isModelDownloaded(repo: repo) {
                 issues.append(.init(scope: .customLLMModel(repo), message: modelNeedsInstallMessage))
             }
         case .remoteLLM(let provider):
@@ -165,7 +168,8 @@ enum ModelConfigurationIssueResolver {
         case .none:
             return
         case .localLLM(let repo):
-            if !customLLMManager.isModelDownloaded(repo: repo) {
+            if !customLLMManager.isCheckingInstallation(repo: repo),
+               !customLLMManager.isModelDownloaded(repo: repo) {
                 issues.append(.init(scope: .translationCustomLLM(repo), message: modelNeedsInstallMessage))
             }
         case .localGGUF:

@@ -162,6 +162,9 @@ struct SettingsView: View {
             refreshModelConfigurationBadge()
             refreshNotifications()
         }
+        .onReceive(ModelInstallationObservation.changes(mlx: mlxModelManager, customLLM: customLLMManager)) { _ in
+            refreshModelConfigurationBadge()
+        }
         .onReceive(modelDownloadBadgeCountPublisher) { count in
             let previousCount = activeModelDownloadCount
             activeModelDownloadCount = count

@@ -189,6 +189,8 @@ run_refactor() {
     -only-testing:VoxtTests/CustomLLMModelDownloadSupportTests
     -only-testing:VoxtTests/ModelDownloadSourceSupportTests
     -only-testing:VoxtTests/ModelInstallationCacheTests
+    -only-testing:VoxtTests/ModelConfigurationIssueResolverTests
+    -only-testing:VoxtTests/VoxtLogRedactorTests
     -only-testing:VoxtTests/MLXModelSupportTests
     -only-testing:VoxtTests/MLXModelPerRepoStateSupportTests
     -only-testing:VoxtTests/GGUFUTF8OutputAccumulatorTests/testWaitsForCompleteMultibyteSequenceBeforeDecoding

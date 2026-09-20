@@ -76,46 +76,6 @@ extension AppDelegate {
         case remoteLLM(provider: RemoteLLMProvider, configuration: RemoteProviderConfiguration)
     }
 
-    func resolveDictionaryCorrection(for text: String) -> DictionaryCorrectionResult {
-        guard let result = dictionaryStore.correctionContext(
-            for: text,
-            activeGroupID: activeDictionaryGroupID()
-        ) else {
-            return DictionaryCorrectionResult(
-                text: text,
-                candidates: [],
-                correctedTerms: [],
-                correctionSnapshots: []
-            )
-        }
-
-        if result.text != text {
-            VoxtLog.dictionary("Dictionary auto-correction applied. inputChars=\(text.count), outputChars=\(result.text.count), matches=\(result.candidates.count)")
-        } else if !result.candidates.isEmpty {
-            VoxtLog.dictionary("Dictionary matches recorded without replacement. matches=\(result.candidates.count)")
-        }
-        return result
-    }
-
-    func resolveDictionaryMatches(for text: String) -> DictionaryCorrectionResult {
-        guard let result = dictionaryStore.matchContext(
-            for: text,
-            activeGroupID: activeDictionaryGroupID()
-        ) else {
-            return DictionaryCorrectionResult(
-                text: text,
-                candidates: [],
-                correctedTerms: [],
-                correctionSnapshots: []
-            )
-        }
-
-        if !result.candidates.isEmpty {
-            VoxtLog.dictionary("Dictionary matches recorded without local replacement. matches=\(result.candidates.count)")
-        }
-        return result
-    }
-
     func activeDictionaryGroupID() -> UUID? {
         if let matchedGroupID = lastEnhancementPromptContext?.matchedGroupID {
             return matchedGroupID

@@ -167,12 +167,7 @@ extension ModelSettingsView {
     }
 
     private var installationRefreshPublisher: AnyPublisher<Void, Never> {
-        Publishers.Merge(
-            mlxModelManager.$installationRevision.map { _ in () },
-            customLLMManager.$installationRevision.map { _ in () }
-        )
-        .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
-        .eraseToAnyPublisher()
+        ModelInstallationObservation.changes(mlx: mlxModelManager, customLLM: customLLMManager)
     }
 
     var contentWithLifecycle: some View {

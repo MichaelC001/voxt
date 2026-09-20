@@ -53,7 +53,7 @@ enum VoxtLogRedactor {
         guard let metadata else { return nil }
         var result: Logger.Metadata = [:]
         for (key, value) in metadata {
-            result[key] = redactedMetadataValue(value)
+            result[key] = isSensitiveMetadataKey(key) ? .string("<redacted>") : redactedMetadataValue(value)
         }
         return result
     }
@@ -79,11 +79,26 @@ enum VoxtLogRedactor {
         case .dictionary(let dictionary):
             var result: Logger.Metadata = [:]
             for (key, value) in dictionary {
-                result[key] = redactedMetadataValue(value)
+                result[key] = isSensitiveMetadataKey(key) ? .string("<redacted>") : redactedMetadataValue(value)
             }
             return .dictionary(result)
         }
     }
+
+    /// Structured metadata separates the key from the value: scanning only the
+    /// string value cannot recognize ["apiKey": "opaque-secret"]. Match exact
+    /// normalized keys so safe counters such as tokenCount remain useful.
+    private nonisolated static func isSensitiveMetadataKey(_ key: String) -> Bool {
+        let normalized = key.lowercased().filter { $0.isLetter || $0.isNumber }
+        return sensitiveMetadataKeys.contains(normalized)
+    }
+
+    private nonisolated static let sensitiveMetadataKeys: Set<String> = [
+            "authorization", "proxyauthorization", "cookie", "setcookie",
+            "apikey", "xapikey", "xapiaccesskey", "xapiappkey", "accesstoken",
+            "refreshtoken", "idtoken", "oauthtoken", "bearertoken", "token",
+            "password", "proxypassword", "secret", "clientsecret", "credential", "credentials"
+    ]
 
     private nonisolated static func isSensitiveHTTPHeaderName(_ name: String) -> Bool {
         let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
