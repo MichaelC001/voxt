@@ -3,7 +3,7 @@ import Foundation
 enum GeminiLiveTranscriptJoining {
     /// Gemini emits Chinese segments that must not be space-joined, and English
     /// turns that must be. Decide per boundary instead of per session.
-    static func join(_ segments: [String]) -> String {
+    nonisolated static func join(_ segments: [String]) -> String {
         var result = ""
         for segment in segments {
             let piece = segment.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -20,14 +20,14 @@ enum GeminiLiveTranscriptJoining {
         return result
     }
 
-    private static func needsSeparator(previous: String, next: String) -> Bool {
+    private nonisolated static func needsSeparator(previous: String, next: String) -> Bool {
         guard let left = previous.unicodeScalars.last,
               let right = next.unicodeScalars.first
         else { return false }
         return !isCJK(left) && !isCJK(right)
     }
 
-    private static func isCJK(_ scalar: Unicode.Scalar) -> Bool {
+    private nonisolated static func isCJK(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.value {
         case 0x3000...0x303F, 0x3400...0x4DBF, 0x4E00...0x9FFF,
              0xF900...0xFAFF, 0xFF00...0xFFEF,

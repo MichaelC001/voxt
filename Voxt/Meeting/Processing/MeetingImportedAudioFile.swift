@@ -532,13 +532,13 @@ nonisolated private final class MeetingImportedWAVWriter {
             try Task.checkCancellation()
             let count = min(MeetingFilePreparationLimits.conversionBufferBytes, byteCount - offset)
             var floatData = Data(count: count)
-            let copyStatus = floatData.withUnsafeMutableBytes { bytes in
+            let copyStatus = floatData.withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
                 CMBlockBufferCopyDataBytes(blockBuffer, atOffset: offset, dataLength: count, destination: bytes.baseAddress!)
             }
             guard copyStatus == kCMBlockBufferNoErr else { throw MeetingImportedAudioFileError.unableToDecode }
             var pcmData = Data(count: count / 2)
-            try floatData.withUnsafeBytes { input in
-                try pcmData.withUnsafeMutableBytes { output in
+            try floatData.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
+                try pcmData.withUnsafeMutableBytes { (output: UnsafeMutableRawBufferPointer) in
                     for index in 0..<(count / MemoryLayout<Float32>.size) {
                         let sample = input.loadUnaligned(fromByteOffset: index * 4, as: Float32.self)
                         guard sample.isFinite else { throw MeetingImportedAudioFileError.unableToDecode }
