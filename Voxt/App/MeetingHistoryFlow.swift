@@ -43,6 +43,7 @@ extension AppDelegate {
 
     func analyzeImportedMeetingFile(
         at sourceURL: URL,
+        originalFileName: String,
         progress: @escaping @MainActor @Sendable (MeetingFileAnalysisProgress) -> Void
     ) async throws -> TranscriptionHistoryEntry {
         guard !isSessionActive, !meetingSessionCoordinator.isActive else {
@@ -61,6 +62,7 @@ extension AppDelegate {
 
         let result = try await meetingSessionCoordinator.analyzeImportedFile(
             at: sourceURL,
+            sourceIsPreparedAudio: true,
             progress: progress
         )
         let importedAudioURL = result.archivedAudioURL
@@ -70,7 +72,7 @@ extension AppDelegate {
             }
             throw CancellationError()
         }
-        let displayTitle = sourceURL.deletingPathExtension().lastPathComponent
+        let displayTitle = URL(fileURLWithPath: originalFileName).deletingPathExtension().lastPathComponent
         guard let entry = persistMeetingHistory(
             result,
             forceSave: true,

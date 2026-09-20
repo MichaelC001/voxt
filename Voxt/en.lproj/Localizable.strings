@@ -2247,6 +2247,7 @@
 "File conversion failed" = "File conversion failed";
 "%@ has been converted successfully." = "%@ has been converted successfully.";
 "Preparing audio…" = "Preparing audio…";
+"The file task queue is full. Clear finished tasks before adding more files." = "The file task queue is full. Clear finished tasks before adding more files.";
 "Transcribing meeting…" = "Transcribing meeting…";
 "Identifying speakers…" = "Identifying speakers…";
 "Saving analysis…" = "Saving analysis…";

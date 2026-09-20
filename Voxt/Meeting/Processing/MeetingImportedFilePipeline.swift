@@ -6,13 +6,15 @@ import Foundation
 final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
     private let modelManager: MLXModelManager
     private let engineContext: MeetingASREngineContext
+    private let sourceIsPreparedAudio: Bool
     private var transcriber: (any MeetingSegmentTranscribing)?
     private var holdsModelUse = false
     private var preparedAudioURL: URL?
 
-    init(modelManager: MLXModelManager, engineContext: MeetingASREngineContext) {
+    init(modelManager: MLXModelManager, engineContext: MeetingASREngineContext, sourceIsPreparedAudio: Bool = false) {
         self.modelManager = modelManager
         self.engineContext = engineContext
+        self.sourceIsPreparedAudio = sourceIsPreparedAudio
     }
 
     func analyze(
@@ -20,10 +22,14 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
         progress: @escaping @MainActor @Sendable (MeetingFileAnalysisProgress) -> Void
     ) async throws -> MeetingSessionResult {
         try Task.checkCancellation()
-        progress(MeetingFileAnalysisProgress(stage: .preparing))
+        progress(MeetingFileAnalysisProgress(stage: .preparing, stageFraction: sourceIsPreparedAudio ? 1 : 0))
         do {
+            let sourceIsPreparedAudio = sourceIsPreparedAudio
             let preparationTask = Task.detached(priority: .utility) {
-                try await MeetingImportedAudioFile.prepare(from: sourceURL) { fraction in
+                if sourceIsPreparedAudio {
+                    return try await MeetingImportedAudioFile.copyPreparedForAnalysis(from: sourceURL)
+                }
+                return try await MeetingImportedAudioFile.prepare(from: sourceURL) { fraction in
                     await progress(
                         MeetingFileAnalysisProgress(
                             stage: .preparing,

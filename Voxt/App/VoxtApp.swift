@@ -175,9 +175,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     )
     lazy var meetingFileTaskQueue = MeetingFileTaskQueue(
-        analyzer: { @MainActor [weak self] sourceURL, progress in
+        analyzer: { @MainActor [weak self] sourceURL, originalFileName, progress in
             guard let self else { throw CancellationError() }
-            return try await self.analyzeImportedMeetingFile(at: sourceURL, progress: progress)
+            return try await self.analyzeImportedMeetingFile(
+                at: sourceURL, originalFileName: originalFileName, progress: progress
+            )
         },
         cancelActiveAnalysis: { @MainActor [weak self] in
             await self?.cancelImportedMeetingFileAnalysis()

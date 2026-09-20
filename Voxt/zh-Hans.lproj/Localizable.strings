@@ -2247,6 +2247,7 @@
 "File conversion failed" = "文件转换失败";
 "%@ has been converted successfully." = "%@ 已转换成功。";
 "Preparing audio…" = "正在准备音频…";
+"The file task queue is full. Clear finished tasks before adding more files." = "文件任务队列已满，请清理已结束的任务后再添加文件。";
 "Transcribing meeting…" = "正在转写会议…";
 "Identifying speakers…" = "正在识别说话人…";
 "Saving analysis…" = "正在保存分析…";

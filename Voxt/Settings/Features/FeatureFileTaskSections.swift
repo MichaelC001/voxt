@@ -33,6 +33,7 @@ extension FeatureSettingsView {
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -42,9 +43,10 @@ extension FeatureSettingsView {
                 onImportDroppedFiles: importDroppedMeetingFiles
             )
         }
+        // The settings shell owns the outer insets. Unlike a fully scrolling
+        // feature page, this split layout must not inset the pinned upload card
+        // again or reserve a scroll-indicator gutter for the entire page.
         .padding(.top, 2)
-        .padding(.bottom, 12)
-        .padding(.trailing, SettingsUIStyle.contentScrollTrailingGutter)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -144,7 +146,7 @@ private struct MeetingFileTaskRow: View {
                 actionButtons
             }
 
-            if task.status == .processing || task.status == .cancelling || task.status == .completed {
+            if task.status == .preparing || task.status == .processing || task.status == .cancelling || task.status == .completed {
                 ProgressView(value: task.progressFraction, total: 1)
                     .progressViewStyle(.linear)
                     .tint(statusColor)
@@ -160,7 +162,7 @@ private struct MeetingFileTaskRow: View {
     @ViewBuilder
     private var actionButtons: some View {
         switch task.status {
-        case .processing, .cancelling:
+        case .preparing, .processing, .cancelling:
             Button(featureSettingsLocalized(task.status == .cancelling ? "Cancelling…" : "Cancel"), action: onCancel)
                 .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
                 .disabled(task.status == .cancelling)
@@ -243,6 +245,8 @@ private struct MeetingFileTaskRow: View {
         switch task.status {
         case .queued:
             return featureSettingsLocalized("Waiting")
+        case .preparing:
+            return featureSettingsLocalized("Preparing audio…")
         case .processing:
             return featureSettingsLocalized("Processing")
         case .cancelling:
@@ -265,7 +269,7 @@ private struct MeetingFileTaskRow: View {
         switch task.status {
         case .queued:
             return .secondary
-        case .processing, .cancelling:
+        case .preparing, .processing, .cancelling:
             return .accentColor
         case .completed:
             return .green
