@@ -395,7 +395,7 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 
 新增 49 项（设置 7、WebSocket 7、reload 6、ASR preview 4、热键 3、进度 3、推理规划 5、会议展示 5、repo 校验 2、LLM 故障 7），静态方法总数 **1,763**。聚焦脚本纳入新 suite；原回归覆盖不删。
 
-CI 增加 unsigned Release build、xcresult/discovery/summary 及 `/usr/bin/time -l` 原始资源记录。首个收尾 run `35478088469` 因 `@concurrent` 随新增 helper 错位导致编译失败；已恢复至原异步校验方法。第二轮 run `35478584544` 又发现说话人模型下载仍引用旧进度 helper，已改接通用实现并复查全部调用点。第三轮 run `35479399460` 的 `68701e5` 已完成 1,763 项 XCTest：1,740 通过、23 个模型门禁跳过、0 失败；随后 Release 在 Swift 6.3.2 的 `EarlyPerfInliner` / 泛型 coordinator 析构处崩溃。将 Entry 改为独立 nonisolated 泛型值，保持任务类型安全及 Release 优化，等待重新验证。该 run 还显示冷实例 Remote ASR 完成测试耗时约 600 秒；清理改为只移除实际采集过的 input node，避免清理时懒初始化硬件。失败记录保留，旧 HEAD 的 XCTest 通过不替代新 HEAD 的完整门禁。
+CI 增加 unsigned Release build、xcresult/discovery/summary 及 `/usr/bin/time -l` 原始资源记录。首个收尾 run `35478088469` 因 `@concurrent` 随新增 helper 错位导致编译失败；已恢复至原异步校验方法。第二轮 run `35478584544` 又发现说话人模型下载仍引用旧进度 helper，已改接通用实现并复查全部调用点。第三轮 run `35479399460` 的 `68701e5` 已完成 1,763 项 XCTest：1,740 通过、23 个模型门禁跳过、0 失败；随后 Release 在 Swift 6.3.2 的 `EarlyPerfInliner` / 泛型 coordinator 析构处崩溃。将 Entry 改为独立 nonisolated 泛型值，保持任务类型安全及 Release 优化，等待重新验证。该 run 还显示冷实例 Remote ASR 完成测试耗时约 600 秒；清理改为只移除实际采集过的 input node，避免清理时懒初始化硬件。第四轮 `35481423733`（`39ed131`）XCTest 再次 1,740 通过/23 跳过/0 失败，冷清理测试降至 0.0013 秒；Release 仍在同一析构处崩溃，单独提取 Entry 不足以解决。继续改为成员级 MainActor 隔离，保留类型安全/私有状态及 Release 优化。失败记录保留，旧 HEAD 的 XCTest 通过不替代新 HEAD 的完整门禁。
 
 ## 验证与下一门禁
 

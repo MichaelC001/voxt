@@ -49,7 +49,7 @@ Tests 工作流现在保存 `validation-evidence`（7 天保留）：
 - `VoxtTests.xcresult`、`test-summary.json`、`test-discovery.json`；
 - `debug-test.log`、`release-build.log`，包含 `/usr/bin/time -l` 的原始命令资源统计与 Xcode build timing summary。
 
-`68701e5` 的 run `35479399460` 已确认 1,740 项通过、23 项模型门禁跳过、0 失败；Release 随后触发 Swift 6.3.2 泛型析构优化器崩溃，已调整 Entry 类型边界，后续必须重新验证，不能把该 run 算作完整门禁通过。CI 现在也限定单测试默认 120 秒、最多 300 秒，避免硬件意外初始化或死等待无界阻塞。
+`68701e5` 的 run `35479399460` 已确认 1,740 项通过、23 项模型门禁跳过、0 失败；Release 随后触发 Swift 6.3.2 泛型析构优化器崩溃，单独调整 Entry 类型边界后的 `39ed131` / run `35481423733` 也复现同一崩溃（XCTest 再次 1,740 通过/23 跳过），继续改为成员级 MainActor 隔离，不关闭 Release 优化。后续必须重新验证，不能把这些 run 算作完整门禁通过。冷实例清理测试在 `39ed131` 降至 0.0013 秒（前次约 600 秒），这是该场景的观测，不外推为整体应用提速。CI 现在也限定单测试默认 120 秒、最多 300 秒，避免硬件意外初始化或死等待无界阻塞。
 
 必须核对 HEAD SHA、所有新增 suite 的发现/执行及 skip 数。**模型门禁 skip 不是模型通过；构建命令的 RSS 不是整个应用/Metal 的峰值内存。**
 

@@ -11,9 +11,7 @@ nonisolated struct SharedModelLoadTask: Sendable {
     func waitForCompletion() async { await wait() }
 }
 
-// Keep this value independent of the coordinator's generic actor context.
-// Swift 6.3.2's Release inliner crashes in the synthesized coordinator deinit
-// when Entry is a nested generic type. No type erasure or optimization bypass.
+// Value storage is independent of actor context; all owner access stays on MainActor.
 nonisolated private struct SharedModelLoadEntry<Value: Sendable>: Sendable {
     let generation: UUID
     let task: Task<Value, Error>
@@ -22,17 +20,21 @@ nonisolated private struct SharedModelLoadEntry<Value: Sendable>: Sendable {
 
 /// Coalesces current waiters while retaining invalidated loads until they exit.
 /// A cancelled waiter is not evidence that native loading released its resources.
-@MainActor
-final class SharedModelLoadCoordinator<Value: Sendable> {
+// Swift 6.3.2 crashes optimizing the synthesized deinit of this generic global-
+// actor class. Isolate the members instead of the type: the compiler still
+// enforces MainActor access, with no unsafe storage or Release flag changes.
+nonisolated final class SharedModelLoadCoordinator<Value: Sendable> {
     private typealias Entry = SharedModelLoadEntry<Value>
 
-    private var entries: [String: Entry] = [:]
-    private var outstanding: [UUID: Task<Value, Error>] = [:]
+    @MainActor private var entries: [String: Entry] = [:]
+    @MainActor private var outstanding: [UUID: Task<Value, Error>] = [:]
 
-    var hasPendingLoad: Bool { !entries.isEmpty }
-    var hasOutstandingLoad: Bool { !outstanding.isEmpty }
+    @MainActor init() {}
 
-    func value(
+    @MainActor var hasPendingLoad: Bool { !entries.isEmpty }
+    @MainActor var hasOutstandingLoad: Bool { !outstanding.isEmpty }
+
+    @MainActor func value(
         for key: String,
         start: @escaping @Sendable () async throws -> Value
     ) async throws -> Value {
@@ -73,14 +75,14 @@ final class SharedModelLoadCoordinator<Value: Sendable> {
     }
 
     @discardableResult
-    func cancelAll() -> [SharedModelLoadTask] {
+    @MainActor func cancelAll() -> [SharedModelLoadTask] {
         entries.removeAll()
         let tasks = Array(outstanding.values)
         tasks.forEach { $0.cancel() }
         return tasks.map { SharedModelLoadTask($0) }
     }
 
-    private func cancelWaiter(_ id: UUID, key: String, generation: UUID) {
+    @MainActor private func cancelWaiter(_ id: UUID, key: String, generation: UUID) {
         guard var entry = entries[key], entry.generation == generation,
               entry.waiterIDs.remove(id) != nil else { return }
         if entry.waiterIDs.isEmpty {
@@ -91,7 +93,7 @@ final class SharedModelLoadCoordinator<Value: Sendable> {
         }
     }
 
-    private func finishWaiter(_ id: UUID, key: String, generation: UUID) {
+    @MainActor private func finishWaiter(_ id: UUID, key: String, generation: UUID) {
         // Called only after awaiting the underlying task, including cancelled
         // waiters. The generation can be retired even if its key was replaced.
         outstanding[generation] = nil
