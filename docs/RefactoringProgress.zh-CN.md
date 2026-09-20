@@ -397,6 +397,14 @@ Fake 会话复用真实基类，通过既有 override 边界注入故障；截�
 
 CI 增加 unsigned Release build、xcresult/discovery/summary 及 `/usr/bin/time -l` 原始资源记录。首个收尾 run `35478088469` 因 `@concurrent` 随新增 helper 错位导致编译失败；已恢复至原异步校验方法。第二轮 run `35478584544` 又发现说话人模型下载仍引用旧进度 helper，已改接通用实现并复查全部调用点。第三轮 run `35479399460` 的 `68701e5` 已完成 1,763 项 XCTest：1,740 通过、23 个模型门禁跳过、0 失败；随后 Release 在 Swift 6.3.2 的 `EarlyPerfInliner` / 泛型 coordinator 析构处崩溃。将 Entry 改为独立 nonisolated 泛型值，保持任务类型安全及 Release 优化，等待重新验证。该 run 还显示冷实例 Remote ASR 完成测试耗时约 600 秒；清理改为只移除实际采集过的 input node，避免清理时懒初始化硬件。第四轮 `35481423733`（`39ed131`）XCTest 再次 1,740 通过/23 跳过/0 失败，冷清理测试降至 0.0013 秒；Release 仍在同一析构处崩溃，单独提取 Entry 不足以解决。最终改为成员级 MainActor 隔离，保留类型安全/私有状态及 Release 优化。第五轮 `35482326300`（`d817b78`）**XCTest 和 Release 全部通过**：1,740 通过、23 跳过、0 失败，新增 suite 与原 6 项加载协调器测试均已核对执行。冷清理回归 0.0025 秒。前面失败记录保留，不冒称失败 run 通过；详细命令统计及外部限制见收尾清单。
 
+## 后续专项：启动模型检测与全仓静态复审
+
+用户反馈首次打开误报模型未安装，本轮 `4e07cbb` 修复了 unknown→missing 错判和 Settings 外壳漏订阅 installationRevision；选择器检测中显示 Loading，保留不可选。共享 100ms 合并通知，不加轮询/主线程 scan，也不把检测中当作已安装。
+
+同时进行了全仓只读收集及重点链路审查：716 个应用/测试 Swift 文件，区分词法孤儿候选与框架入口；确认删除 3 个孤儿 UI 类型、4 个普通/私有词典 helper、3 个无调用测试工厂，不删测试方法/数据格式。修复 structured metadata 密钥字段名未脱敏的问题，新增 8 个 Swift / 4 个工具测试。详细未解决风险与实测方案见 [全项目性能、安全与精简审查](PerformanceSecurityReview.zh-CN.md)。
+
+`4e07cbb` 已通过 [完整 XCTest / Release CI 35490900072](https://github.com/hehehai/voxt/actions/runs/35490900072)：1,771 发现、1,748 通过、23 模型门禁跳过、0 失败；新增 suite 逐项核对通过。这不意味着 SEC-02 CDP 边界、长录音内存、同步导入/上传、子进程退出及真机 profile 已完成。本次新发现也说明前批“代码收尾”不能被解释为未来无缺陷或全部性能安全验收通过。
+
 ## 验证与下一门禁
 
 Linux 已执行：

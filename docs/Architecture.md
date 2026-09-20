@@ -56,4 +56,8 @@ Settings sidebar/header/footer and notification/feedback dialogs have dedicated 
 
 The concentrated closeout also tracks retiring MLX/remote-preview tasks, serializes meeting VAD preparation with cleanup, and prevents stale dictionary reads from replacing newer snapshots. Five stateful coordination files remain above the review threshold by explicit ownership decision, not by exposing their private state to file slices. See the [closeout and real-environment acceptance checklist (中文)](RefactoringCloseout.zh-CN.md).
 
+Installation presence is asynchronous: callers must not turn an unknown cache result into a missing-model warning. Settings shell/catalog listen to a shared debounced installation-revision publisher instead of polling or observing every progress change. Structured log metadata is redacted by sensitive key as well as value, including nested dictionaries and arrays.
+
+The subsequent [performance/security audit (中文)](PerformanceSecurityReview.zh-CN.md) records new findings and still-open boundaries. Earlier closeout is not a claim that future audits will find no issues.
+
 See the [refactoring assessment (中文)](RefactoringAssessment.zh-CN.md) and [phased implementation record](RefactoringProgress.zh-CN.md) for measured hotspots, completed cleanup, pending work and verification limits.

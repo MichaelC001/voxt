@@ -91,6 +91,10 @@ The concentrated closeout adds 49 cases: sheet operations (7), WebSocket transpo
 
 CI archives `validation-evidence` with xcresult, discovered tests, test summary and Debug/Release logs. Review skips independently, especially gated model tests. See the [closeout checklist](../docs/RefactoringCloseout.zh-CN.md).
 
+Startup installation regression: `ModelConfigurationIssueResolverTests` adds five cases using isolated defaults/root and small fixture files. It checks cold installed/missing states, all selected scopes, automatic badge recomputation without downloads/UI interaction, remote configuration warnings and pending selection behavior. Three `VoxtLogRedactorTests` cases cover key-aware recursive metadata redaction. The unused selector/catalog/URL fixture factories were removed; no test methods or model gates were deleted.
+
+`tools/audit_source_inventory.py` provides read-only review candidates and locations, not reachability/security/performance proofs. CI preserves its report. See the [performance/security review](../docs/PerformanceSecurityReview.zh-CN.md) for unresolved findings and runtime acceptance.
+
 ## Keep useful coverage
 
 Reuse [TestSupport](TestSupport/README.md), isolated defaults and temporary directories. Delete a test only when its contract is retired or equivalent coverage is identified; do not discard cancellation, migration, security or provider-specific regressions as duplication.

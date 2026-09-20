@@ -29,6 +29,8 @@ Stage 6D adds `DictionarySuggestionStoreTests` and the existing `RemoteProviderC
 
 The concentrated closeout adds scoped sheet tasks, WebSocket close/deadline, stale reload, ASR preview, corrupt hotkey preference, bounded progress, inference planning and meeting presentation suites. `RemoteLLMRuntimeClientFailureTests` uses isolated URLProtocol sessions for actual streaming execution/fallback/cancellation without provider accounts. CI now builds Release after tests and archives xcresult/discovery plus command timing/resource logs. See [closeout](RefactoringCloseout.zh-CN.md) for remaining manual/native/model and performance acceptance; a build RSS observation is not application/Metal memory validation.
 
+The startup-model fix adds `ModelConfigurationIssueResolverTests` and `VoxtLogRedactorTests` to `refactor`. Installation checks still use background cached scans; tests verify that checking is not reported as missing and that the actual installation-revision publisher refreshes issues without user interaction. The source inventory is archived by CI as review evidence, not an assertion that all listed sites are safe. Follow the [performance/security review](PerformanceSecurityReview.zh-CN.md) for real-device profiling and outstanding risks.
+
 The old `whisper` / `diagnostic` groups were removed because their dedicated Whisper test classes no longer exist. This does not remove MLX Whisper model support or migration coverage. Unknown groups fail rather than selecting nonexistent suites. The `all` / `full` groups avoid rerunning VAD suites already selected by core.
 
 See [test-suite organization](../VoxtTests/README.md) and the [phased refactoring record](RefactoringProgress.zh-CN.md).
