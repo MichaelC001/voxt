@@ -122,6 +122,7 @@ extension AppDelegate {
         microphoneItem.submenu = buildMicrophoneMenu()
         menu.addItem(microphoneItem)
 
+        addRecentHistoryItems(to: menu, availability: availability)
         menu.addItem(NSMenuItem.separator())
 
         let checkUpdatesItem = NSMenuItem(
@@ -187,30 +188,25 @@ extension AppDelegate {
             item.representedObject = filter.rawValue
             submenu.addItem(item)
         }
+        return submenu
+    }
 
-        submenu.addItem(.separator())
-        let heading = NSMenuItem(title: AppLocalization.localizedString("Recent Transcriptions"), action: nil, keyEquivalent: "")
-        heading.isEnabled = false
-        submenu.addItem(heading)
+    private func addRecentHistoryItems(to menu: NSMenu, availability: FeatureAvailabilitySettings) {
         let entries = StatusMenuHistorySupport.recentEntries(from: statusMenuRecentEntries, availability: availability)
+        guard !entries.isEmpty else { return }
+
+        menu.addItem(NSMenuItem.separator())
         for entry in entries {
-            let kindTitle = entry.kind == .translation ? HistoryFilterTab.translation.title : HistoryFilterTab.transcription.title
             let item = NSMenuItem(
-                title: "\(kindTitle): \(StatusMenuHistorySupport.previewTitle(for: entry))",
+                title: StatusMenuHistorySupport.previewTitle(for: entry),
                 action: #selector(copyRecentHistoryFromMenu(_:)),
                 keyEquivalent: ""
             )
             item.target = self
             item.representedObject = entry.id.uuidString
             item.toolTip = AppLocalization.localizedString("Click to copy full text")
-            submenu.addItem(item)
+            menu.addItem(item)
         }
-        if entries.isEmpty {
-            let emptyItem = NSMenuItem(title: AppLocalization.localizedString("No recent transcriptions"), action: nil, keyEquivalent: "")
-            emptyItem.isEnabled = false
-            submenu.addItem(emptyItem)
-        }
-        return submenu
     }
 
     private func buildMicrophoneMenu() -> NSMenu {
