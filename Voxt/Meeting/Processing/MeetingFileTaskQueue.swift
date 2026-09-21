@@ -8,6 +8,7 @@ enum MeetingFileTaskStatus: String, Codable, Hashable, Sendable {
     case queued
     case preparing
     case processing
+    case waitingForResources
     case cancelling
     case completed
     case failed
@@ -17,7 +18,7 @@ enum MeetingFileTaskStatus: String, Codable, Hashable, Sendable {
         switch self {
         case .completed, .failed, .cancelled:
             return true
-        case .queued, .preparing, .processing, .cancelling:
+        case .queued, .preparing, .processing, .waitingForResources, .cancelling:
             return false
         }
     }
@@ -208,6 +209,7 @@ final class MeetingFileTaskQueue: ObservableObject {
     private var stagingTasks: [UUID: Task<Void, Never>] = [:]
     private var reservedStagingBytes: Int64 = 0
     private var isShuttingDown = false
+    private var resourceWaitNotificationToken: NSObjectProtocol?
 
     init(
         analyzer: @escaping Analyzer,
@@ -240,6 +242,15 @@ final class MeetingFileTaskQueue: ObservableObject {
         self.tasks = []
 
         loadPersistedTasks()
+        resourceWaitNotificationToken = NotificationCenter.default.addObserver(
+            forName: .voxtMeetingFileResourceWaitDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                self?.handleResourceWaitNotification(notification)
+            }
+        }
         removeAbandonedPartialFiles()
         restoreStagingReservations()
     }
@@ -295,7 +306,8 @@ final class MeetingFileTaskQueue: ObservableObject {
         guard !tasks[index].isTerminal else { return }
         MeetingFileTrace.event("cancel-requested", taskID: taskID, diagnosticContext(for: tasks[index]))
 
-        if activeTaskID == taskID, tasks[index].status == .processing {
+        if activeTaskID == taskID,
+           tasks[index].status == .processing || tasks[index].status == .waitingForResources {
             tasks[index].status = .cancelling
             persist()
             Task { @MainActor [weak self] in
@@ -356,6 +368,7 @@ final class MeetingFileTaskQueue: ObservableObject {
         let finishedTasks = tasks.filter(\.isTerminal)
         tasks.removeAll(where: \.isTerminal)
         for task in finishedTasks {
+            Task { await MeetingFileAnalysisCheckpointStore.shared.clear(taskID: task.id) }
             try? fileManager.removeItem(at: stagedURL(for: task))
             if let legacyName = task.legacyStagedFileName {
                 try? fileManager.removeItem(at: storageDirectoryURL.appendingPathComponent(legacyName))
@@ -387,6 +400,10 @@ final class MeetingFileTaskQueue: ObservableObject {
 
     func shutdown() async {
         MeetingFileTrace.event("shutdown-requested", taskID: activeTaskID ?? activePreparationID)
+        if let resourceWaitNotificationToken {
+            NotificationCenter.default.removeObserver(resourceWaitNotificationToken)
+            self.resourceWaitNotificationToken = nil
+        }
         isShuttingDown = true
         tickerTask?.cancel()
         tickerTask = nil
@@ -459,6 +476,7 @@ final class MeetingFileTaskQueue: ObservableObject {
             tasks[currentIndex].startedAt = tasks[currentIndex].startedAt ?? startDate
             tasks[currentIndex].completedAt = nil
             tasks[currentIndex].progressStage = .transcribing
+            tasks[currentIndex].status = .processing
             tasks[currentIndex].progressFraction = 0.15
             tasks[currentIndex].processedMediaDurationSeconds = nil
             tasks[currentIndex].processingSpeedSecondsPerSecond = nil
@@ -489,6 +507,7 @@ final class MeetingFileTaskQueue: ObservableObject {
                     tasks[finishedIndex].status = .cancelled
                     tasks[finishedIndex].completedAt = now()
                 } else {
+                    await MeetingFileAnalysisCheckpointStore.shared.clear(taskID: taskID)
                     tasks[finishedIndex].status = .completed
                     tasks[finishedIndex].completedAt = now()
                     tasks[finishedIndex].progressStage = .saving
@@ -612,6 +631,23 @@ final class MeetingFileTaskQueue: ObservableObject {
 
         task.speedSampleAt = sampleDate
         task.speedSampleProcessedMediaDurationSeconds = processedDuration
+    }
+
+    private func handleResourceWaitNotification(_ notification: Notification) {
+        guard let rawTaskID = notification.userInfo?["taskID"] as? String,
+              let taskID = UUID(uuidString: rawTaskID),
+              let index = tasks.firstIndex(where: { $0.id == taskID }),
+              activeTaskID == taskID
+        else { return }
+        let isWaiting = notification.userInfo?["isWaiting"] as? Bool ?? false
+        guard !tasks[index].isTerminal else { return }
+        if isWaiting, tasks[index].status == .processing {
+            tasks[index].status = .waitingForResources
+            persist()
+        } else if !isWaiting, tasks[index].status == .waitingForResources {
+            tasks[index].status = .processing
+            persist()
+        }
     }
 
     private func markCancelled(taskID: UUID) {
@@ -843,7 +879,7 @@ final class MeetingFileTaskQueue: ObservableObject {
                 let destinationName = task.stagedFileName.hasSuffix(".prepared.wav")
                     ? task.stagedFileName : task.stagedFileName + ".prepared.wav"
                 try? fileManager.removeItem(at: storageDirectoryURL.appendingPathComponent(destinationName).appendingPathExtension("partial"))
-                guard task.status == .processing || task.status == .cancelling || task.status == .preparing else { return task }
+                guard task.status == .processing || task.status == .waitingForResources || task.status == .cancelling || task.status == .preparing else { return task }
                 var restored = task.resetForRetry()
                 restored.errorMessage = AppLocalization.localizedString("The task was interrupted and has been queued again.")
                 return restored

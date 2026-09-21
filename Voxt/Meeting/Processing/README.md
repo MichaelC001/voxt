@@ -16,6 +16,8 @@ Post-capture meeting processing for ASR, translation, transcript assembly, and f
 
 `MeetingFilePreparationLimits` bounds decoded duration/output, conversion buffers and disk usage. `MeetingFilePreparationResources` waits at checkpoints under memory/thermal pressure. AVFoundation's internal allocations are not covered by the application buffer ceiling.
 
+`MeetingFileAnalysisCheckpointStore` is the intentionally small P2 recovery slice: after each imported-audio descriptor, it atomically stores the committed ASR segments, completed descriptor count, prepared-audio sample count and model fingerprint. A retry/restart resumes at the next descriptor only when input and model identity match; otherwise the checkpoint is discarded. It does not persist model tensors, token streams or speaker-analysis state.
+
 `MeetingImportedFilePipeline` owns one import's transcriber, temporary audio and model use; it does not mutate live coordinator engine/transcriber fields. Prepared queue inputs use a bounded independent archive copy, not another decode, because history storage moves its input. Failure/cancellation discards only that operation's temporary output, never the queue's reusable cache; success transfers the temporary archive to history persistence.
 
 Implementation details, remaining limitations and pending macOS acceptance: [File preprocessing resource safety](../../../docs/FilePreprocessingResourceSafety.zh-CN.md).

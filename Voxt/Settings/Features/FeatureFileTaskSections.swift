@@ -146,7 +146,7 @@ private struct MeetingFileTaskRow: View {
                 actionButtons
             }
 
-            if task.status == .preparing || task.status == .processing || task.status == .cancelling || task.status == .completed {
+            if task.status == .preparing || task.status == .processing || task.status == .waitingForResources || task.status == .cancelling || task.status == .completed {
                 ProgressView(value: task.progressFraction, total: 1)
                     .progressViewStyle(.linear)
                     .tint(statusColor)
@@ -162,7 +162,7 @@ private struct MeetingFileTaskRow: View {
     @ViewBuilder
     private var actionButtons: some View {
         switch task.status {
-        case .preparing, .processing, .cancelling:
+        case .preparing, .processing, .waitingForResources, .cancelling:
             Button(featureSettingsLocalized(task.status == .cancelling ? "Cancelling…" : "Cancel"), action: onCancel)
                 .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
                 .disabled(task.status == .cancelling)
@@ -249,6 +249,8 @@ private struct MeetingFileTaskRow: View {
             return featureSettingsLocalized("Preparing audio…")
         case .processing:
             return task.progressStage.displayTitle
+        case .waitingForResources:
+            return featureSettingsLocalized("Waiting for system resources…")
         case .cancelling:
             return featureSettingsLocalized("Cancelling…")
         case .completed:
@@ -270,7 +272,7 @@ private struct MeetingFileTaskRow: View {
         switch task.status {
         case .queued:
             return .secondary
-        case .preparing, .processing, .cancelling:
+        case .preparing, .processing, .waitingForResources, .cancelling:
             return .accentColor
         case .completed:
             return .green

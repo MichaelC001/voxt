@@ -2212,6 +2212,7 @@
 "File conversion failed" = "ファイル変換に失敗しました";
 "%@ has been converted successfully." = "%@ の変換が完了しました。";
 "Preparing audio…" = "音声を準備しています…";
+"Waiting for system resources…" = "システムリソースを待機しています…";
 "The file task queue is full. Clear finished tasks before adding more files." = "ファイルタスクのキューがいっぱいです。終了したタスクを削除してからファイルを追加してください。";
 "Transcribing meeting…" = "会議を文字起こししています…";
 "Identifying speakers…" = "話者を識別しています…";

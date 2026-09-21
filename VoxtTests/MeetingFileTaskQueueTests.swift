@@ -447,6 +447,40 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         XCTAssertTrue(queue.tasks.allSatisfy(\.isTerminal))
     }
 
+    func testResourceWaitNotificationUpdatesTaskStatusWithoutLosingProgress() async throws {
+        let storage = try TemporaryDirectory()
+        let source = try makeSourceFile(named: "resource-wait.wav")
+        let gate = ManualTaskBarrier()
+        let queue = MeetingFileTaskQueue(
+            analyzer: { _, _, _ in
+                await gate.wait()
+                return Self.makeHistoryEntry()
+            },
+            cancelActiveAnalysis: {}, canStart: { true }, storageDirectoryURL: storage.url
+        )
+        queue.enqueue(urls: [source])
+        try await waitUntil(queue, status: .processing, at: 0)
+        let taskID = try XCTUnwrap(queue.tasks.first?.id)
+        NotificationCenter.default.post(
+            name: .voxtMeetingFileResourceWaitDidChange,
+            object: nil,
+            userInfo: ["taskID": taskID.uuidString, "isWaiting": true]
+        )
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(queue.task(id: taskID)?.status, .waitingForResources)
+
+        NotificationCenter.default.post(
+            name: .voxtMeetingFileResourceWaitDidChange,
+            object: nil,
+            userInfo: ["taskID": taskID.uuidString, "isWaiting": false]
+        )
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(queue.task(id: taskID)?.status, .processing)
+        gate.release()
+        try await waitUntil(queue, status: .completed, at: 0)
+        await queue.shutdown()
+    }
+
     func testFailedAnalysisPreservesStageAndCauseForDiagnosis() async throws {
         let storage = try TemporaryDirectory()
         let source = try makeSourceFile(named: "failed-transcription.wav")

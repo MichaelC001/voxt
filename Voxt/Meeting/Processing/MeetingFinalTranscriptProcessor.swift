@@ -75,14 +75,24 @@ enum MeetingFinalTranscriptionPass {
         options: Options = Options(),
         requiresCompleteTranscription: Bool = false,
         progress: (@Sendable (Double) async -> Void)? = nil,
-        processedDurationProgress: (@Sendable (Double, TimeInterval) async -> Void)? = nil
+        processedDurationProgress: (@Sendable (Double, TimeInterval) async -> Void)? = nil,
+        initialSegments: [MeetingTranscriptSegment] = [],
+        startingDescriptorIndex: Int = 0,
+        checkpoint: (@Sendable ([MeetingTranscriptSegment], Int) async throws -> Void)? = nil
     ) async throws -> [MeetingTranscriptSegment] {
-        var segments: [MeetingTranscriptSegment] = []
+        var segments = initialSegments
         let descriptorCount = max(descriptors.count, 1)
-        var completedDurationBeforeDescriptor: TimeInterval = 0
-        await progress?(0)
-        await processedDurationProgress?(0, 0)
-        for (descriptorIndex, descriptor) in descriptors.enumerated() {
+        let startIndex = min(max(startingDescriptorIndex, 0), descriptors.count)
+        var completedDurationBeforeDescriptor = descriptors
+            .prefix(startIndex)
+            .reduce(0) { $0 + max($1.durationSeconds, 0) }
+        await progress?(startIndex == 0 ? 0 : Double(startIndex) / Double(descriptorCount))
+        await processedDurationProgress?(
+            startIndex == 0 ? 0 : Double(startIndex) / Double(descriptorCount),
+            completedDurationBeforeDescriptor
+        )
+        for (relativeDescriptorIndex, descriptor) in descriptors.dropFirst(startIndex).enumerated() {
+            let descriptorIndex = relativeDescriptorIndex + startIndex
             try Task.checkCancellation()
             let descriptorDuration = max(descriptor.durationSeconds, 0)
             let windowStarted = ContinuousClock.now
@@ -107,6 +117,7 @@ enum MeetingFinalTranscriptionPass {
                     completedDurationBeforeDescriptor + descriptorDuration
                 )
                 windowCompleted = true
+                try await checkpoint?(segments, descriptorIndex + 1)
                 continue
             }
             let chunks = chunks(for: asset, options: options)
@@ -141,6 +152,7 @@ enum MeetingFinalTranscriptionPass {
                 )
             }
             windowCompleted = true
+            try await checkpoint?(segments, descriptorIndex + 1)
         }
         try Task.checkCancellation()
         return MeetingTranscriptPostProcessor.process(segments)

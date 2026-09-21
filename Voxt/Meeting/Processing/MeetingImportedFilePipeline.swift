@@ -61,7 +61,30 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
             )
 
             stage = "transcribing"
-            MeetingFileTrace.event("transcription-started", "durationSeconds=\(importedAudio.durationSeconds), windows=\(importedAudio.assetDescriptors.count)")
+            let taskID = MeetingFileTrace.taskID
+            let checkpointStore = MeetingFileAnalysisCheckpointStore.shared
+            let modelFingerprint = Self.modelFingerprint(for: engineContext)
+            let storedCheckpoint: MeetingFileASRCheckpoint?
+            if let taskID {
+                let candidate = await checkpointStore.load(taskID: taskID)
+                storedCheckpoint = candidate?.preparedAudioSampleCount == importedAudio.sampleCount
+                    && candidate?.descriptorCount == importedAudio.assetDescriptors.count
+                    && candidate?.modelFingerprint == modelFingerprint
+                    ? candidate
+                    : nil
+                if candidate != nil, storedCheckpoint == nil {
+                    await checkpointStore.clear(taskID: taskID)
+                    MeetingFileTrace.event("asr-checkpoint-discarded", "reason=configuration-or-input-mismatch")
+                }
+            } else {
+                storedCheckpoint = nil
+            }
+            let startingDescriptorIndex = storedCheckpoint?.completedDescriptorCount ?? 0
+            let initialSegments = storedCheckpoint?.segments ?? []
+            MeetingFileTrace.event(
+                "transcription-started",
+                "durationSeconds=\(importedAudio.durationSeconds), windows=\(importedAudio.assetDescriptors.count), resumeFromWindow=\(startingDescriptorIndex)"
+            )
             progress(MeetingFileAnalysisProgress(stage: .transcribing))
             let importedTranscriber = try makeTranscriber()
             transcriber = importedTranscriber
@@ -83,6 +106,24 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                             processedMediaDurationSeconds: processedDuration
                         )
                     )
+                },
+                initialSegments: initialSegments,
+                startingDescriptorIndex: startingDescriptorIndex,
+                checkpoint: { segments, completedDescriptorCount in
+                    guard let taskID else { return }
+                    await checkpointStore.save(
+                        MeetingFileASRCheckpoint(
+                            schemaVersion: MeetingFileASRCheckpoint.currentSchemaVersion,
+                            taskID: taskID,
+                            preparedAudioSampleCount: importedAudio.sampleCount,
+                            descriptorCount: importedAudio.assetDescriptors.count,
+                            modelFingerprint: modelFingerprint,
+                            completedDescriptorCount: completedDescriptorCount,
+                            segments: segments,
+                            updatedAt: Date()
+                        )
+                    )
+                    MeetingFileTrace.event("asr-checkpoint-saved", "completedWindows=\(completedDescriptorCount), segments=\(segments.count)")
                 }
             )
             try Task.checkCancellation()
@@ -91,6 +132,7 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                 throw MeetingFileAnalysisError.noTranscript
             }
 
+            releaseASRResourcesAtStageBoundary()
             stage = "identifyingSpeakers"
             MeetingFileTrace.event("speaker-analysis-requested", "segments=\(transcriptSegments.count)")
             progress(MeetingFileAnalysisProgress(stage: .identifyingSpeakers))
@@ -146,6 +188,23 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
             }
             throw error
         }
+    }
+
+    private func releaseASRResourcesAtStageBoundary() {
+        guard holdsModelUse else { return }
+        holdsModelUse = false
+        modelManager.endActiveUse()
+        modelManager.releaseLoadedModelIfIdle(reason: "file-asr-stage-completed")
+        MeetingFileTrace.event("asr-resources-released-before-speaker-analysis")
+    }
+
+    private static func modelFingerprint(for context: MeetingASREngineContext) -> String {
+        [
+            context.engine.rawValue,
+            context.historyModelDescription,
+            context.mlxModelRepo ?? "none",
+            String(describing: context.resolvedMode)
+        ].joined(separator: "|")
     }
 
     private func makeTranscriber() throws -> any MeetingSegmentTranscribing {

@@ -18,6 +18,7 @@
 - [集中收尾、保留决策与最终验收清单](RefactoringCloseout.zh-CN.md)
 - [全项目性能、安全与精简审查（含未解决风险）](PerformanceSecurityReview.zh-CN.md)
 - [权限最小化诊断与方案评估](PermissionMinimizationAssessment.zh-CN.md)
+- [文件任务分析资源调度、阶段释放与断点恢复方案](FileAnalysisResourceSchedulingPlan.zh-CN.md)
 - [上下文增强删除与权限精简实施记录（待 Mac 验收）](ContextEnhancementRemovalImplementation.zh-CN.md)
 - [Test suites and focused checks](../VoxtTests/README.md)
 - [MLX dependency policy and current pins](MLXAudioDependency.md)

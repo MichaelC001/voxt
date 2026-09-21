@@ -656,6 +656,13 @@ class MLXModelManager: ObservableObject {
         scheduleIdleUnloadIfNeeded()
     }
 
+    /// Releases an idle model at an explicit stage boundary. Callers must have
+    /// already ended their active-use lease; active inference is never forced out.
+    func releaseLoadedModelIfIdle(reason: String) {
+        guard activeUseCount == 0 else { return }
+        unloadLoadedModelIfIdle(expectedRepo: loadedRepo, reason: reason)
+    }
+
     func shutdownForApplicationTermination() async {
         if let shutdownTask { await shutdownTask.value; return }
         isShuttingDownForApplicationTermination = true

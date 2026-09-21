@@ -14,6 +14,7 @@ nonisolated extension Notification.Name {
     static let voxtAudioInputDevicesDidChange = Notification.Name("voxt.audioInputDevices.didChange")
     static let voxtOverlayAppearanceDidChange = Notification.Name("voxt.overlayAppearance.didChange")
     static let voxtFeatureSettingsDidChange = Notification.Name("voxt.feature-settings.did-change")
+    static let voxtMeetingFileResourceWaitDidChange = Notification.Name("voxt.meeting-file.resource-wait.did-change")
     static let voxtHotkeyDidTrigger = Notification.Name("voxt.hotkey.did-trigger")
     static let voxtModelStorageAuthorizationDidChange = Notification.Name("voxt.model-storage.authorization.did-change")
 }

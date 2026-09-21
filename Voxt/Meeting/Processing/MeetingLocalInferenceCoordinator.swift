@@ -153,6 +153,10 @@ actor MeetingLocalInferenceCoordinator {
         try Task.checkCancellation()
         statistics.submittedCount += 1
 
+        if workClass == .fileASR {
+            try await waitForFileAnalysisResources()
+        }
+
         if workClass.isThermallyDeferrable {
             switch ProcessInfo.processInfo.thermalState {
             case .serious, .critical:
@@ -252,8 +256,51 @@ actor MeetingLocalInferenceCoordinator {
         waiter.continuation.resume(returning: token)
     }
 
+    private func waitForFileAnalysisResources() async throws {
+        var didWait = false
+        defer {
+            if didWait {
+                postFileResourceWait(isWaiting: false)
+                VoxtLog.meeting("File ASR resource wait ended. cancelled=\(Task.isCancelled)")
+            }
+        }
+
+        var retryDelayMilliseconds = 250
+        while recordingActive
+            || memoryPressureConstrained
+            || ProcessInfo.processInfo.thermalState == .serious
+            || ProcessInfo.processInfo.thermalState == .critical {
+            try Task.checkCancellation()
+            if !didWait {
+                didWait = true
+                postFileResourceWait(isWaiting: true)
+                VoxtLog.meetingWarning(
+                    "File ASR resource wait started. recordingActive=\(recordingActive), memoryPressure=\(memoryPressureConstrained), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue)"
+                )
+            }
+            try await Task.sleep(for: .milliseconds(retryDelayMilliseconds))
+            retryDelayMilliseconds = min(retryDelayMilliseconds * 2, 5_000)
+        }
+    }
+
+    private func postFileResourceWait(isWaiting: Bool) {
+        guard let taskID = MeetingFileTrace.taskID else { return }
+        NotificationCenter.default.post(
+            name: .voxtMeetingFileResourceWaitDidChange,
+            object: nil,
+            userInfo: [
+                "taskID": taskID.uuidString,
+                "isWaiting": isWaiting
+            ]
+        )
+    }
+
     private func canRun(_ workClass: MeetingLocalInferenceWorkClass) -> Bool {
-        !(recordingActive && workClass.waitsWhileRecording) &&
-            !(memoryPressureConstrained && workClass.isMemoryDeferrable)
+        let thermalState = ProcessInfo.processInfo.thermalState
+        let thermalBlocked = workClass.isThermallyDeferrable
+            && (thermalState == .serious || thermalState == .critical)
+        return !(recordingActive && workClass.waitsWhileRecording)
+            && !(memoryPressureConstrained && workClass.isMemoryDeferrable)
+            && !thermalBlocked
     }
 }
