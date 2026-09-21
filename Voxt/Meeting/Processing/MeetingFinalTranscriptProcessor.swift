@@ -172,10 +172,29 @@ enum MeetingFinalTranscriptionPass {
         }
     }
 
+    struct ChunkPlan {
+        let samples: Range<Int>
+        let preventsAdjacentMerge: Bool
+    }
+
+    /// Retain only sample ranges for upcoming chunks. The lazy collection copies
+    /// PCM for the one chunk being consumed, not every overlapping chunk at once.
     static func chunks(
         for asset: MeetingAudioAsset,
         options: Options = Options()
-    ) -> [BufferedMeetingChunk] {
+    ) -> LazyMapCollection<[ChunkPlan], BufferedMeetingChunk> {
+        chunkPlans(for: asset, options: options).lazy.map { plan in
+            BufferedMeetingChunk(
+                segmentID: UUID(), speaker: asset.source.defaultSpeaker,
+                startSeconds: asset.sessionStartOffset + Double(plan.samples.lowerBound) / asset.sampleRate,
+                endSeconds: asset.sessionStartOffset + Double(plan.samples.upperBound) / asset.sampleRate,
+                sampleRate: asset.sampleRate, samples: Array(asset.samples[plan.samples]),
+                isFinal: true, preventsAdjacentMerge: plan.preventsAdjacentMerge
+            )
+        }
+    }
+
+    static func chunkPlans(for asset: MeetingAudioAsset, options: Options = Options()) -> [ChunkPlan] {
         guard asset.sampleRate > 0, !asset.samples.isEmpty else { return [] }
         let regions = speechRegions(in: asset, options: options)
         guard regions.count > 1 else {
@@ -202,31 +221,22 @@ enum MeetingFinalTranscriptionPass {
         range: Range<Int>,
         preventsAdjacentMerge: Bool,
         options: Options
-    ) -> [BufferedMeetingChunk] {
+    ) -> [ChunkPlan] {
         let sampleRate = asset.sampleRate
         let maxChunkSamples = max(Int(options.maxChunkSeconds * sampleRate), 1)
         let overlapSamples = max(Int(options.overlapSeconds * sampleRate), 0)
         let stepSamples = max(maxChunkSamples - overlapSamples, 1)
         let minimumSamples = max(Int(options.minimumChunkSeconds * sampleRate), 1)
-        var chunks: [BufferedMeetingChunk] = []
+        var chunks: [ChunkPlan] = []
         var start = range.lowerBound
 
         while start < range.upperBound {
             let end = min(start + maxChunkSamples, range.upperBound)
-            let samples = Array(asset.samples[start..<end])
+            let samples = asset.samples[start..<end]
             if samples.count >= minimumSamples,
                rootMeanSquare(samples) >= options.minimumRMS {
                 chunks.append(
-                    BufferedMeetingChunk(
-                        segmentID: UUID(),
-                        speaker: asset.source.defaultSpeaker,
-                        startSeconds: asset.sessionStartOffset + Double(start) / sampleRate,
-                        endSeconds: asset.sessionStartOffset + Double(end) / sampleRate,
-                        sampleRate: sampleRate,
-                        samples: samples,
-                        isFinal: true,
-                        preventsAdjacentMerge: preventsAdjacentMerge
-                    )
+                    ChunkPlan(samples: start..<end, preventsAdjacentMerge: preventsAdjacentMerge)
                 )
             }
             guard end < range.upperBound else { break }

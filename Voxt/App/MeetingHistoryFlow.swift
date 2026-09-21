@@ -85,6 +85,7 @@ extension AppDelegate {
         let result = try await meetingSessionCoordinator.analyzeImportedFile(
             at: sourceURL,
             sourceIsPreparedAudio: true,
+            archivePreparedAudio: historyAudioStorageEnabled,
             progress: progress
         )
         let importedAudioURL = result.archivedAudioURL

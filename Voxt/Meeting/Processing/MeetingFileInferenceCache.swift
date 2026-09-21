@@ -3,9 +3,28 @@ import Foundation
 
 /// File inference keeps a modest reusable allocator cache between work units.
 /// This is a boundary policy, NOT a cap on model weights or total process memory.
-/// Do not alter MLX's global cache/memory limits or discard live speaker state.
+/// Only a work-unit-scoped unused-cache limit is changed; live-memory limits and
+/// speaker state are untouched.
 nonisolated enum MeetingFileInferenceCache {
-    static let retainedCacheThresholdBytes = 256 * 1_024 * 1_024
+    static let retainedCacheThresholdBytes = 128 * 1_024 * 1_024
+
+    /// Bound unused allocator storage while a file work unit is executing, not
+    /// just after it returns. Preserve a stricter existing setting and restore
+    /// the previous global value on every exit; never alter the live-memory limit.
+    static func beginWorkUnit() -> @Sendable () -> Void {
+        let previous = Memory.cacheLimit
+        let applied = min(previous, retainedCacheThresholdBytes)
+        if applied != previous { Memory.cacheLimit = applied }
+        if Memory.cacheMemory > applied { Memory.clearCache() }
+        MeetingFileTrace.event("file-cache-scope", "cacheLimitBytes=\(applied)")
+        return {
+            // All file units share one permit. Do not overwrite an explicit
+            // setting made by another caller while this unit was running.
+            if applied != previous, Memory.cacheLimit == applied {
+                Memory.cacheLimit = previous
+            }
+        }
+    }
 
     static func shouldTrim(cacheBytes: Int, underPressure: Bool) -> Bool {
         cacheBytes > 0 && (underPressure || cacheBytes > retainedCacheThresholdBytes)

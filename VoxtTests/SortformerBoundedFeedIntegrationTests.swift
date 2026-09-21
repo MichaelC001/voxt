@@ -5,6 +5,18 @@ import MLXAudioVAD
 
 @MainActor
 final class SortformerBoundedFeedIntegrationTests: XCTestCase {
+    func testFileWorkUnitBoundsOnlyUnusedCacheAndRestoresThePreviousSetting() throws {
+        try ModelTestGate.requireEnabled("MLX file cache limit scope test")
+        let previous = Memory.cacheLimit
+        let liveLimit = Memory.memoryLimit
+        let restore = MeetingFileInferenceCache.beginWorkUnit()
+        XCTAssertEqual(Memory.cacheLimit, min(previous, MeetingFileInferenceCache.retainedCacheThresholdBytes))
+        XCTAssertEqual(Memory.memoryLimit, liveLimit)
+        restore()
+        XCTAssertEqual(Memory.cacheLimit, previous)
+        XCTAssertEqual(Memory.memoryLimit, liveLimit)
+    }
+
     func testInstalledSortformerKeepsStreamingStateBoundedForTwentyMinutes() async throws {
         try ModelTestGate.requireEnabled("Sortformer bounded-feed integration test")
         ModelTestGate.configureStorageRoot(for: self)
@@ -25,6 +37,11 @@ final class SortformerBoundedFeedIntegrationTests: XCTestCase {
         }
         let feedCount = (20 * 60 * 16_000 + samples.count - 1) / samples.count
         for index in 0..<feedCount {
+            let restore = MeetingFileInferenceCache.beginWorkUnit()
+            defer {
+                MeetingFileInferenceCache.trimIfNeeded(underPressure: false)
+                restore()
+            }
             let (_, nextState) = try await model.feed(
                 chunk: MLXArray(samples), state: state, sampleRate: 16_000,
                 spkcacheMax: policy.cacheMaximumFrames, fifoMax: MeetingSpeakerFeedPolicy.fifoMaximumFrames
@@ -32,9 +49,7 @@ final class SortformerBoundedFeedIntegrationTests: XCTestCase {
             try policy.validate(fifoFrames: nextState.fifoLen, cacheFrames: nextState.spkcacheLen)
             XCTAssertGreaterThan(nextState.framesProcessed, state.framesProcessed, "feed \(index)")
             state = nextState
-            // Match file inference's work-unit boundary policy without resetting
-            // the live speaker tensors. The following feed still consumes state.
-            MeetingFileInferenceCache.trimIfNeeded(underPressure: false)
+            // The following feed consumes the same state across cache scopes.
         }
         // Synthetic audio proves a memory-state invariant, not diarization quality.
         // Real multi-speaker recordings must separately validate DER and timestamps.

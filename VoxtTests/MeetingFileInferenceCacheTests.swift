@@ -23,6 +23,48 @@ final class MeetingFileInferenceCacheTests: XCTestCase {
         XCTAssertNil(MeetingMemoryPressureMonitor.constraint(forRawLevel: UInt32(mixed)))
     }
 
+    func testBoundedFileWorkDoesNotBlockOnWarningButStillBlocksOnCritical() {
+        XCTAssertEqual(MeetingMemoryPressureMonitor.fileConstraint(forRawLevel: UInt32(DispatchSource.MemoryPressureEvent.warning.rawValue)), false)
+        XCTAssertEqual(MeetingMemoryPressureMonitor.fileConstraint(forRawLevel: UInt32(DispatchSource.MemoryPressureEvent.normal.rawValue)), false)
+        XCTAssertEqual(MeetingMemoryPressureMonitor.fileConstraint(forRawLevel: UInt32(DispatchSource.MemoryPressureEvent.critical.rawValue)), true)
+        XCTAssertNil(MeetingMemoryPressureMonitor.fileConstraint(forRawLevel: 0))
+        XCTAssertNil(MeetingMemoryPressureMonitor.fileConstraint(forRawLevel: .max))
+    }
+
+    func testFileWarningPolicyDoesNotRelaxOtherCallers() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator(readMemoryPressure: { false })
+        await coordinator.setMemoryPressureConstrained(true)
+        try await coordinator.withPermit(.fileSpeakerAnalysis) {}
+        do {
+            try await coordinator.withPermit(.summary) {}
+            XCTFail("A file policy override must not change the shared warning flag")
+        } catch {
+            guard let safety = error as? MeetingLocalInferenceCoordinatorError,
+                  case .memoryConstrained = safety else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
+    func testCacheScopeIsRestoredOnFailureAndNeverInstalledForLiveWork() async throws {
+        let probe = FileCacheProbe()
+        let coordinator = MeetingLocalInferenceCoordinator(beginFileWorkUnit: {
+            probe.beginScope()
+            return { probe.endScope() }
+        })
+        do {
+            try await coordinator.withPermit(.fileSpeakerAnalysis) {
+                XCTAssertEqual(probe.openScopes, 1)
+                throw URLError(.cannotDecodeContentData)
+            }
+            XCTFail("Expected original error")
+        } catch { XCTAssertEqual((error as? URLError)?.code, .cannotDecodeContentData) }
+        XCTAssertEqual(probe.openScopes, 0)
+        try await coordinator.withPermit(.fileASR) { XCTAssertEqual(probe.openScopes, 1) }
+        XCTAssertEqual(probe.openScopes, 0)
+        try await coordinator.withPermit(.liveASRFinal) { XCTAssertEqual(probe.openScopes, 0) }
+    }
+
     func testInheritedCacheIsReclaimedBeforeAdmissionAndAllowsConfirmedRecovery() async throws {
         let probe = FileCacheProbe()
         probe.setCache(1_788_153_124)
@@ -157,6 +199,10 @@ private nonisolated final class FileCacheProbe: @unchecked Sendable {
     private var cache = 0
     private var trims = 0
     private var calls = 0
+    private var scopes = 0
+    var openScopes: Int { lock.withLock { scopes } }
+    func beginScope() { lock.withLock { scopes += 1 } }
+    func endScope() { lock.withLock { scopes -= 1 } }
     var cacheBytes: Int { lock.withLock { cache } }
     var reclamations: Int { lock.withLock { trims } }
     var maintenanceCalls: Int { lock.withLock { calls } }

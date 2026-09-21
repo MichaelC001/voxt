@@ -596,6 +596,23 @@ final class MeetingTranscriptAssemblyTests: XCTestCase {
     }
 
     @MainActor
+    func testChunkPlanningKeepsRangesAndMaterializesOnlyTheRequestedPCM() {
+        let asset = MeetingAudioAsset(
+            source: .mixed, samples: Array(repeating: Float(0.1), count: 600),
+            sampleRate: 10, sessionStartOffset: 120
+        )
+        let plans = MeetingFinalTranscriptionPass.chunkPlans(for: asset)
+        XCTAssertEqual(plans.map(\.samples), [0..<220, 210..<430, 420..<600])
+        let chunks = MeetingFinalTranscriptionPass.chunks(for: asset)
+        XCTAssertEqual(chunks.count, plans.count)
+        let middle = chunks[1]
+        XCTAssertEqual(middle.samples, Array(asset.samples[210..<430]))
+        XCTAssertEqual(middle.startSeconds, 141)
+        XCTAssertEqual(middle.endSeconds, 163)
+        XCTAssertFalse(middle.preventsAdjacentMerge)
+    }
+
+    @MainActor
     func testFinalTranscriptionPassPrefersWholeAssetTranscriptionWhenAvailable() async throws {
         let asset = MeetingAudioAsset(
             source: .systemAudio,

@@ -44,7 +44,7 @@ nonisolated final class MeetingFilePreparationResources: @unchecked Sendable {
     private let monitor = MeetingMemoryPressureMonitor()
 
     init() {
-        monitor.start { [weak self] constrained in
+        monitor.start(criticalOnly: true) { [weak self] constrained in
             guard let self else { return }
             self.lock.withLock { self.memoryConstrained = constrained }
         }
@@ -61,7 +61,8 @@ nonisolated final class MeetingFilePreparationResources: @unchecked Sendable {
         while true {
             try Task.checkCancellation()
             let thermal = ProcessInfo.processInfo.thermalState
-            let memoryPressure = lock.withLock { memoryConstrained }
+            let memoryPressure = MeetingMemoryPressureMonitor.currentFileConstraint()
+                ?? lock.withLock { memoryConstrained }
             if !memoryPressure, thermal != .serious, thermal != .critical {
                 return
             }

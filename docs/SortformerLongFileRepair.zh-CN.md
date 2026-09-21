@@ -50,7 +50,7 @@ popLen = min(fifoLen - fifoMax, spkcacheUpdatePeriod)
 
 13:20:46 UTC 开始 `memoryPressure=true`，音频推进停在约 4529.76 秒，总进度 89.23%。随后约 20 分钟只有心跳，footprint 仍约 2.17 GB；不是持续推理。原先等待循环只睡眠与检查布尔值，没有主动回收闲置 allocator 缓存，也没有复核可能陈旧的压力事件。日志不能单独证明系统所有压力都来自本进程，也不能断定后续 Metal 编译服务 XPC 错误是直接原因。
 
-本次小范围修复：
+上一轮小范围修复（以下记录当时行为；当前已调整为下一节的固定低开销链路）：
 
 - `MeetingFileInferenceCache` 在文件 ASR/说话人工作的安全边界检查闲置 cache；**超过 256 MiB 才清理**，小缓存保留，避免无条件每块清缓存。只调用 MLX `Memory.clearCache()` 释放 allocator-owned unused buffers，不删除权重或重置 streaming state，不修改全局 `cacheLimit`/`memoryLimit`。
 - 返回/异常/取消的清理由 `withPermit` 的 defer 在原生工作真正退出后、释放许可之前执行。继承的旧大缓存在首次准入前也检查；内存压力等待期间、协调器通道空闲时，每次压力周期额外清理一次闲置缓存。其他工作占有通道时不在等待线程进行维护。
@@ -62,13 +62,31 @@ popLen = min(fifoLen - fifoMax, spkcacheUpdatePeriod)
 
 复测关注：出现 `file-cache-reclaimed` 后 cache/footprint 是否实际下降；`file-permit-wait` 是否仍显示真实压力；压力解除后能否出现下一条 feed 完成。若系统确实长期处于 warning/critical，仍应保持暂停而非绕过保护。本地尚未执行 macOS/XCTest，不能宣称此样本已完整处理成功。
 
+## 当前简化：直接压低开销，不再将 warning 视为不可执行
+
+最新附件含旧进程记录，不能把其中 1.788 GB 旧缓存当作新进程占用。22:40 新进程在模型加载之前被 `source=current-sample` 阻塞，footprint 约 61 MB，通道空闲。该日志没有保留 warning/critical 原始等级，不能仅凭低 footprint 判断系统无压力；但继续叠加缓存回收/轮询不能解决把两级都视为硬阻塞的策略问题。
+
+当前做法保持单任务、短输入和既有检查点，只修改实际资源使用方式：
+
+1. 每个文件推理单元持有许可期间，MLX unused `cacheLimit` 临时取原值与 **128 MiB** 的较小值；清理超限旧缓存，异常/取消/成功退出均恢复原设置。不修改 active `memoryLimit`，不每块卸载模型。实际分配仍受 MLX 的回收时机影响，这不是整个进程内存峰值的硬上限。同步参与的文件任务共用既有串行许可；全局缓存设置在工作单元期间可能影响其他 MLX 使用者的缓存复用性能，但不会删除他们的活跃张量。
+2. 文件路径只在已知 **critical** 时阻塞；normal/warning 下执行固定有界工作并保持缓存上限，不做可用内存猜测和自动预算扩张。未知探测保留通知保护，取消/录音/严重温度/磁盘安全检查不移除。其他后台任务的 warning 行为不被文件任务修改；不可执行的其他 waiter 不再阻塞已符合准入条件的文件任务。
+3. 同样的 critical-only 策略用于流式文件准备和最终归档复制，避免转录结束后又因普通 warning 卡在保存阶段。
+4. ASR 分块先记录样本范围，使用 lazy collection 在消费当前块时才复制 PCM。22 秒上限、1 秒重叠、静音规划和时间轴保持不变，不同时持有一整个窗口的所有分块副本。
+5. 文件音频已标准化为有限值的 16 kHz PCM，说话人阶段不再对同一窗口做一次全量 `map`/重采样复制。模型的 streaming state 连续保留，不通过重置 speaker 身份节约内存。
+6. ASR 转录器局部作用域在转录后结束，阶段边界取消已结束的残余工作、清空转录器引用，再释放 manager 的闲置 ASR 权重，避免 VAD/转录器缓存跟随整个说话人阶段。
+7. 分析只读队列缓存；原先分析前的完整 WAV 副本改到成功后的保存阶段才创建，且仅在任务开始分析时开启了历史音频存储才复制。历史仍取得独立副本，不会移动队列缓存。取消/失败只清理本次拥有的临时文件。
+
+不承诺内存、CPU、GPU 三者同时达到绝对最小：更小的 unused cache 可能增加重新分配；这里优先减少闲置保留和重复复制，不增加更多模型调用、激进静音裁剪或新并发任务。关键验收是完整运行的 footprint/MLX cache 降低且质量不退化、普通 warning 下能推进、critical 下不强行运行；不是只看 RSS 或总进度。尚未在 macOS 执行验证。
+
 ## 验收
 
 纯逻辑/桩测试：
 - `MeetingSpeakerFeedPolicyTests`：12 小时 FIFO 递推上限、旧 60 秒 feed 反例、小 updatePeriod、非法配置、超限和时间轴 padding。
 - `MeetingFileSpeakerFailureTests`：文件说话人错误不能退化成成功的无说话人结果。
 - `MeetingLocalInferenceCoordinatorTests`：文件说话人压力等待/取消，等待通道期间出现压力时不误准入。
-- `MeetingFileInferenceCacheTests`：缓存阈值、压力周期清理、成功/错误/取消后的维护、其他原生工作占用时不清理、当前 normal 读数恢复、未知/持续压力不强行放行。使用注入的 allocator/probe，不在普通单测初始化 GPU。
+- `MeetingFileInferenceCacheTests`：缓存阈值、作用域退出恢复、warning/critical 文件策略、其他调用者保护不变、成功/错误/取消后的维护和未知/持续 critical 不强行放行。使用注入的 allocator/probe，不在普通单测初始化 GPU。
+- `MeetingTranscriptAssemblyTests`：惰性范围计划、按需 PCM、重叠和时间轴回归；保留已有静音和严格错误测试。
+- `SortformerBoundedFeedIntegrationTests` 补充 cacheLimit 恢复与 live memoryLimit 不变验证，长流式测试采用同样的工作单元缓存作用域。
 
 模型测试（默认跳过，需要本地已安装 Sortformer）：
 - `SortformerBoundedFeedIntegrationTests`：20 分钟合成音频，实际锁定模型持续 feed 的 fifo/cache 上限和帧进度。合成测试不替代真实多人质量验证。
@@ -88,4 +106,4 @@ VOXT_RUN_MODEL_TESTS=1 VOXT_MODEL_STORAGE_ROOT='/path/to/models' \
 
 用户原始 2 小时样本至少同机复测：不清理有效任务/检查点，点击重试应跳过 ASR；确认 `speaker-feed-policy` 与 `speaker-feed-completed` 帧数受限；不再随处理分钟数逐步扩大单次计算上下文。记录窗口耗时分布、footprint/MLX/cache、系统 swap/内存压力、CPU/GPU、温度、取消响应，以及跨 5 秒和 60 秒边界的 speaker 一致性、DER、时间轴和短发言保留。
 
-另查只读转录预览不触发模型/历史写入，清理任务后找不到检查点时明确提示。不要把仅编译成功或纯递推测试通过称为长文件性能已达标。
+另外验证：普通 warning 下文件模型加载和后续小块能执行；critical/录音时继续暂停且可取消；关闭历史音频存储不创建副本；分析失败后原缓存仍有效；开启存储仅在保存阶段出现 archive-copy 日志，历史回放有效。另查只读转录预览不触发模型/历史写入，清理任务后找不到检查点时明确提示。不要把仅编译成功或纯递推测试通过称为长文件性能已达标。

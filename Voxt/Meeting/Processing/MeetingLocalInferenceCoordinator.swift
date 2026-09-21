@@ -88,7 +88,8 @@ nonisolated enum MeetingLocalInferenceCoordinatorError: LocalizedError, Sendable
 actor MeetingLocalInferenceCoordinator {
     static let shared = MeetingLocalInferenceCoordinator(
         maintainFileCache: { MeetingFileInferenceCache.trimIfNeeded(underPressure: $0) },
-        readMemoryPressure: { MeetingMemoryPressureMonitor.currentConstraint() }
+        readMemoryPressure: { MeetingMemoryPressureMonitor.currentFileConstraint() },
+        beginFileWorkUnit: { MeetingFileInferenceCache.beginWorkUnit() }
     )
 
     private struct Waiter {
@@ -113,15 +114,18 @@ actor MeetingLocalInferenceCoordinator {
     private let clock = ContinuousClock()
     private let maintainFileCache: @Sendable (Bool) -> Void
     private let readMemoryPressure: @Sendable () -> Bool?
+    private let beginFileWorkUnit: @Sendable () -> (@Sendable () -> Void)
 
     // Isolated coordinators in tests must not initialize or mutate the MLX GPU
-    // allocator. The shared production instance installs these two small hooks.
+    // allocator. The shared production instance installs the file cache hooks.
     init(
         maintainFileCache: @escaping @Sendable (Bool) -> Void = { _ in },
-        readMemoryPressure: @escaping @Sendable () -> Bool? = { nil }
+        readMemoryPressure: @escaping @Sendable () -> Bool? = { nil },
+        beginFileWorkUnit: @escaping @Sendable () -> (@Sendable () -> Void) = { {} }
     ) {
         self.maintainFileCache = maintainFileCache
         self.readMemoryPressure = readMemoryPressure
+        self.beginFileWorkUnit = beginFileWorkUnit
     }
 
     func setRecordingActive(_ isActive: Bool) {
@@ -137,12 +141,12 @@ actor MeetingLocalInferenceCoordinator {
         scheduleNextIfPossible()
     }
 
-    private func refreshMemoryPressure() {
+    private func fileMemoryBlocked() -> Bool {
         let sample = readMemoryPressure()
         memoryPressureSampleAvailable = sample != nil
-        guard let current = sample, current != memoryPressureConstrained else { return }
-        memoryPressureConstrained = current
-        VoxtLog.meeting("Meeting memory pressure changed. source=current-sample, constrained=\(current)")
+        // Do not change the notification-based policy for unrelated live/LLM
+        // callers. Only bounded file work treats a known warning as nonblocking.
+        return sample ?? memoryPressureConstrained
     }
 
     func withPermit<T: Sendable>(
@@ -155,12 +159,15 @@ actor MeetingLocalInferenceCoordinator {
             let token = try await acquire(workClass)
             let admittedAt = ContinuousClock.now
             MeetingFileTrace.event("inference-permit-admitted", "workClass=\(workClass.rawValue), waitElapsed=\(submittedAt.duration(to: admittedAt))")
+            let isFile = workClass == .fileASR || workClass == .fileSpeakerAnalysis
+            let restoreCacheLimit: (@Sendable () -> Void)? = isFile ? beginFileWorkUnit() : nil
             defer {
-                if workClass == .fileASR || workClass == .fileSpeakerAnalysis {
+                if isFile {
                     // Work has actually returned (including errors/cancellation).
                     // Trim before admitting another operation, not during native feed.
-                    maintainFileCache(memoryPressureConstrained)
+                    maintainFileCache(fileMemoryBlocked())
                 }
+                restoreCacheLimit?()
                 release(token)
                 MeetingFileTrace.event("inference-permit-released", "workClass=\(workClass.rawValue), operationElapsed=\(admittedAt.duration(to: .now))")
             }
@@ -305,18 +312,20 @@ actor MeetingLocalInferenceCoordinator {
         var lastWaitLog: ContinuousClock.Instant?
         while true {
             try Task.checkCancellation()
-            refreshMemoryPressure()
-            if !memoryPressureConstrained { reclaimedForPressure = false }
+            var fileMemoryConstrained = fileMemoryBlocked()
+            if !fileMemoryConstrained { reclaimedForPressure = false }
             if activeToken == nil {
                 // An inherited multi-GB cache can prevent the very recovery we
                 // are waiting for. Reclaim once per pressure episode; subsequent
                 // polls only trim if unused buffers again exceed the threshold.
-                maintainFileCache(memoryPressureConstrained && !reclaimedForPressure)
-                reclaimedForPressure = memoryPressureConstrained
-                refreshMemoryPressure()
+                maintainFileCache(fileMemoryConstrained && !reclaimedForPressure)
+                reclaimedForPressure = fileMemoryConstrained
+                fileMemoryConstrained = fileMemoryBlocked()
             }
             try Task.checkCancellation()
-            if activeToken == nil, canRun(workClass), waiters.isEmpty {
+            if activeToken == nil,
+               canRun(workClass, memoryBlocked: fileMemoryConstrained),
+               !waiters.contains(where: { canRun($0.workClass) }) {
                 let token = UUID()
                 activeToken = token
                 return token
@@ -324,10 +333,10 @@ actor MeetingLocalInferenceCoordinator {
             if !didWait {
                 didWait = true
                 postFileResourceWait(isWaiting: true)
-                MeetingFileTrace.event("file-permit-wait-started", "workClass=\(workClass.rawValue), recordingActive=\(recordingActive), memoryPressure=\(memoryPressureConstrained)")
+                MeetingFileTrace.event("file-permit-wait-started", "workClass=\(workClass.rawValue), recordingActive=\(recordingActive), fileMemoryBlocked=\(fileMemoryConstrained)")
             }
             if lastWaitLog == nil || lastWaitLog!.duration(to: .now) >= .seconds(15) {
-                MeetingFileTrace.event("file-permit-wait", "workClass=\(workClass.rawValue), recordingActive=\(recordingActive), memoryPressure=\(memoryPressureConstrained), pressureProbeAvailable=\(memoryPressureSampleAvailable), laneOccupied=\(activeToken != nil), queuedCount=\(waiters.count)")
+                MeetingFileTrace.event("file-permit-wait", "workClass=\(workClass.rawValue), recordingActive=\(recordingActive), fileMemoryBlocked=\(fileMemoryConstrained), pressureProbeAvailable=\(memoryPressureSampleAvailable), laneOccupied=\(activeToken != nil), queuedCount=\(waiters.count)")
                 lastWaitLog = .now
             }
             try await Task.sleep(for: .milliseconds(retryDelayMilliseconds))
@@ -348,12 +357,12 @@ actor MeetingLocalInferenceCoordinator {
         )
     }
 
-    private func canRun(_ workClass: MeetingLocalInferenceWorkClass) -> Bool {
+    private func canRun(_ workClass: MeetingLocalInferenceWorkClass, memoryBlocked: Bool? = nil) -> Bool {
         let thermalState = ProcessInfo.processInfo.thermalState
         let thermalBlocked = workClass.isThermallyDeferrable
             && (thermalState == .serious || thermalState == .critical)
         return !(recordingActive && workClass.waitsWhileRecording)
-            && !(memoryPressureConstrained && workClass.isMemoryDeferrable)
+            && !((memoryBlocked ?? memoryPressureConstrained) && workClass.isMemoryDeferrable)
             && !thermalBlocked
     }
 }

@@ -159,11 +159,13 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
             guard let asset = await loadAsset(descriptor) else {
                 throw MeetingSpeakerFeedError.audioUnavailable
             }
-            let prepared = ASRVoiceActivitySampleRateConverter.resample(
-                samples: asset.samples,
-                from: asset.sampleRate,
-                to: 16_000
-            )
+            // Prepared file PCM is already finite, mono and 16 kHz. Avoid the
+            // converter's full-window sanitizing map/copy on this trusted path.
+            let prepared = fileAnalysis && asset.sampleRate == 16_000
+                ? asset.samples
+                : ASRVoiceActivitySampleRateConverter.resample(
+                    samples: asset.samples, from: asset.sampleRate, to: 16_000
+                )
             guard !prepared.isEmpty else {
                 throw MeetingSpeakerFeedError.audioUnavailable
             }

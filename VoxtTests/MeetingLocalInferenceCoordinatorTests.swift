@@ -178,6 +178,27 @@ final class MeetingLocalInferenceCoordinatorTests: XCTestCase {
         XCTAssertEqual(recoveredPeak, 1)
     }
 
+    func testBlockedNonFileWaiterDoesNotPreventBoundedFileWorkUnderWarning() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator(readMemoryPressure: { false })
+        let gate = MeetingInferenceGate()
+        let order = MeetingInferenceOrderRecorder()
+        let active = Task { try await coordinator.withPermit(.liveASRFinal) { await gate.wait() } }
+        await gate.waitUntilStarted()
+        let summary = Task { try await coordinator.withPermit(.summary) { await order.append("summary") } }
+        let queued = await waitForQueuedWork(1, coordinator: coordinator)
+        XCTAssertTrue(queued)
+        await coordinator.setMemoryPressureConstrained(true)
+        await gate.open()
+        try await active.value
+        try await coordinator.withPermit(.fileSpeakerAnalysis) { await order.append("file") }
+        let duringWarning = await order.values()
+        XCTAssertEqual(duringWarning, ["file"])
+        await coordinator.setMemoryPressureConstrained(false)
+        try await summary.value
+        let final = await order.values()
+        XCTAssertEqual(final, ["file", "summary"])
+    }
+
     func testBackgroundWorkWaitsWhileRecording() async throws {
         let coordinator = MeetingLocalInferenceCoordinator()
         let tracker = MeetingInferenceConcurrencyTracker()

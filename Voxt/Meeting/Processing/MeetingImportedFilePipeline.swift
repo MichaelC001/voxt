@@ -7,14 +7,17 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
     private let modelManager: MLXModelManager
     private let engineContext: MeetingASREngineContext
     private let sourceIsPreparedAudio: Bool
+    private let archivePreparedAudio: Bool
     private var transcriber: (any MeetingSegmentTranscribing)?
     private var holdsModelUse = false
     private var preparedAudioURL: URL?
 
-    init(modelManager: MLXModelManager, engineContext: MeetingASREngineContext, sourceIsPreparedAudio: Bool = false) {
+    init(modelManager: MLXModelManager, engineContext: MeetingASREngineContext,
+         sourceIsPreparedAudio: Bool = false, archivePreparedAudio: Bool = true) {
         self.modelManager = modelManager
         self.engineContext = engineContext
         self.sourceIsPreparedAudio = sourceIsPreparedAudio
+        self.archivePreparedAudio = archivePreparedAudio
     }
 
     func analyze(
@@ -24,7 +27,7 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
         try Task.checkCancellation()
         progress(MeetingFileAnalysisProgress(stage: .preparing, stageFraction: sourceIsPreparedAudio ? 1 : 0))
         let startedAt = ContinuousClock.now
-        var stage = "archive-preparation"
+        var stage = "audio-validation"
         MeetingFileTrace.event("pipeline-started", "preparedInput=\(sourceIsPreparedAudio), engine=\(engineContext.engine.rawValue)")
         do {
             let sourceIsPreparedAudio = sourceIsPreparedAudio
@@ -32,7 +35,7 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
             let preparationTask = Task.detached(priority: .utility) {
                 try await MeetingFileTrace.$taskID.withValue(traceTaskID) {
                     if sourceIsPreparedAudio {
-                        return try await MeetingImportedAudioFile.copyPreparedForAnalysis(from: sourceURL)
+                        return try MeetingImportedAudioFile.validatedPreparedFile(at: sourceURL)
                     }
                     return try await MeetingImportedAudioFile.prepare(from: sourceURL) { fraction in
                         await progress(
@@ -49,7 +52,9 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
             } onCancel: {
                 preparationTask.cancel()
             }
-            preparedAudioURL = importedAudio.standardizedAudioURL
+            // Queue caches are borrowed read-only, never owned by this pipeline.
+            // Only newly created temporary audio can be removed by cleanup.
+            if !sourceIsPreparedAudio { preparedAudioURL = importedAudio.standardizedAudioURL }
             try Task.checkCancellation()
 
             progress(
@@ -86,53 +91,56 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                 "durationSeconds=\(importedAudio.durationSeconds), windows=\(importedAudio.assetDescriptors.count), resumeFromWindow=\(startingDescriptorIndex)"
             )
             progress(MeetingFileAnalysisProgress(stage: .transcribing))
-            let importedTranscriber = try makeTranscriber()
-            transcriber = importedTranscriber
-            try Task.checkCancellation()
+            let transcriptSegments: [MeetingTranscriptSegment]
+            do {
+                let importedTranscriber = try makeTranscriber()
+                transcriber = importedTranscriber
+                try Task.checkCancellation()
 
-            let transcriptSegments = try await MeetingFinalTranscriptionPass.transcribe(
-                descriptors: importedAudio.assetDescriptors,
-                loadAsset: { descriptor in
-                    importedAudio.loadAsset(descriptor)
-                },
-                transcriber: importedTranscriber,
-                requiresCompleteTranscription: true,
-                processedDurationProgress: { fraction, processedDuration in
-                    await progress(
-                        MeetingFileAnalysisProgress(
-                            stage: .transcribing,
-                            stageFraction: fraction,
-                            mediaDurationSeconds: importedAudio.durationSeconds,
-                            processedMediaDurationSeconds: processedDuration
+                transcriptSegments = try await MeetingFinalTranscriptionPass.transcribe(
+                    descriptors: importedAudio.assetDescriptors,
+                    loadAsset: { descriptor in
+                        importedAudio.loadAsset(descriptor)
+                    },
+                    transcriber: importedTranscriber,
+                    requiresCompleteTranscription: true,
+                    processedDurationProgress: { fraction, processedDuration in
+                        await progress(
+                            MeetingFileAnalysisProgress(
+                                stage: .transcribing,
+                                stageFraction: fraction,
+                                mediaDurationSeconds: importedAudio.durationSeconds,
+                                processedMediaDurationSeconds: processedDuration
+                            )
                         )
-                    )
-                },
-                initialSegments: initialSegments,
-                startingDescriptorIndex: startingDescriptorIndex,
-                checkpoint: { segments, completedDescriptorCount in
-                    guard let taskID else { return }
-                    await checkpointStore.save(
-                        MeetingFileASRCheckpoint(
-                            schemaVersion: MeetingFileASRCheckpoint.currentSchemaVersion,
-                            taskID: taskID,
-                            preparedAudioSampleCount: importedAudio.sampleCount,
-                            descriptorCount: importedAudio.assetDescriptors.count,
-                            modelFingerprint: modelFingerprint,
-                            completedDescriptorCount: completedDescriptorCount,
-                            segments: segments,
-                            updatedAt: Date()
+                    },
+                    initialSegments: initialSegments,
+                    startingDescriptorIndex: startingDescriptorIndex,
+                    checkpoint: { segments, completedDescriptorCount in
+                        guard let taskID else { return }
+                        await checkpointStore.save(
+                            MeetingFileASRCheckpoint(
+                                schemaVersion: MeetingFileASRCheckpoint.currentSchemaVersion,
+                                taskID: taskID,
+                                preparedAudioSampleCount: importedAudio.sampleCount,
+                                descriptorCount: importedAudio.assetDescriptors.count,
+                                modelFingerprint: modelFingerprint,
+                                completedDescriptorCount: completedDescriptorCount,
+                                segments: segments,
+                                updatedAt: Date()
+                            )
                         )
-                    )
-                    MeetingFileTrace.event("asr-checkpoint-saved", "completedWindows=\(completedDescriptorCount), segments=\(segments.count)")
-                }
-            )
+                        MeetingFileTrace.event("asr-checkpoint-saved", "completedWindows=\(completedDescriptorCount), segments=\(segments.count)")
+                    }
+                )
+            }
             try Task.checkCancellation()
             MeetingFileTrace.event("transcription-completed", "segments=\(transcriptSegments.count), elapsed=\(startedAt.duration(to: .now))")
             guard !MeetingTranscriptFormatter.meaningfulSegments(for: transcriptSegments).isEmpty else {
                 throw MeetingFileAnalysisError.noTranscript
             }
 
-            releaseASRResourcesAtStageBoundary()
+            await releaseASRResourcesAtStageBoundary()
             stage = "identifyingSpeakers"
             MeetingFileTrace.event("speaker-analysis-requested", "segments=\(transcriptSegments.count)")
             progress(MeetingFileAnalysisProgress(stage: .identifyingSpeakers))
@@ -154,6 +162,21 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
             MeetingFileTrace.event("speaker-analysis-returned", "segments=\(finalSegments.count)")
             stage = "saving"
             progress(MeetingFileAnalysisProgress(stage: .saving))
+            if sourceIsPreparedAudio, archivePreparedAudio {
+                // History moves its input. Create an independent copy only after
+                // analysis succeeds and only when an archive was requested.
+                let traceID = MeetingFileTrace.taskID
+                let archiveTask = Task.detached(priority: .utility) {
+                    try await MeetingFileTrace.$taskID.withValue(traceID) {
+                        try await MeetingImportedAudioFile.copyPreparedForAnalysis(from: sourceURL)
+                    }
+                }
+                let archive = try await withTaskCancellationHandler {
+                    try await archiveTask.value
+                } onCancel: { archiveTask.cancel() }
+                preparedAudioURL = archive.standardizedAudioURL
+                try Task.checkCancellation()
+            }
             let result = MeetingSessionResult(
                 captureMode: .meeting,
                 transcriptionEngine: engineContext.engine,
@@ -161,7 +184,7 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                 segments: finalSegments,
                 visibleSnapshotSegments: finalSegments,
                 audioDurationSeconds: importedAudio.durationSeconds,
-                archivedAudioURL: importedAudio.standardizedAudioURL
+                archivedAudioURL: preparedAudioURL
             )
             MeetingFileTrace.event("pipeline-result-ready", "elapsed=\(startedAt.duration(to: .now)), segments=\(finalSegments.count)")
             return result
@@ -174,7 +197,9 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
         }
     }
 
-    private func releaseASRResourcesAtStageBoundary() {
+    private func releaseASRResourcesAtStageBoundary() async {
+        await transcriber?.cancelPendingWork()
+        transcriber = nil
         guard holdsModelUse else { return }
         holdsModelUse = false
         modelManager.endActiveUse()
