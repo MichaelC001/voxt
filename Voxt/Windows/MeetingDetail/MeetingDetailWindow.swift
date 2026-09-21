@@ -20,10 +20,38 @@ final class MeetingDetailWindowManager {
     typealias TranscriptSegmentsPersistence = @MainActor (UUID, [MeetingTranscriptSegment]) -> TranscriptionHistoryEntry?
 
     private var historyControllers: [UUID: MeetingDetailWindowController] = [:]
+    private var fileControllers: [UUID: MeetingDetailWindowController] = [:]
     private var liveController: MeetingDetailWindowController?
+
+    func presentFileTranscript(taskID: UUID, title: String, segments: [MeetingTranscriptSegment]) {
+        let controller: MeetingDetailWindowController
+        if let existing = fileControllers[taskID] {
+            controller = existing
+            if !controller.displaysFileTranscript(title: title, segments: segments) {
+                let viewModel = MeetingDetailViewModel(fileTaskTitle: title, segments: segments)
+                controller.replaceViewModel(viewModel) { [weak self] in self?.fileControllers[taskID] = nil }
+            }
+        } else {
+            let viewModel = MeetingDetailViewModel(fileTaskTitle: title, segments: segments)
+            controller = MeetingDetailWindowController(viewModel: viewModel) { [weak self] in
+                self?.fileControllers[taskID] = nil
+            }
+            fileControllers[taskID] = controller
+        }
+        controller.showWindow(nil)
+        AppBehaviorController.bringStandardWindowToFront(controller.window)
+    }
+
+    func hasFileTranscriptWindow(taskID: UUID) -> Bool { fileControllers[taskID] != nil }
+
+    func closeFileTranscript(taskID: UUID) {
+        fileControllers.removeValue(forKey: taskID)?.close()
+    }
 
     func presentHistoryMeeting(
         entry: TranscriptionHistoryEntry,
+        replacingFileTaskID: UUID? = nil,
+        activate: Bool = true,
         audioURL: URL?,
         initialSummarySettings: MeetingSummarySettingsSnapshot,
         summaryModelOptionsProvider: @escaping SummaryModelOptionsProvider,
@@ -38,12 +66,15 @@ final class MeetingDetailWindowManager {
         transcriptSegmentsPersistence: @escaping TranscriptSegmentsPersistence
     ) {
         if let controller = historyControllers[entry.id] {
+            if let replacingFileTaskID { closeFileTranscript(taskID: replacingFileTaskID) }
             controller.refreshSummaryConfiguration(
                 settings: summarySettingsProvider(),
                 modelOptions: summaryModelOptionsProvider()
             )
-            controller.showWindow(nil)
-            AppBehaviorController.bringStandardWindowToFront(controller.window)
+            if activate {
+                controller.showWindow(nil)
+                AppBehaviorController.bringStandardWindowToFront(controller.window)
+            }
             return
         }
 
@@ -72,12 +103,22 @@ final class MeetingDetailWindowManager {
             summaryChatPersistence: summaryChatPersistence,
             transcriptSegmentsPersistence: transcriptSegmentsPersistence
         )
-        let controller = MeetingDetailWindowController(viewModel: viewModel) { [weak self] in
-            self?.historyControllers[entry.id] = nil
+        let onClose: () -> Void = { [weak self] in self?.historyControllers[entry.id] = nil }
+        let controller: MeetingDetailWindowController
+        if let replacingFileTaskID,
+           let draftController = fileControllers.removeValue(forKey: replacingFileTaskID) {
+            // Preserve NSWindow identity/frame; replace the view tree so playback
+            // StateObjects bind only to the final history-owned archive URL.
+            controller = draftController
+            controller.replaceViewModel(viewModel, onClose: onClose)
+        } else {
+            controller = MeetingDetailWindowController(viewModel: viewModel, onClose: onClose)
         }
         historyControllers[entry.id] = controller
-        controller.showWindow(nil)
-        AppBehaviorController.bringStandardWindowToFront(controller.window)
+        if activate {
+            controller.showWindow(nil)
+            AppBehaviorController.bringStandardWindowToFront(controller.window)
+        }
     }
 
     func presentLiveMeeting(
@@ -124,7 +165,7 @@ private final class MeetingDetailWindowController: NSWindowController, NSWindowD
     private static let defaultWindowSize = NSSize(width: 1040, height: 700)
     private static let minimumWindowSize = NSSize(width: 860, height: 560)
 
-    private let onClose: () -> Void
+    private var onClose: () -> Void
 
     init(viewModel: MeetingDetailViewModel, onClose: @escaping () -> Void) {
         self.onClose = onClose
@@ -160,6 +201,21 @@ private final class MeetingDetailWindowController: NSWindowController, NSWindowD
         window.standardWindowButton(.miniaturizeButton)?.isHidden = false
         window.standardWindowButton(.zoomButton)?.isHidden = false
         positionWindowTrafficLightButtons(window)
+        scheduleTrafficLightButtonPositionUpdate(for: window)
+    }
+
+    func displaysFileTranscript(title: String, segments: [MeetingTranscriptSegment]) -> Bool {
+        guard let host = window?.contentViewController as? NSHostingController<MeetingDetailWindowView> else { return false }
+        let model = host.rootView.viewModel
+        return model.mode == .fileDraft && model.title == title && model.segments == segments
+    }
+
+    func replaceViewModel(_ viewModel: MeetingDetailViewModel, onClose: @escaping () -> Void) {
+        self.onClose = onClose
+        guard let window else { return }
+        let frame = window.frame
+        window.contentViewController = NSHostingController(rootView: MeetingDetailWindowView(viewModel: viewModel))
+        window.setFrame(frame, display: true)
         scheduleTrafficLightButtonPositionUpdate(for: window)
     }
 

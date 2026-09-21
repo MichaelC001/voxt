@@ -31,11 +31,7 @@ extension FeatureSettingsView {
                                 },
                                 onViewTranscript: {
                                     Task { @MainActor in
-                                        guard let text = await meetingFileTaskQueue.completedTranscript(taskID: task.id) else {
-                                            showMeetingFileImportToast(featureSettingsLocalized("No completed transcription checkpoint is available."))
-                                            return
-                                        }
-                                        fileTranscriptPreview = FileTranscriptPreview(id: task.id, text: text)
+                                        await AppDelegate.shared?.showMeetingFileTranscript(taskID: task.id)
                                     }
                                 }
                             )

@@ -194,6 +194,8 @@ final class MeetingFileTaskQueue: ObservableObject {
     private let cancelActiveAnalysis: ActiveAnalysisCanceller
     private let canStart: CanStartProvider
     private let rollbackAnalysis: AnalysisRollback
+    private let onAnalysisCompleted: @MainActor (UUID, TranscriptionHistoryEntry) -> Void
+    private let onTaskRemoved: @MainActor (UUID) -> Void
     private let fileManager: FileManager
     private let now: () -> Date
     private let storageDirectoryURL: URL
@@ -221,6 +223,8 @@ final class MeetingFileTaskQueue: ObservableObject {
                 from: source, to: destination, limits: limits, checkpoint: checkpoint, progress: progress
             )
         },
+        onAnalysisCompleted: @escaping @MainActor (UUID, TranscriptionHistoryEntry) -> Void = { _, _ in },
+        onTaskRemoved: @escaping @MainActor (UUID) -> Void = { _ in },
         fileManager: FileManager = .default,
         storageDirectoryURL: URL? = nil,
         now: @escaping () -> Date = Date.init
@@ -230,6 +234,8 @@ final class MeetingFileTaskQueue: ObservableObject {
         self.cancelActiveAnalysis = cancelActiveAnalysis
         self.canStart = canStart
         self.rollbackAnalysis = rollbackAnalysis
+        self.onAnalysisCompleted = onAnalysisCompleted
+        self.onTaskRemoved = onTaskRemoved
         self.fileManager = fileManager
         self.now = now
 
@@ -269,14 +275,14 @@ final class MeetingFileTaskQueue: ObservableObject {
 
     /// An unfinished speaker pass must not hide an already completed ASR result.
     /// Read the durable checkpoint, never a partial in-flight transcript array.
-    func completedTranscript(taskID: UUID) async -> String? {
+    func completedTranscriptSegments(taskID: UUID) async -> [MeetingTranscriptSegment]? {
         guard task(id: taskID) != nil,
               let checkpoint = await MeetingFileAnalysisCheckpointStore.shared.load(taskID: taskID),
               checkpoint.taskID == taskID,
               checkpoint.completedDescriptorCount == checkpoint.descriptorCount,
               task(id: taskID) != nil else { return nil }
-        let text = MeetingTranscriptFormatter.joinedText(for: checkpoint.segments)
-        return text.isEmpty ? nil : text
+        let segments = MeetingTranscriptPostProcessor.process(checkpoint.segments)
+        return segments.isEmpty ? nil : segments
     }
 
     func enqueue(urls: [URL]) {
@@ -380,6 +386,7 @@ final class MeetingFileTaskQueue: ObservableObject {
         let finishedTasks = tasks.filter(\.isTerminal)
         tasks.removeAll(where: \.isTerminal)
         for task in finishedTasks {
+            onTaskRemoved(task.id)
             Task { await MeetingFileAnalysisCheckpointStore.shared.clear(taskID: task.id) }
             try? fileManager.removeItem(at: stagedURL(for: task))
             if let legacyName = task.legacyStagedFileName {
@@ -519,7 +526,8 @@ final class MeetingFileTaskQueue: ObservableObject {
                     tasks[finishedIndex].status = .cancelled
                     tasks[finishedIndex].completedAt = now()
                 } else {
-                    await MeetingFileAnalysisCheckpointStore.shared.clear(taskID: taskID)
+                    // Publish completion before checkpoint cleanup can suspend.
+                    // Preview readers can now resolve the durable history entry.
                     tasks[finishedIndex].status = .completed
                     tasks[finishedIndex].completedAt = now()
                     tasks[finishedIndex].progressStage = .saving
@@ -535,6 +543,8 @@ final class MeetingFileTaskQueue: ObservableObject {
                             "historyEntryID": entry.id.uuidString
                         ]
                     )
+                    onAnalysisCompleted(taskID, entry)
+                    await MeetingFileAnalysisCheckpointStore.shared.clear(taskID: taskID)
                 }
             } catch is CancellationError {
                 if isShuttingDown {

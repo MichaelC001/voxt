@@ -190,6 +190,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         },
         rollbackAnalysis: { @MainActor [weak self] entry in
             _ = self?.historyStore.delete(id: entry.id)
+        },
+        onAnalysisCompleted: { @MainActor [weak self] taskID, entry in
+            guard let self, self.meetingDetailWindowManager.hasFileTranscriptWindow(taskID: taskID) else { return }
+            self.showMeetingDetailWindow(for: entry, replacingFileTaskID: taskID, activate: false)
+        },
+        onTaskRemoved: { @MainActor [weak self] taskID in
+            self?.meetingDetailWindowManager.closeFileTranscript(taskID: taskID)
         }
     )
     var statusItem: NSStatusItem?

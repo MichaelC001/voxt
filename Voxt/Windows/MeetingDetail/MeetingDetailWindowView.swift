@@ -29,7 +29,7 @@ struct MeetingDetailWindowView: View {
                     leftPane
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    if !viewModel.isSummaryCollapsed {
+                    if viewModel.mode != .fileDraft, !viewModel.isSummaryCollapsed {
                         rightSidebar
                             .frame(width: sidebarWidth)
                             .frame(maxHeight: .infinity)
@@ -104,6 +104,14 @@ struct MeetingDetailWindowView: View {
         VStack(alignment: .leading, spacing: 12) {
             topToolbar
 
+            if viewModel.mode == .fileDraft {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: viewModel.title).font(.headline).lineLimit(1)
+                    Text(viewModel.subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+            }
+
             if viewModel.isSearchPresented {
                 transcriptSearchBar
             }
@@ -146,7 +154,8 @@ struct MeetingDetailWindowView: View {
                     tint: Color.accentColor,
                     isActive: viewModel.translationEnabled,
                     helpText: AppLocalization.localizedString("Translate"),
-                    accessibilityText: AppLocalization.localizedString("Translate")
+                    accessibilityText: AppLocalization.localizedString("Translate"),
+                    isDisabled: viewModel.mode == .fileDraft
                 ) {
                     MeetingDetailTranslateIcon(
                         color: viewModel.translationEnabled ? Color.accentColor : Color.secondary
@@ -164,6 +173,16 @@ struct MeetingDetailWindowView: View {
                     MeetingDetailExportIcon(color: .secondary)
                 }
 
+                if viewModel.mode == .fileDraft {
+                    Button(AppLocalization.localizedString("Copy")) {
+                        _ = AppDelegate.shared?.pasteboardTextWriter.write(
+                            MeetingTranscriptFormatter.joinedText(for: viewModel.segments),
+                            to: .general, restorePrevious: false
+                        )
+                    }
+                    .buttonStyle(MeetingPillButtonStyle())
+                }
+
                 Rectangle()
                     .fill(MeetingDetailUIStyle.dividerColor)
                     .frame(width: 1, height: 18)
@@ -177,7 +196,8 @@ struct MeetingDetailWindowView: View {
                     ),
                     accessibilityText: AppLocalization.localizedString(
                         viewModel.isSummaryCollapsed ? "Expand Summary" : "Collapse Summary"
-                    )
+                    ),
+                    isDisabled: viewModel.mode == .fileDraft
                 ) {
                     MeetingDetailSummaryCollapseIcon(
                         color: viewModel.isSummaryCollapsed ? Color.accentColor : Color.secondary

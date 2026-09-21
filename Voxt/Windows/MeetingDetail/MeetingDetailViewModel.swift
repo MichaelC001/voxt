@@ -31,6 +31,7 @@ final class MeetingDetailViewModel: ObservableObject {
     enum Mode {
         case history
         case live
+        case fileDraft
     }
 
     @Published private(set) var title: String
@@ -164,6 +165,40 @@ final class MeetingDetailViewModel: ObservableObject {
         refreshTranscriptListCaches()
     }
 
+    /// Completed ASR checkpoint, not a history entry. No writable persistence or
+    /// inference handlers are installed until the task finishes successfully.
+    init(fileTaskTitle: String, segments: [MeetingTranscriptSegment]) {
+        self.mode = .fileDraft
+        self.title = fileTaskTitle
+        self.subtitle = AppLocalization.localizedString("Transcription ready — speaker analysis incomplete")
+        self.captureMode = .meeting
+        self.historyEntryID = nil
+        self.summary = nil
+        self.summaryChatMessages = []
+        self.summaryModelOptions = []
+        self.segments = segments
+        self.audioURL = nil // Do not give the player a deletable queue-cache path.
+        self.translationHandler = { _, _ in .cancelled() }
+        self.summarySettingsProvider = nil
+        self.summaryModelOptionsProvider = nil
+        self.summaryStatusProvider = nil
+        self.summaryGenerator = nil
+        self.summaryPersistence = nil
+        self.summaryStalePersistence = nil
+        self.summaryChatAnswerer = nil
+        self.summaryChatPersistence = nil
+        self.transcriptSegmentsPersistence = nil
+        self.historySubtitle = nil
+        self.translationDraftLanguageRaw = Self.initialTranslationLanguageRaw()
+        self.translationEnabled = false
+        self.summaryAutoGenerate = false
+        self.summaryPromptTemplate = ""
+        self.summaryModelSelectionID = ""
+        self.isSummaryCollapsed = true
+        bindInterfaceLanguageChanges()
+        refreshTranscriptListCaches()
+    }
+
     init(
         liveState: MeetingOverlayState,
         initialSummarySettings: MeetingSummarySettingsSnapshot,
@@ -277,12 +312,13 @@ final class MeetingDetailViewModel: ObservableObject {
                 return
             }
             regenerateSummary(isAutomatic: true)
-        case .live:
+        case .live, .fileDraft:
             summaryState = .idle
         }
     }
 
     func setTranslationEnabled(_ isEnabled: Bool) {
+        guard mode != .fileDraft else { return }
         guard isEnabled else {
             isTranslationLanguagePickerPresented = false
             translationEnabled = false
@@ -305,6 +341,7 @@ final class MeetingDetailViewModel: ObservableObject {
     }
 
     func confirmTranslationLanguageSelection() {
+        guard mode != .fileDraft else { return }
         guard let language = TranslationTargetLanguage(rawValue: translationDraftLanguageRaw) else {
             cancelTranslationLanguageSelection()
             return
@@ -330,12 +367,13 @@ final class MeetingDetailViewModel: ObservableObject {
     }
 
     func setTranscriptPresentationMode(_ mode: TranscriptPresentationMode) {
+        guard self.mode != .fileDraft || mode == .timeline else { return }
         guard captureMode.capabilities.allowsSpeakerFeatures || mode == .timeline else { return }
         transcriptPresentationModeRaw = mode.rawValue
     }
 
     func setTranscriptSpeakerDisplayMode(_ mode: TranscriptSpeakerDisplayMode) {
-        guard captureMode.capabilities.allowsSpeakerFeatures else { return }
+        guard self.mode != .fileDraft, captureMode.capabilities.allowsSpeakerFeatures else { return }
         transcriptSpeakerDisplayModeRaw = mode.rawValue
         refreshTranscriptListCaches()
     }
@@ -354,6 +392,7 @@ final class MeetingDetailViewModel: ObservableObject {
     }
 
     func toggleSummaryCollapsed() {
+        guard mode != .fileDraft else { return }
         isSummaryCollapsed.toggle()
     }
 
@@ -530,6 +569,7 @@ final class MeetingDetailViewModel: ObservableObject {
     }
 
     func setSummaryAutoGenerate(_ isEnabled: Bool) {
+        guard mode != .fileDraft else { return }
         summaryAutoGenerate = isEnabled
         FeatureSettingsStore.update(defaults: .standard) { settings in
             settings.meeting.summaryAutoGenerate = isEnabled
@@ -540,6 +580,7 @@ final class MeetingDetailViewModel: ObservableObject {
     }
 
     func setSummaryPromptTemplate(_ promptTemplate: String) {
+        guard mode != .fileDraft else { return }
         summaryPromptTemplate = promptTemplate
         FeatureSettingsStore.update(defaults: .standard) { settings in
             settings.meeting.summaryPrompt = AppPromptDefaults.canonicalStoredText(
@@ -554,6 +595,7 @@ final class MeetingDetailViewModel: ObservableObject {
     }
 
     func setSummaryModelSelectionID(_ selectionID: String) {
+        guard mode != .fileDraft else { return }
         summaryModelSelectionID = selectionID
         FeatureSettingsStore.update(defaults: .standard) { settings in
             settings.meeting.summaryModelSelectionID = FeatureModelSelectionID
@@ -743,6 +785,8 @@ final class MeetingDetailViewModel: ObservableObject {
                 case .live:
                     self.title = AppLocalization.localizedString("Meeting Details")
                     self.updateLiveSubtitle()
+                case .fileDraft:
+                    self.subtitle = AppLocalization.localizedString("Transcription ready — speaker analysis incomplete")
                 }
             }
             .store(in: &cancellables)
@@ -764,6 +808,7 @@ final class MeetingDetailViewModel: ObservableObject {
         settings: MeetingSummarySettingsSnapshot,
         modelOptions: [MeetingSummaryModelOption]
     ) {
+        guard mode != .fileDraft else { return }
         summaryModelOptions = modelOptions
         let resolvedConfiguration = Self.resolveSummaryConfiguration(
             settings: settings,

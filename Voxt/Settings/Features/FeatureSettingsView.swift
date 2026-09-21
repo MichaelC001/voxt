@@ -24,7 +24,6 @@ struct FeatureSettingsView: View {
 
     @State var featureSettings = FeatureSettings.placeholder
     @State var selectorSheet: FeatureModelSelectorSheet?
-    @State var fileTranscriptPreview: FileTranscriptPreview?
     @State var remindersListDescriptors: [RemindersListDescriptor] = []
     @State var isRemindersListSheetPresented = false
     @State var isMeetingAdvancedSettingsExpanded = false
@@ -73,9 +72,6 @@ struct FeatureSettingsView: View {
             Button(featureSettingsLocalized("OK"), role: .cancel) {}
         } message: {
             Text(featureSettingsLocalized("Finish or cancel all file tasks before disabling Files."))
-        }
-        .sheet(item: $fileTranscriptPreview) { preview in
-            FileTranscriptPreviewSheet(preview: preview)
         }
         .sheet(item: $selectorSheet) { sheet in
             FeatureModelSelectorDialog(

@@ -56,6 +56,8 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         var processedNames: [String] = []
         var activeAnalyses = 0
         var maximumActiveAnalyses = 0
+        var completedTaskIDs: [UUID] = []
+        var removedTaskIDs: [UUID] = []
 
         let queue = MeetingFileTaskQueue(
             analyzer: { sourceURL, _, progress in
@@ -70,6 +72,8 @@ final class MeetingFileTaskQueueTests: XCTestCase {
             },
             cancelActiveAnalysis: {},
             canStart: { true },
+            onAnalysisCompleted: { taskID, _ in completedTaskIDs.append(taskID) },
+            onTaskRemoved: { removedTaskIDs.append($0) },
             storageDirectoryURL: storage.url.appendingPathComponent("tasks", isDirectory: true)
         )
 
@@ -80,6 +84,9 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         XCTAssertEqual(maximumActiveAnalyses, 1)
         XCTAssertEqual(queue.tasks.map(\.status), [.completed, .completed])
         XCTAssertTrue(queue.tasks.allSatisfy { $0.historyEntryID != nil })
+        XCTAssertEqual(completedTaskIDs, queue.tasks.map(\.id))
+        queue.clearFinishedTasks()
+        XCTAssertEqual(removedTaskIDs, completedTaskIDs)
         await queue.shutdown()
     }
 
@@ -530,16 +537,18 @@ final class MeetingFileTaskQueueTests: XCTestCase {
             schemaVersion: 1, taskID: id, preparedAudioSampleCount: 32_000, descriptorCount: 2,
             modelFingerprint: "test", completedDescriptorCount: 1, segments: [segment], updatedAt: Date()
         ))
-        let partial = await queue.completedTranscript(taskID: id)
+        let partial = await queue.completedTranscriptSegments(taskID: id)
         XCTAssertNil(partial)
         await store.save(MeetingFileASRCheckpoint(
             schemaVersion: 1, taskID: id, preparedAudioSampleCount: 32_000, descriptorCount: 2,
             modelFingerprint: "test", completedDescriptorCount: 2, segments: [segment], updatedAt: Date()
         ))
-        let complete = await queue.completedTranscript(taskID: id)
-        XCTAssertTrue(complete?.contains("ASR result") == true)
+        let complete = await queue.completedTranscriptSegments(taskID: id)
+        XCTAssertEqual(complete?.first?.text, "ASR result")
+        XCTAssertEqual(complete?.first?.startSeconds, 0)
+        XCTAssertEqual(complete?.first?.endSeconds, 1)
         await store.clear(taskID: id)
-        let cleared = await queue.completedTranscript(taskID: id)
+        let cleared = await queue.completedTranscriptSegments(taskID: id)
         XCTAssertNil(cleared)
         await queue.shutdown()
     }
