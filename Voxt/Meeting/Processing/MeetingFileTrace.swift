@@ -46,6 +46,15 @@ nonisolated enum MeetingFileTrace {
             }
         }
         let rss = result == KERN_SUCCESS ? String(info.resident_size) : "unavailable"
-        return "processRSSBytes=\(rss), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue)"
+        var vm = task_vm_info_data_t()
+        var vmCount = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let vmResult = withUnsafeMutablePointer(to: &vm) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(vmCount)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &vmCount)
+            }
+        }
+        let footprint = vmResult == KERN_SUCCESS ? String(vm.phys_footprint) : "unavailable"
+        let compressed = vmResult == KERN_SUCCESS ? String(vm.compressed) : "unavailable"
+        return "processRSSBytes=\(rss), physicalFootprintBytes=\(footprint), compressedBytes=\(compressed), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue)"
     }
 }

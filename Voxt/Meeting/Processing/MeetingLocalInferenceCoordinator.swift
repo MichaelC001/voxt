@@ -9,6 +9,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
     case liveASRPartial
     case realtimeTranslation
     case fileASR
+    case fileSpeakerAnalysis
     case finalASR
     case speakerAnalysis
     case detailTranslation
@@ -20,7 +21,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
         case .liveASRFinal: return 95
         case .liveASRPartial: return 85
         case .realtimeTranslation: return 70
-        case .fileASR: return 10
+        case .fileASR, .fileSpeakerAnalysis: return 10
         case .finalASR: return 60
         case .speakerAnalysis: return 50
         case .detailTranslation: return 40
@@ -30,7 +31,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
 
     var waitsWhileRecording: Bool {
         switch self {
-        case .fileASR, .finalASR, .speakerAnalysis, .detailTranslation, .summary:
+        case .fileASR, .fileSpeakerAnalysis, .finalASR, .speakerAnalysis, .detailTranslation, .summary:
             return true
         case .liveASRFeed, .liveASRFinal, .liveASRPartial, .realtimeTranslation:
             return false
@@ -41,7 +42,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
         switch self {
         case .liveASRFeed, .liveASRFinal, .finalASR:
             return false
-        case .liveASRPartial, .realtimeTranslation, .fileASR, .speakerAnalysis, .detailTranslation, .summary:
+        case .liveASRPartial, .realtimeTranslation, .fileASR, .fileSpeakerAnalysis, .speakerAnalysis, .detailTranslation, .summary:
             return true
         }
     }
@@ -50,7 +51,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
         switch self {
         case .liveASRFeed, .liveASRFinal, .finalASR:
             return false
-        case .liveASRPartial, .realtimeTranslation, .fileASR, .speakerAnalysis, .detailTranslation, .summary:
+        case .liveASRPartial, .realtimeTranslation, .fileASR, .fileSpeakerAnalysis, .speakerAnalysis, .detailTranslation, .summary:
             return true
         }
     }
@@ -153,8 +154,8 @@ actor MeetingLocalInferenceCoordinator {
         try Task.checkCancellation()
         statistics.submittedCount += 1
 
-        if workClass == .fileASR {
-            try await waitForFileAnalysisResources()
+        if workClass == .fileASR || workClass == .fileSpeakerAnalysis {
+            return try await acquireFilePermit(workClass)
         }
 
         if workClass.isThermallyDeferrable {
@@ -256,30 +257,33 @@ actor MeetingLocalInferenceCoordinator {
         waiter.continuation.resume(returning: token)
     }
 
-    private func waitForFileAnalysisResources() async throws {
+    private func acquireFilePermit(_ workClass: MeetingLocalInferenceWorkClass) async throws -> UUID {
+        // The file queue is serial. Recheck pressure AND lane availability on
+        // every admission, including recovery after waiting for another caller.
+        // No native work or permit is left running while sleeping.
         var didWait = false
         defer {
             if didWait {
                 postFileResourceWait(isWaiting: false)
-                VoxtLog.meeting("File ASR resource wait ended. cancelled=\(Task.isCancelled)")
+                MeetingFileTrace.event("file-permit-wait-ended", "workClass=\(workClass.rawValue), cancelled=\(Task.isCancelled)")
             }
         }
-
         var retryDelayMilliseconds = 250
-        while recordingActive
-            || memoryPressureConstrained
-            || ProcessInfo.processInfo.thermalState == .serious
-            || ProcessInfo.processInfo.thermalState == .critical {
+        while true {
             try Task.checkCancellation()
+            if activeToken == nil, canRun(workClass), waiters.isEmpty {
+                let token = UUID()
+                activeToken = token
+                return token
+            }
             if !didWait {
                 didWait = true
                 postFileResourceWait(isWaiting: true)
-                VoxtLog.meetingWarning(
-                    "File ASR resource wait started. recordingActive=\(recordingActive), memoryPressure=\(memoryPressureConstrained), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue)"
-                )
+                MeetingFileTrace.event("file-permit-wait-started", "workClass=\(workClass.rawValue), recordingActive=\(recordingActive), memoryPressure=\(memoryPressureConstrained)")
             }
             try await Task.sleep(for: .milliseconds(retryDelayMilliseconds))
             retryDelayMilliseconds = min(retryDelayMilliseconds * 2, 5_000)
+            scheduleNextIfPossible()
         }
     }
 

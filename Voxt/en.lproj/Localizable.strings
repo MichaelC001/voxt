@@ -2218,6 +2218,13 @@
 "%@ has been converted successfully." = "%@ has been converted successfully.";
 "Preparing audio…" = "Preparing audio…";
 "Waiting for system resources…" = "Waiting for system resources…";
+"The speaker model configuration cannot be processed safely." = "The speaker model configuration cannot be processed safely.";
+"Speaker analysis stopped because its streaming state exceeded the safety limit. The transcription checkpoint is preserved." = "Speaker analysis stopped because its streaming state exceeded the safety limit. The transcription checkpoint is preserved.";
+"The speaker analysis audio window is unavailable." = "The speaker analysis audio window is unavailable.";
+"View Transcription" = "View Transcription";
+"Transcription ready — speaker analysis incomplete" = "Transcription ready — speaker analysis incomplete";
+"No completed transcription checkpoint is available." = "No completed transcription checkpoint is available.";
+"Speaker analysis stopped because a short audio block took too long. The transcription checkpoint is preserved; retry when system resources are available." = "Speaker analysis stopped because a short audio block took too long. The transcription checkpoint is preserved; retry when system resources are available.";
 "The file task queue is full. Clear finished tasks before adding more files." = "The file task queue is full. Clear finished tasks before adding more files.";
 "Transcribing meeting…" = "Transcribing meeting…";
 "Identifying speakers…" = "Identifying speakers…";

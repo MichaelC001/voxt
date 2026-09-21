@@ -2213,6 +2213,13 @@
 "%@ has been converted successfully." = "%@ の変換が完了しました。";
 "Preparing audio…" = "音声を準備しています…";
 "Waiting for system resources…" = "システムリソースを待機しています…";
+"The speaker model configuration cannot be processed safely." = "話者モデルの設定を安全に処理できません。";
+"Speaker analysis stopped because its streaming state exceeded the safety limit. The transcription checkpoint is preserved." = "ストリーミング状態が安全上限を超えたため話者分析を停止しました。文字起こしのチェックポイントは保持されています。";
+"The speaker analysis audio window is unavailable." = "話者分析に必要な音声区間を読み込めません。";
+"View Transcription" = "文字起こしを表示";
+"Transcription ready — speaker analysis incomplete" = "文字起こし完了・話者分析は未完了";
+"No completed transcription checkpoint is available." = "完了した文字起こしのチェックポイントがありません。";
+"Speaker analysis stopped because a short audio block took too long. The transcription checkpoint is preserved; retry when system resources are available." = "短い音声ブロックの処理に時間がかかりすぎたため話者分析を停止しました。文字起こしのチェックポイントは保持されています。システムリソースに余裕ができたら再試行してください。";
 "The file task queue is full. Clear finished tasks before adding more files." = "ファイルタスクのキューがいっぱいです。終了したタスクを削除してからファイルを追加してください。";
 "Transcribing meeting…" = "会議を文字起こししています…";
 "Identifying speakers…" = "話者を識別しています…";

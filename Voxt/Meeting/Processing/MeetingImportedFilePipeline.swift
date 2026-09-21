@@ -136,35 +136,19 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
             stage = "identifyingSpeakers"
             MeetingFileTrace.event("speaker-analysis-requested", "segments=\(transcriptSegments.count)")
             progress(MeetingFileAnalysisProgress(stage: .identifyingSpeakers))
-            let finalSegments: [MeetingTranscriptSegment]
-            do {
-                finalSegments = try await MeetingLocalInferenceCoordinator.shared.withPermit(.speakerAnalysis) {
-                    MeetingFileTrace.event("speaker-analysis-admitted")
-                    return await MeetingSpeakerAnalysisPipeline.analyzedSegments(
-                        from: transcriptSegments,
-                        descriptors: importedAudio.assetDescriptors,
-                        loadAsset: { descriptor in
-                            importedAudio.loadAsset(descriptor)
-                        },
-                        continuousAudioURL: importedAudio.standardizedAudioURL,
-                        options: MeetingSpeakerDiarizationOptions.fromPreferences(),
-                        progress: { fraction in
-                            await progress(
-                                MeetingFileAnalysisProgress(
-                                    stage: .identifyingSpeakers,
-                                    stageFraction: fraction
-                                )
-                            )
-                        }
-                    )
+            // The file engine acquires/releases a permit per small feed, not for
+            // the entire recording. Keep native speaker state continuous inside it.
+            let finalSegments = try await MeetingSpeakerAnalysisPipeline.analyzedFileSegments(
+                from: transcriptSegments,
+                descriptors: importedAudio.assetDescriptors,
+                loadAsset: { descriptor in importedAudio.loadAsset(descriptor) },
+                options: MeetingSpeakerDiarizationOptions.fromPreferences(),
+                progress: { fraction in
+                    await progress(MeetingFileAnalysisProgress(
+                        stage: .identifyingSpeakers, stageFraction: fraction
+                    ))
                 }
-            } catch {
-                VoxtLog.meetingWarning(
-                    "Imported meeting speaker analysis skipped by device safety policy: \(error.localizedDescription)"
-                )
-                MeetingFileTrace.event("speaker-analysis-fallback", MeetingFileTaskDiagnostics.errorSummary(error))
-                finalSegments = MeetingTranscriptPostProcessor.process(transcriptSegments)
-            }
+            )
             try Task.checkCancellation()
 
             MeetingFileTrace.event("speaker-analysis-returned", "segments=\(finalSegments.count)")

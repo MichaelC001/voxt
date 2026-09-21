@@ -28,6 +28,15 @@ extension FeatureSettingsView {
                                 },
                                 onOpenDetails: {
                                     AppDelegate.shared?.showMeetingFileTaskDetail(taskID: task.id)
+                                },
+                                onViewTranscript: {
+                                    Task { @MainActor in
+                                        guard let text = await meetingFileTaskQueue.completedTranscript(taskID: task.id) else {
+                                            showMeetingFileImportToast(featureSettingsLocalized("No completed transcription checkpoint is available."))
+                                            return
+                                        }
+                                        fileTranscriptPreview = FileTranscriptPreview(id: task.id, text: text)
+                                    }
                                 }
                             )
                         }
@@ -118,6 +127,7 @@ private struct MeetingFileTaskRow: View {
     let onPrioritize: () -> Void
     let onRetry: () -> Void
     let onOpenDetails: () -> Void
+    let onViewTranscript: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -143,7 +153,13 @@ private struct MeetingFileTaskRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                actionButtons
+                VStack(alignment: .trailing, spacing: 6) {
+                    actionButtons
+                    if task.progressStage == .identifyingSpeakers, task.status != .completed {
+                        Button(featureSettingsLocalized("View Transcription"), action: onViewTranscript)
+                            .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
+                    }
+                }
             }
 
             if task.status == .preparing || task.status == .processing || task.status == .waitingForResources || task.status == .cancelling || task.status == .completed {

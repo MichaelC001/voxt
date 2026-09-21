@@ -126,6 +126,58 @@ final class MeetingLocalInferenceCoordinatorTests: XCTestCase {
         }
     }
 
+    func testFileSpeakerAnalysisWaitsForPressureAndCanBeCancelled() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator()
+        let tracker = MeetingInferenceConcurrencyTracker()
+        await coordinator.setMemoryPressureConstrained(true)
+        let task = Task {
+            try await coordinator.withPermit(.fileSpeakerAnalysis) {
+                await tracker.begin()
+                await tracker.end()
+            }
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        task.cancel()
+        do { try await task.value; XCTFail("Expected cancellation") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        let peak = await tracker.peakCount()
+        XCTAssertEqual(peak, 0)
+        await coordinator.setMemoryPressureConstrained(false)
+        try await coordinator.withPermit(.fileSpeakerAnalysis) {
+            await tracker.begin()
+            await tracker.end()
+        }
+        let recoveredPeak = await tracker.peakCount()
+        XCTAssertEqual(recoveredPeak, 1)
+    }
+
+    func testPressureAppearingWhileFileSpeakerWaitsForLaneIsRechecked() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator()
+        let gate = MeetingInferenceGate()
+        let tracker = MeetingInferenceConcurrencyTracker()
+        let first = Task {
+            try await coordinator.withPermit(.liveASRFinal) { await gate.wait() }
+        }
+        await gate.waitUntilStarted()
+        let speaker = Task {
+            try await coordinator.withPermit(.fileSpeakerAnalysis) {
+                await tracker.begin()
+                await tracker.end()
+            }
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        await coordinator.setMemoryPressureConstrained(true)
+        await gate.open()
+        try await first.value
+        try await Task.sleep(for: .milliseconds(300))
+        let peak = await tracker.peakCount()
+        XCTAssertEqual(peak, 0)
+        await coordinator.setMemoryPressureConstrained(false)
+        try await speaker.value
+        let recoveredPeak = await tracker.peakCount()
+        XCTAssertEqual(recoveredPeak, 1)
+    }
+
     func testBackgroundWorkWaitsWhileRecording() async throws {
         let coordinator = MeetingLocalInferenceCoordinator()
         let tracker = MeetingInferenceConcurrencyTracker()

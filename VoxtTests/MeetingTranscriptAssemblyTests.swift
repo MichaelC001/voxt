@@ -694,12 +694,12 @@ final class MeetingTranscriptAssemblyTests: XCTestCase {
                 )
             },
             transcriber: WholeAssetMeetingTranscriber(),
+            progress: { value in await recorder.append(value) },
             initialSegments: [initial],
             startingDescriptorIndex: 1,
             checkpoint: { segments, completedCount in
                 await checkpointCounts.append(segments.count, completedCount)
-            },
-            progress: { value in await recorder.append(value) }
+            }
         )
 
         XCTAssertEqual(segments.count, 2)
@@ -844,7 +844,6 @@ private actor MeetingAnalysisProgressRecorder {
     }
 }
 
-@MainActor
 private actor CheckpointCountRecorder {
     private var recorded: [(Int, Int)] = []
 
@@ -855,6 +854,7 @@ private actor CheckpointCountRecorder {
     func values() -> [(Int, Int)] { recorded }
 }
 
+@MainActor
 private final class WholeAssetMeetingTranscriber: MeetingSegmentTranscribing {
     private(set) var chunkTranscriptionCount = 0
 

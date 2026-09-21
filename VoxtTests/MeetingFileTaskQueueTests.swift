@@ -515,6 +515,35 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         XCTAssertEqual(payload.tasks.first?.processedMediaDurationSeconds, failed.processedMediaDurationSeconds)
     }
 
+    func testOnlyCompletedASRCheckpointCanBePreviewed() async throws {
+        let storage = try TemporaryDirectory()
+        let source = try makeSourceFile(named: "preview.wav")
+        let queue = MeetingFileTaskQueue(
+            analyzer: { _, _, _ in throw CancellationError() },
+            cancelActiveAnalysis: {}, canStart: { false }, storageDirectoryURL: storage.url
+        )
+        queue.enqueue(urls: [source])
+        let id = try XCTUnwrap(queue.tasks.first?.id)
+        let store = MeetingFileAnalysisCheckpointStore.shared
+        let segment = MeetingTranscriptSegment(speaker: .them, startSeconds: 0, endSeconds: 1, text: "ASR result")
+        await store.save(MeetingFileASRCheckpoint(
+            schemaVersion: 1, taskID: id, preparedAudioSampleCount: 32_000, descriptorCount: 2,
+            modelFingerprint: "test", completedDescriptorCount: 1, segments: [segment], updatedAt: Date()
+        ))
+        let partial = await queue.completedTranscript(taskID: id)
+        XCTAssertNil(partial)
+        await store.save(MeetingFileASRCheckpoint(
+            schemaVersion: 1, taskID: id, preparedAudioSampleCount: 32_000, descriptorCount: 2,
+            modelFingerprint: "test", completedDescriptorCount: 2, segments: [segment], updatedAt: Date()
+        ))
+        let complete = await queue.completedTranscript(taskID: id)
+        XCTAssertTrue(complete?.contains("ASR result") == true)
+        await store.clear(taskID: id)
+        let cleared = await queue.completedTranscript(taskID: id)
+        XCTAssertNil(cleared)
+        await queue.shutdown()
+    }
+
     func testTaskEstimateAndRetryReset() {
         let enqueuedAt = Date(timeIntervalSince1970: 100)
         var task = MeetingFileTask.queued(

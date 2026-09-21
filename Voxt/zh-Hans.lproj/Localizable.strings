@@ -2218,6 +2218,13 @@
 "%@ has been converted successfully." = "%@ 已转换成功。";
 "Preparing audio…" = "正在准备音频…";
 "Waiting for system resources…" = "正在等待系统资源…";
+"The speaker model configuration cannot be processed safely." = "当前说话人模型配置无法安全处理。";
+"Speaker analysis stopped because its streaming state exceeded the safety limit. The transcription checkpoint is preserved." = "说话人分析的流式状态超过安全上限，已停止处理。转录检查点已保留。";
+"The speaker analysis audio window is unavailable." = "无法读取说话人分析所需的音频窗口。";
+"View Transcription" = "查看转录";
+"Transcription ready — speaker analysis incomplete" = "转录已完成，说话人分析尚未完成";
+"No completed transcription checkpoint is available." = "暂无可用的完整转录检查点。";
+"Speaker analysis stopped because a short audio block took too long. The transcription checkpoint is preserved; retry when system resources are available." = "说话人分析的短音频块处理耗时过长，已停止继续处理。转录检查点已保留，请在系统资源充足时重试。";
 "The file task queue is full. Clear finished tasks before adding more files." = "文件任务队列已满，请清理已结束的任务后再添加文件。";
 "Transcribing meeting…" = "正在转写会议…";
 "Identifying speakers…" = "正在识别说话人…";

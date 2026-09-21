@@ -267,6 +267,18 @@ final class MeetingFileTaskQueue: ObservableObject {
         tasks.first { $0.id == id }
     }
 
+    /// An unfinished speaker pass must not hide an already completed ASR result.
+    /// Read the durable checkpoint, never a partial in-flight transcript array.
+    func completedTranscript(taskID: UUID) async -> String? {
+        guard task(id: taskID) != nil,
+              let checkpoint = await MeetingFileAnalysisCheckpointStore.shared.load(taskID: taskID),
+              checkpoint.taskID == taskID,
+              checkpoint.completedDescriptorCount == checkpoint.descriptorCount,
+              task(id: taskID) != nil else { return nil }
+        let text = MeetingTranscriptFormatter.joinedText(for: checkpoint.segments)
+        return text.isEmpty ? nil : text
+    }
+
     func enqueue(urls: [URL]) {
         guard !isShuttingDown else { return }
 
