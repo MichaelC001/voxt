@@ -44,12 +44,31 @@ popLen = min(fifoLen - fifoMax, spkcacheUpdatePeriod)
 - 不自动重试任意异常、不改变模型选择、不删除源视频或有效 ASR 检查点。
 - 状态写入/读取身份的完整加固、阶段增量存储和模型状态持久化不在本修复范围。
 
+## 后续修复：89.23% 长时间等待与闲置 MLX 缓存
+
+2026-09-21 第二次日志显示 FIFO/cache 均稳定为 188，窗口 60–75 仍正常推进；但 MLX 的 `activeMemory` 约 237 MB，allocator `cacheMemory` 约 1.788 GB，footprint 约 2.22 GB。注意这里的 speaker cache **帧数**与 MLX allocator cache **字节数**不是同一个缓存。
+
+13:20:46 UTC 开始 `memoryPressure=true`，音频推进停在约 4529.76 秒，总进度 89.23%。随后约 20 分钟只有心跳，footprint 仍约 2.17 GB；不是持续推理。原先等待循环只睡眠与检查布尔值，没有主动回收闲置 allocator 缓存，也没有复核可能陈旧的压力事件。日志不能单独证明系统所有压力都来自本进程，也不能断定后续 Metal 编译服务 XPC 错误是直接原因。
+
+本次小范围修复：
+
+- `MeetingFileInferenceCache` 在文件 ASR/说话人工作的安全边界检查闲置 cache；**超过 256 MiB 才清理**，小缓存保留，避免无条件每块清缓存。只调用 MLX `Memory.clearCache()` 释放 allocator-owned unused buffers，不删除权重或重置 streaming state，不修改全局 `cacheLimit`/`memoryLimit`。
+- 返回/异常/取消的清理由 `withPermit` 的 defer 在原生工作真正退出后、释放许可之前执行。继承的旧大缓存在首次准入前也检查；内存压力等待期间、协调器通道空闲时，每次压力周期额外清理一次闲置缓存。其他工作占有通道时不在等待线程进行维护。
+- 256 MiB 是**工作单元之间的缓存保留阈值**，不是硬性总内存/单次推理峰值上限。全局 allocator 可能被其他模型重新填充；其余调用者仍拥有自己的活跃数据，不能声称该协调器覆盖所有 MLX 调用。
+- 文件准入/等待使用只读 `kern.memorystatus_vm_pressure_level` 可选探测，按 dispatch 的 normal/warning/critical 值解释。系统确实报告 normal 才能解除旧标志；探测失败、未知值或仍有压力时保留原保护，不以低 RSS 或等待超时猜测恢复。该接口可用性仍需目标 macOS 验证。
+- 每 15 秒输出真实的 `memoryPressure`、`pressureProbeAvailable`、通道占用和排队数；记录 normal/pressure 状态变化与缓存回收前后 active/cache。继续沿用原有可取消等待和进度，不增加新的状态机、自动重跑或模型卸载流程。
+
+证据：锁定的 mlx-swift 0.31.6 `Source/MLX/Memory.swift` 中 `clearCache()` 通过 eval lock 调用 `mlx_clear_cache`；XNU `bsd/kern/kern_memorystatus_notify.c` 的 sysctl handler 将当前压力转换为 NOTE_MEMORYSTATUS 单值后输出。仅做只读探测，有明确不支持时回退，未更改任何依赖或系统设置。
+
+复测关注：出现 `file-cache-reclaimed` 后 cache/footprint 是否实际下降；`file-permit-wait` 是否仍显示真实压力；压力解除后能否出现下一条 feed 完成。若系统确实长期处于 warning/critical，仍应保持暂停而非绕过保护。本地尚未执行 macOS/XCTest，不能宣称此样本已完整处理成功。
+
 ## 验收
 
 纯逻辑/桩测试：
 - `MeetingSpeakerFeedPolicyTests`：12 小时 FIFO 递推上限、旧 60 秒 feed 反例、小 updatePeriod、非法配置、超限和时间轴 padding。
 - `MeetingFileSpeakerFailureTests`：文件说话人错误不能退化成成功的无说话人结果。
 - `MeetingLocalInferenceCoordinatorTests`：文件说话人压力等待/取消，等待通道期间出现压力时不误准入。
+- `MeetingFileInferenceCacheTests`：缓存阈值、压力周期清理、成功/错误/取消后的维护、其他原生工作占用时不清理、当前 normal 读数恢复、未知/持续压力不强行放行。使用注入的 allocator/probe，不在普通单测初始化 GPU。
 
 模型测试（默认跳过，需要本地已安装 Sortformer）：
 - `SortformerBoundedFeedIntegrationTests`：20 分钟合成音频，实际锁定模型持续 feed 的 fifo/cache 上限和帧进度。合成测试不替代真实多人质量验证。
@@ -59,7 +78,8 @@ macOS：
 xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO \
   -only-testing:VoxtTests/MeetingSpeakerFeedPolicyTests \
   -only-testing:VoxtTests/MeetingFileSpeakerFailureTests \
-  -only-testing:VoxtTests/MeetingLocalInferenceCoordinatorTests
+  -only-testing:VoxtTests/MeetingLocalInferenceCoordinatorTests \
+  -only-testing:VoxtTests/MeetingFileInferenceCacheTests
 
 VOXT_RUN_MODEL_TESTS=1 VOXT_MODEL_STORAGE_ROOT='/path/to/models' \
   xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO \

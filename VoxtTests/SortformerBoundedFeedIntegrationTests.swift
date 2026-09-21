@@ -32,6 +32,9 @@ final class SortformerBoundedFeedIntegrationTests: XCTestCase {
             try policy.validate(fifoFrames: nextState.fifoLen, cacheFrames: nextState.spkcacheLen)
             XCTAssertGreaterThan(nextState.framesProcessed, state.framesProcessed, "feed \(index)")
             state = nextState
+            // Match file inference's work-unit boundary policy without resetting
+            // the live speaker tensors. The following feed still consumes state.
+            MeetingFileInferenceCache.trimIfNeeded(underPressure: false)
         }
         // Synthetic audio proves a memory-state invariant, not diarization quality.
         // Real multi-speaker recordings must separately validate DER and timestamps.
