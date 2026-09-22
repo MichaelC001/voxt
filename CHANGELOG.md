@@ -6,6 +6,50 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.0-beta.1] - 2026-09-22
+
+### English
+
+#### Added
+- Added Google Gemini live transcription for voice input, with language hints, custom vocabulary, and live previews.
+- Added a six-step onboarding guide with model selection, permission setup, shortcut configuration, and guided practice.
+- Added streaming file transcription preprocessing with resource-aware scheduling, recovery, and reusable transcription previews.
+
+#### Changed
+- Improved local MLX model installation, loading, cleanup, and meeting transcription lifecycle handling.
+- Added a tray history shortcut and more compact history entries in the status menu.
+
+#### Fixed
+- Fixed Qwen multilingual finalization and several file task, speaker analysis, and final transcription recovery issues.
+
+### 简体中文
+
+#### 新增
+- 新增 Google Gemini 实时语音转写，支持语言提示、自定义词汇和实时预览。
+- 新增六步引导流程，覆盖模型选择、权限设置、快捷键配置和练习操作。
+- 新增文件转录流式预处理，支持资源感知调度、失败恢复和可复用的转录预览。
+
+#### 改进
+- 改进本地 MLX 模型安装、加载、清理以及会议转录的生命周期处理。
+- 托盘菜单新增历史记录快捷入口，并精简状态菜单中的历史记录条目。
+
+#### 修复
+- 修复 Qwen 多语言最终转写，以及文件任务、说话人分析和最终转录恢复中的多个问题。
+
+### 日本語
+
+#### 追加
+- Google Gemini のリアルタイム音声文字起こしに対応し、言語ヒント、カスタム語彙、ライブプレビューを追加しました。
+- モデル選択、権限設定、ショートカット設定、練習操作を含む6ステップのオンボーディングガイドを追加しました。
+- リソースを考慮したスケジューリング、復旧、再利用可能な文字起こしプレビューに対応した、ファイル文字起こしのストリーミング前処理を追加しました。
+
+#### 変更
+- ローカル MLX モデルのインストール、読み込み、解放、会議文字起こしのライフサイクル処理を改善しました。
+- トレイメニューに履歴へのショートカットを追加し、ステータスメニューの履歴項目をよりコンパクトにしました。
+
+#### 修正
+- Qwen の多言語最終処理、およびファイルタスク、話者分析、最終文字起こしの復旧に関する複数の問題を修正しました。
+
 ## [1.14.1] - 2026-08-17
 
 ### English
