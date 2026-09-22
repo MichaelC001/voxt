@@ -35,6 +35,12 @@ Examples:
 - “Help me write a 200-word self introduction.”
 - “Draft a short project update for my manager.”
 
+## Input Scope And Privacy
+
+Context Enhancement (window text, UI structure and screenshots) has been removed. Rewrite no longer scans the foreground window or attaches screenshots. Requests use the spoken instruction, explicitly selected source text and existing conversation as text inputs. Select a message or provide its contents before asking to reply to it; the model cannot see your screen.
+
+Screen Recording and Input Monitoring are no longer requested. Accessibility remains necessary for global shortcuts and automatic insertion. App Branch routing, dictionary features and selected-text operations remain; this does not mean all cross-app text access has been removed. Custom prompts are preserved, so review any old rules that depend on screenshots.
+
 ## Model And Provider Selection
 
 Rewrite follows the rewrite model/provider settings in the main window's `Model` page.

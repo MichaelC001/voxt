@@ -137,13 +137,16 @@ final class CustomLLMModelSupportTests: XCTestCase {
         XCTAssertFalse(modelIDs.contains("mlx-community/AceReason-Nemotron-7B-4bit"))
     }
 
-    func testCatalogDetectsVisionCapableRepos() {
-        XCTAssertTrue(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/gemma-4-e2b-it-4bit"))
-        XCTAssertTrue(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/Qwen2.5-VL-3B-Instruct-4bit"))
-        XCTAssertTrue(CustomLLMModelCatalog.supportsImageInput(repo: "lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit"))
-        XCTAssertTrue(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/Ministral-3-3B-Instruct-2512-4bit"))
-        XCTAssertFalse(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/paligemma-3b-mix-448-8bit"))
-        XCTAssertFalse(CustomLLMModelCatalog.supportsImageInput(repo: "mlx-community/Qwen3-8B-4bit"))
+    func testTextOnlyRequestsKeepArchitectureAppropriateLoadingFactory() {
+        XCTAssertTrue(CustomLLMModelCatalog.requiresVLMFactory(repo: "mlx-community/gemma-4-e2b-it-4bit"))
+        XCTAssertTrue(CustomLLMModelCatalog.requiresVLMFactory(repo: "mlx-community/Qwen2.5-VL-3B-Instruct-4bit"))
+        XCTAssertTrue(CustomLLMModelCatalog.requiresVLMFactory(repo: "lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit"))
+        XCTAssertTrue(CustomLLMModelCatalog.requiresVLMFactory(repo: "mlx-community/Ministral-3-3B-Instruct-2512-4bit"))
+        XCTAssertFalse(CustomLLMModelCatalog.requiresVLMFactory(repo: "mlx-community/paligemma-3b-mix-448-8bit"))
+        XCTAssertFalse(CustomLLMModelCatalog.requiresVLMFactory(repo: "mlx-community/Qwen3-8B-4bit"))
+        for model in CustomLLMModelCatalog.availableModels {
+            XCTAssertFalse(CustomLLMModelCatalog.catalogTagKeys(for: model.id).contains("Vision"))
+        }
     }
 
     func testStorageSupportBuildsExpectedCacheDirectory() {

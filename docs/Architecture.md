@@ -13,7 +13,7 @@ Voxt is a macOS 15+ menu bar application, built with the shared `Voxt` Xcode sch
 | `Voxt/Core/History/`, `Voxt/Core/Dictionary/` | Domain stores, repositories and query/value support |
 | `Voxt/Core/Notes/` | Note storage, external export state and Obsidian/Reminders sync |
 | `Voxt/Core/Models/` | Local LLM/GGUF loading, installation, downloads and model storage support |
-| `Voxt/Core/Transcription/` | Capture metrics, VAD planning, context and transcript support |
+| `Voxt/Core/Transcription/` | Capture metrics, VAD planning, ASR hints and transcript support |
 | `Voxt/Transcription/` | Speech and MLX transcription, ASR model management |
 | `Voxt/Transcription/RemoteASR/` | Remote ASR capture, upload and streaming protocols |
 | `Voxt/Meeting/` | Meeting coordination and live sessions; capture, processing and speaker-analysis subdomains |
@@ -39,6 +39,12 @@ Voxt is a macOS 15+ menu bar application, built with the shared `Voxt` Xcode sch
 Resumable transfer is shared under `Core/Models` in separate types/delegate/transport files. Custom LLM request policy/tokenizer adaptation and GGUF runtime have their own files; managers retain mutable state. Remote-provider option/default resolution is separated without moving protected credential presence or runtime construction outside their `fileprivate` boundary.
 
 Shared model loading uses `Core/Models/SharedModelLoadCoordinator<Value>`: current waiter entries and outstanding native-loading tasks have different lifetimes. Cancelled generations remain waitable by shutdown and block idle reclamation until they actually return. Manager shutdown callers share one complete cleanup task.
+
+## Permission and input boundaries
+
+LLM requests are text-only. Automatic foreground-window text/structure capture, screenshots, image attachment models and debug capture have been removed. App identity snapshots still support App Branch, dictionary scope and delivery targeting; selected-text operations are retained. Some text-generation checkpoints still require MLXVLM's loading factory.
+
+Global hotkeys and shortcut recording use Accessibility-backed modifying event taps (with local recording fallback), not Input Monitoring/HID listeners. Recording mute changes the current output device's writable mute property and restores only owned changes; it also mutes Voxt sounds. It does not create an audio tap. Meeting system audio still uses a public Core Audio process tap and requests access when capture starts, without private TCC preflight. Screen Recording is no longer requested. See the [implementation and pending macOS validation](ContextEnhancementRemovalImplementation.zh-CN.md).
 
 ## Current limitations and maintenance rules
 

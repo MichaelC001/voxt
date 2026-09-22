@@ -37,7 +37,6 @@ final class GGUFUTF8OutputAccumulatorTests: XCTestCase {
             fallbackText: "hello",
             inputCharacterCount: 5,
             outputTokenBudgetHint: nil,
-            attachments: [],
             conversationHistory: [],
             previousResponseID: nil,
             responseFormat: nil
@@ -69,7 +68,6 @@ final class GGUFUTF8OutputAccumulatorTests: XCTestCase {
             fallbackText: "你好",
             inputCharacterCount: 5,
             outputTokenBudgetHint: 48,
-            attachments: [],
             conversationHistory: [],
             previousResponseID: nil,
             responseFormat: nil

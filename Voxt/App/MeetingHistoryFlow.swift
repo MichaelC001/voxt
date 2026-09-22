@@ -21,7 +21,7 @@ extension AppDelegate {
             return
         }
 
-        showMeetingDetailWindow(for: entry)
+        showMeetingDetailWindow(for: entry, replacingFileTaskID: taskID)
     }
 
     func showMeetingFileTaskDetail(taskID: UUID) {
@@ -34,7 +34,29 @@ extension AppDelegate {
             return
         }
 
-        showMeetingDetailWindow(for: entry)
+        showMeetingDetailWindow(for: entry, replacingFileTaskID: taskID)
+    }
+
+    func showMeetingFileTranscript(taskID: UUID) async {
+        guard let task = meetingFileTaskQueue.task(id: taskID) else { return }
+        if task.status == .completed {
+            showMeetingFileTaskDetail(taskID: taskID)
+            return
+        }
+        let segments = await meetingFileTaskQueue.completedTranscriptSegments(taskID: taskID)
+        // Loading a checkpoint suspends. The task may have completed or been
+        // removed; never reopen an obsolete draft after either transition.
+        guard let current = meetingFileTaskQueue.task(id: taskID),
+              current.startedAt == task.startedAt else { return }
+        if current.status == .completed {
+            showMeetingFileTaskDetail(taskID: taskID)
+        } else if let segments {
+            meetingDetailWindowManager.presentFileTranscript(
+                taskID: taskID, title: current.fileName, segments: segments
+            )
+        } else {
+            showOverlayReminder(AppLocalization.localizedString("No completed transcription checkpoint is available."))
+        }
     }
 
     func cancelImportedMeetingFileAnalysis() async {
@@ -43,6 +65,7 @@ extension AppDelegate {
 
     func analyzeImportedMeetingFile(
         at sourceURL: URL,
+        originalFileName: String,
         progress: @escaping @MainActor @Sendable (MeetingFileAnalysisProgress) -> Void
     ) async throws -> TranscriptionHistoryEntry {
         guard !isSessionActive, !meetingSessionCoordinator.isActive else {
@@ -61,6 +84,8 @@ extension AppDelegate {
 
         let result = try await meetingSessionCoordinator.analyzeImportedFile(
             at: sourceURL,
+            sourceIsPreparedAudio: true,
+            archivePreparedAudio: historyAudioStorageEnabled,
             progress: progress
         )
         let importedAudioURL = result.archivedAudioURL
@@ -70,12 +95,13 @@ extension AppDelegate {
             }
             throw CancellationError()
         }
-        let displayTitle = sourceURL.deletingPathExtension().lastPathComponent
+        let displayTitle = URL(fileURLWithPath: originalFileName).deletingPathExtension().lastPathComponent
         guard let entry = persistMeetingHistory(
             result,
             forceSave: true,
             displayTitle: displayTitle
         ) else {
+            VoxtLog.meetingError("File analysis result could not be saved.")
             if let importedAudioURL {
                 try? FileManager.default.removeItem(at: importedAudioURL)
             }
@@ -122,9 +148,15 @@ extension AppDelegate {
         historyStore.reloadAsync()
     }
 
-    func showMeetingDetailWindow(for entry: TranscriptionHistoryEntry) {
+    func showMeetingDetailWindow(
+        for entry: TranscriptionHistoryEntry,
+        replacingFileTaskID: UUID? = nil,
+        activate: Bool = true
+    ) {
         meetingDetailWindowManager.presentHistoryMeeting(
             entry: entry,
+            replacingFileTaskID: replacingFileTaskID,
+            activate: activate,
             audioURL: historyStore.audioURL(for: entry),
             initialSummarySettings: currentMeetingSummarySettingsSnapshot(),
             summaryModelOptionsProvider: { @MainActor in

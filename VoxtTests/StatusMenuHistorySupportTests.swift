@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import Voxt
 
@@ -54,11 +55,16 @@ final class StatusMenuHistorySupportTests: XCTestCase {
         XCTAssertEqual(entry.previewText, "  first\n\tsecond  ")
     }
 
-    func testPreviewTruncatesAtCharacterBoundaryAndMarksRepositoryTruncation() {
+    func testPreviewTruncatesAtRenderedWidthAndMarksRepositoryTruncation() {
         let emoji = "👨‍👩‍👧‍👦"
         XCTAssertEqual(StatusMenuHistorySupport.previewTitle(for: makeEntry(index: 0, text: emoji)), emoji)
         let entry = makeEntry(index: 0, text: String(repeating: emoji, count: 49))
-        XCTAssertEqual(StatusMenuHistorySupport.previewTitle(for: entry), String(repeating: emoji, count: 48) + "…")
+        let preview = StatusMenuHistorySupport.previewTitle(for: entry)
+        XCTAssertTrue(preview.hasSuffix("…"))
+        XCTAssertLessThan(preview.dropLast().count, 49)
+        let emojiCharacter = emoji.first!
+        XCTAssertTrue(preview.dropLast().allSatisfy { $0 == emojiCharacter })
+
         let partial = makeEntry(index: 1, text: "short preview", textLength: 1_000)
         XCTAssertEqual(StatusMenuHistorySupport.previewTitle(for: partial), "short preview…")
     }

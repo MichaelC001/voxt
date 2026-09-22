@@ -304,11 +304,20 @@ final class MeetingMLXSegmentTranscriber: MeetingSegmentTranscribing {
     }
 
     func transcribeSegmentsStrict(chunk: BufferedMeetingChunk) async throws -> [MeetingTranscriptSegment] {
-        let result = try await MeetingLocalInferenceCoordinator.shared.withPermit(strictInferenceWorkClass) { [mlxTranscriber] in
-            try await mlxTranscriber.transcribeBufferedResult(
-                samples: chunk.samples,
-                sampleRate: chunk.sampleRate
+        let startedAt = ContinuousClock.now
+        let result: MLXBufferedTranscriptionResult?
+        do {
+            result = try await MeetingLocalInferenceCoordinator.shared.withPermit(strictInferenceWorkClass) { [mlxTranscriber] in
+                try await mlxTranscriber.transcribeBufferedResult(
+                    samples: chunk.samples,
+                    sampleRate: chunk.sampleRate
+                )
+            }
+        } catch {
+            VoxtLog.meetingWarning(
+                "Meeting strict ASR chunk failed. workClass=\(strictInferenceWorkClass.rawValue), repo=\(modelManager.currentModelRepo), audioStartSeconds=\(chunk.startSeconds), audioEndSeconds=\(chunk.endSeconds), elapsed=\(startedAt.duration(to: .now)), \(MeetingFileTaskDiagnostics.errorSummary(error))"
             )
+            throw error
         }
         guard let result else { return [] }
         let capability = MLXModelCatalog.capability(for: modelManager.currentModelRepo)

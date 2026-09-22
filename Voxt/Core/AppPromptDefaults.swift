@@ -134,6 +134,10 @@ enum AppPromptDefaults {
             ]
         case .rewrite:
             return [
+                // Defaults retired with automatic window-context capture.
+                "896482a35261df59cd0e37f50265e7ca9b28b942796f250381bf26d5bbbf0b74",
+                "d662ecb5d34cada98d06f112cd51b7bd299b5114f5531a5b8d21a0a18d08c4d1",
+                "5ed3a58145fa218cac67277b95042d84a4d153eb30de7e411668555d4378972f",
                 "09f35f472123a67b863f54e0d8f9429a097047060cbe82b97145efa85b4bb03d",
                 "5b3bb1cd6779e3ca43b727fb8e91066c749ac4c9b87dce66f1da9606b8ad3bb5",
                 "821bb73ad9372d231078bee8ac4d8ab8223c5c4010cce0d8fc25510ca12696cb"

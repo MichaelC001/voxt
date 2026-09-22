@@ -378,16 +378,11 @@ extension OnboardingSettingsView {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Toggle(localized("Mute other media audio while recording"), isOn: $muteSystemAudioWhileRecording)
-                Text(localized("Requires system audio recording permission, and only affects other apps' media playback while Voxt is recording."))
+                Toggle(localized("Mute output device while recording"), isOn: $muteSystemAudioWhileRecording)
+                Text(localized("Mutes all sounds on the current output device, including Voxt. Some devices do not support software mute. No system audio recording permission is needed."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                if let systemAudioPermissionMessage {
-                    Text(systemAudioPermissionMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             GeneralSettingsCard(title: "Shortcut") {

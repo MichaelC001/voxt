@@ -44,7 +44,6 @@ struct PermissionsSettingsView: View {
 
     @AppStorage(AppPreferenceKey.appEnhancementEnabled) private var appEnhancementEnabled = true
     @AppStorage(AppPreferenceKey.appBranchCustomBrowsers) private var appBranchCustomBrowsersJSON = "[]"
-    @AppStorage(AppPreferenceKey.muteSystemAudioWhileRecording) private var muteSystemAudioWhileRecording = false
     @AppStorage(AppPreferenceKey.transcriptionEngine) private var transcriptionEngineRaw = TranscriptionEngine.mlxAudio.rawValue
     @AppStorage(AppPreferenceKey.featureSettings) private var featureSettingsRaw = ""
     @AppStorage(Self.knownAuthorizedBrowserBundleIDsStorageKey) private var knownAuthorizedBrowserBundleIDsJSON = "[]"
@@ -64,6 +63,18 @@ struct PermissionsSettingsView: View {
                 }
             }
             .settingsNavigationAnchor(.permissionsMain)
+
+            // Core Audio prompts when a user starts a meeting with system audio.
+            // There is no public preflight API; do not display a fabricated status.
+            PermissionsSettingsSection(
+                title: permissionsLocalized("System Audio for Meetings"),
+                description: permissionsLocalized("Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute.")
+            ) {
+                Button(permissionsLocalized("Open Settings")) {
+                    PermissionGuidance.openSystemAudioSettings()
+                }
+                .buttonStyle(SettingsPillButtonStyle())
+            }
 
             if appEnhancementEnabled {
                 Divider()
@@ -130,9 +141,6 @@ struct PermissionsSettingsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.16), value: permissionToastMessage)
-        .onChange(of: muteSystemAudioWhileRecording) { _, _ in
-            refreshPermissionRequirementsAndStates()
-        }
         .onChange(of: transcriptionEngineRaw) { _, _ in
             refreshPermissionRequirementsAndStates()
         }
@@ -245,7 +253,6 @@ struct PermissionsSettingsView: View {
         let settings = FeatureSettingsStore.load(defaults: .standard)
         let context = SettingsPermissionRequirementResolver.requirementContext(
             selectedEngine: transcriptionEngine,
-            muteSystemAudioWhileRecording: muteSystemAudioWhileRecording,
             featureSettings: settings
         )
         let latestKinds = SettingsPermissionRequirementResolver.requiredPermissions(context: context)
@@ -294,27 +301,6 @@ struct PermissionsSettingsView: View {
         case .accessibility:
             let granted = AccessibilityPermissionManager.request(prompt: true)
             if !granted {
-                Task { @MainActor in
-                    PermissionGuidance.openSettings(for: kind)
-                }
-            }
-        case .inputMonitoring:
-            let granted = EventListeningPermissionManager.requestInputMonitoring(prompt: true)
-            if !granted {
-                Task { @MainActor in
-                    PermissionGuidance.openSettings(for: kind)
-                }
-            }
-        case .screenCapture:
-            let granted = ScreenCapturePermission.requestAccess()
-            if !granted {
-                Task { @MainActor in
-                    PermissionGuidance.openSettings(for: kind)
-                }
-            }
-        case .systemAudioCapture:
-            SystemAudioCapturePermission.requestAccess { granted in
-                guard !granted else { return }
                 Task { @MainActor in
                     PermissionGuidance.openSettings(for: kind)
                 }

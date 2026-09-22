@@ -66,7 +66,7 @@ struct RewritePromptBuilder {
             - Treat the spoken instruction itself as the full request; it does not need a separate rewrite target.
             - Answer or perform the request directly instead of restating it or asking the user to confirm details they already supplied.
             - A place, subject, date, or other qualifier explicitly present in the request is not missing context.
-            - Ask a clarification question only when an essential detail is genuinely absent and cannot be inferred from the request, conversation, or app context.
+            - Ask a clarification question only when an essential detail is genuinely absent and cannot be inferred from the request, selected source text, or conversation.
             - If the request needs live information but live lookup is unavailable, state that limitation directly and briefly; do not pretend that an already supplied place or date is missing.
             """
             : ""
@@ -187,33 +187,5 @@ enum RewriteDirectAnswerRuntimeGuidance {
         - Resolve relative dates such as “today”, “tomorrow”, and “今天” from the date and time above.
         - When live lookup is unavailable, never imply that current facts were verified. State the limitation once and still provide any useful non-live guidance you can.
         """
-    }
-}
-
-enum RewriteAppContextGuidance {
-    static func content(
-        hasTextContext: Bool,
-        imageAttachmentCount: Int,
-        directAnswerMode: Bool
-    ) -> String? {
-        guard hasTextContext || imageAttachmentCount > 0 else { return nil }
-
-        var lines = [
-            "- Active app context may include current app text and one or more screenshots.",
-            "- Use app context only to identify the user's target, resolve references like \"this\", \"that\", or \"the latest message\", and infer the current screen state.",
-            "- If app context reveals the target message or target UI content, answer based on that content instead of repeating the spoken instruction.",
-            "- Do not restate the user's request when the target can be identified from app context.",
-            "- If the target cannot be identified from app context, return a short, helpful fallback instead of inventing details."
-        ]
-
-        if imageAttachmentCount > 0 {
-            lines.append("- When screenshots are attached, inspect them first for the latest visible message or relevant UI content.")
-        }
-
-        if directAnswerMode {
-            lines.append("- In direct-answer mode, generate the final reply or text directly once the target is identified.")
-        }
-
-        return lines.joined(separator: "\n")
     }
 }

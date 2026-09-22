@@ -5,7 +5,7 @@ import CoreAudio
 
 extension OnboardingGuideView {
     private var allRequiredPermissions: [OnboardingContextualPermission] {
-        var permissions: [OnboardingContextualPermission] = [.microphone, .accessibility, .inputMonitoring]
+        var permissions: [OnboardingContextualPermission] = [.microphone, .accessibility]
         if featureSettings.transcription.asrSelectionID.asrSelection == .dictation {
             permissions.append(.speechRecognition)
         }
@@ -196,25 +196,6 @@ extension OnboardingGuideView {
                 PermissionGuidance.openSettings(for: permission)
             }
             startPermissionMonitoring(permission)
-        case .inputMonitoring:
-            let granted = EventListeningPermissionManager.requestInputMonitoring(prompt: true)
-            if !granted {
-                PermissionGuidance.openSettings(for: permission)
-            }
-            startPermissionMonitoring(permission)
-        case .screenCapture:
-            let granted = ScreenCapturePermission.requestAccess()
-            if !granted {
-                PermissionGuidance.openSettings(for: permission)
-            }
-            startPermissionMonitoring(permission)
-        case .systemAudioCapture:
-            SystemAudioCapturePermission.requestAccess { _ in
-                Task { @MainActor in
-                    permissionRefreshRevision += 1
-                    startPermissionMonitoring(permission)
-                }
-            }
         }
     }
 

@@ -20,16 +20,20 @@ final class MeetingSystemAudioCapture: @unchecked Sendable {
             case .outputDeviceUnavailable(let status):
                 return AppLocalization.format("System output device unavailable (%d).", Int(status))
             case .tapCreationFailed(let status):
-                return AppLocalization.format("System audio tap creation failed (%d).", Int(status))
+                return AppLocalization.format("System audio tap creation failed (%d).", Int(status)) + " " + Self.accessGuidance
             case .aggregateDeviceCreationFailed(let status):
                 return AppLocalization.format("System audio aggregate device failed (%d).", Int(status))
             case .ioProcCreationFailed(let status):
                 return AppLocalization.format("System audio callback setup failed (%d).", Int(status))
             case .startFailed(let status):
-                return AppLocalization.format("System audio capture failed to start (%d).", Int(status))
+                return AppLocalization.format("System audio capture failed to start (%d).", Int(status)) + " " + Self.accessGuidance
             case .invalidTapFormat:
                 return AppLocalization.localizedString("System audio tap returned an invalid format.")
             }
+        }
+
+        private static var accessGuidance: String {
+            AppLocalization.localizedString("If access was denied, enable System Audio Recording for Voxt in System Settings, then retry the meeting.")
         }
     }
 
@@ -101,7 +105,14 @@ final class MeetingSystemAudioCapture: @unchecked Sendable {
             throw CaptureError.aggregateDeviceCreationFailed(aggregateStatus)
         }
 
-        let streamDescription = try Self.tapStreamDescription(for: tapID)
+        let streamDescription: AudioStreamBasicDescription
+        do {
+            streamDescription = try Self.tapStreamDescription(for: tapID)
+        } catch {
+            AudioHardwareDestroyAggregateDevice(aggregateDeviceID)
+            AudioHardwareDestroyProcessTap(tapID)
+            throw error
+        }
         var mutableStreamDescription = streamDescription
         guard let format = AVAudioFormat(streamDescription: &mutableStreamDescription) else {
             AudioHardwareDestroyAggregateDevice(aggregateDeviceID)

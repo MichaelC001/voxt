@@ -70,6 +70,135 @@ final class MeetingLocalInferenceCoordinatorTests: XCTestCase {
         XCTAssertEqual(values, ["live", "summary"])
     }
 
+    func testFileAnalysisWaitsThroughMemoryPressureAndResumes() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator()
+        let tracker = MeetingInferenceConcurrencyTracker()
+        await coordinator.setMemoryPressureConstrained(true)
+
+        let task = Task {
+            try await coordinator.withPermit(.fileASR) {
+                await tracker.begin()
+                await tracker.end()
+            }
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let peakWhilePressured = await tracker.peakCount()
+        XCTAssertEqual(peakWhilePressured, 0)
+
+        await coordinator.setMemoryPressureConstrained(false)
+        try await task.value
+        let peakAfterPressure = await tracker.peakCount()
+        XCTAssertEqual(peakAfterPressure, 1)
+    }
+
+    func testFileAnalysisWaitsThroughRecordingAndDoesNotFail() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator()
+        let tracker = MeetingInferenceConcurrencyTracker()
+        await coordinator.setRecordingActive(true)
+
+        let task = Task {
+            try await coordinator.withPermit(.fileASR) {
+                await tracker.begin()
+                await tracker.end()
+            }
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let peakWhileRecording = await tracker.peakCount()
+        XCTAssertEqual(peakWhileRecording, 0)
+
+        await coordinator.setRecordingActive(false)
+        try await task.value
+        let peakAfterRecording = await tracker.peakCount()
+        XCTAssertEqual(peakAfterRecording, 1)
+    }
+
+    func testNonFileDeferrableWorkStillReportsMemoryPressure() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator()
+        await coordinator.setMemoryPressureConstrained(true)
+
+        do {
+            _ = try await coordinator.withPermit(.summary) {}
+            XCTFail("Expected non-file background work to be rejected")
+        } catch let error as MeetingLocalInferenceCoordinatorError {
+            guard case .memoryConstrained = error else {
+                return XCTFail("Unexpected coordinator error: \(error)")
+            }
+        }
+    }
+
+    func testFileSpeakerAnalysisWaitsForPressureAndCanBeCancelled() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator()
+        let tracker = MeetingInferenceConcurrencyTracker()
+        await coordinator.setMemoryPressureConstrained(true)
+        let task = Task {
+            try await coordinator.withPermit(.fileSpeakerAnalysis) {
+                await tracker.begin()
+                await tracker.end()
+            }
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        task.cancel()
+        do { try await task.value; XCTFail("Expected cancellation") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        let peak = await tracker.peakCount()
+        XCTAssertEqual(peak, 0)
+        await coordinator.setMemoryPressureConstrained(false)
+        try await coordinator.withPermit(.fileSpeakerAnalysis) {
+            await tracker.begin()
+            await tracker.end()
+        }
+        let recoveredPeak = await tracker.peakCount()
+        XCTAssertEqual(recoveredPeak, 1)
+    }
+
+    func testPressureAppearingWhileFileSpeakerWaitsForLaneIsRechecked() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator()
+        let gate = MeetingInferenceGate()
+        let tracker = MeetingInferenceConcurrencyTracker()
+        let first = Task {
+            try await coordinator.withPermit(.liveASRFinal) { await gate.wait() }
+        }
+        await gate.waitUntilStarted()
+        let speaker = Task {
+            try await coordinator.withPermit(.fileSpeakerAnalysis) {
+                await tracker.begin()
+                await tracker.end()
+            }
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        await coordinator.setMemoryPressureConstrained(true)
+        await gate.open()
+        try await first.value
+        try await Task.sleep(for: .milliseconds(300))
+        let peak = await tracker.peakCount()
+        XCTAssertEqual(peak, 0)
+        await coordinator.setMemoryPressureConstrained(false)
+        try await speaker.value
+        let recoveredPeak = await tracker.peakCount()
+        XCTAssertEqual(recoveredPeak, 1)
+    }
+
+    func testBlockedNonFileWaiterDoesNotPreventBoundedFileWorkUnderWarning() async throws {
+        let coordinator = MeetingLocalInferenceCoordinator(readMemoryPressure: { false })
+        let gate = MeetingInferenceGate()
+        let order = MeetingInferenceOrderRecorder()
+        let active = Task { try await coordinator.withPermit(.liveASRFinal) { await gate.wait() } }
+        await gate.waitUntilStarted()
+        let summary = Task { try await coordinator.withPermit(.summary) { await order.append("summary") } }
+        let queued = await waitForQueuedWork(1, coordinator: coordinator)
+        XCTAssertTrue(queued)
+        await coordinator.setMemoryPressureConstrained(true)
+        await gate.open()
+        try await active.value
+        try await coordinator.withPermit(.fileSpeakerAnalysis) { await order.append("file") }
+        let duringWarning = await order.values()
+        XCTAssertEqual(duringWarning, ["file"])
+        await coordinator.setMemoryPressureConstrained(false)
+        try await summary.value
+        let final = await order.values()
+        XCTAssertEqual(final, ["file", "summary"])
+    }
+
     func testBackgroundWorkWaitsWhileRecording() async throws {
         let coordinator = MeetingLocalInferenceCoordinator()
         let tracker = MeetingInferenceConcurrencyTracker()

@@ -43,13 +43,14 @@ nonisolated enum MemoryEfficientModelContainerLoader {
     static func load(
         from directory: URL,
         using tokenizerLoader: any TokenizerLoader,
-        supportsVision: Bool
+        requiresVLMFactory: Bool
     ) async throws -> ModelContainer {
         let configuration = ResolvedModelConfiguration(directory: directory)
         let configData = try configurationData(for: configuration)
         let baseConfig = try decodeBaseConfiguration(configData, configuration: configuration)
 
-        if supportsVision {
+        // Some supported architectures use the VLM factory even for text-only requests.
+        if requiresVLMFactory {
             return try await loadVisionContainer(
                 configuration: configuration,
                 configData: configData,

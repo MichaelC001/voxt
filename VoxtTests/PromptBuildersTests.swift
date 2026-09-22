@@ -174,17 +174,4 @@ final class PromptBuildersTests: XCTestCase {
         XCTAssertContains(guidance, "今天")
     }
 
-    func testRewriteAppContextGuidancePrioritizesScreenshotsAndDirectAnswer() {
-        let guidance = RewriteAppContextGuidance.content(
-            hasTextContext: true,
-            imageAttachmentCount: 1,
-            directAnswerMode: true
-        )
-
-        let text = try! XCTUnwrap(guidance)
-        XCTAssertFalse(text.contains("App context usage rules:"))
-        XCTAssertContains(text, "When screenshots are attached, inspect them first")
-        XCTAssertContains(text, "Do not restate the user's request")
-        XCTAssertContains(text, "In direct-answer mode, generate the final reply")
-    }
 }

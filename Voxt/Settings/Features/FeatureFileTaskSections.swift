@@ -28,11 +28,20 @@ extension FeatureSettingsView {
                                 },
                                 onOpenDetails: {
                                     AppDelegate.shared?.showMeetingFileTaskDetail(taskID: task.id)
+                                },
+                                onRemove: {
+                                    meetingFileTaskQueue.removeFinishedTask(taskID: task.id)
+                                },
+                                onViewTranscript: {
+                                    Task { @MainActor in
+                                        await AppDelegate.shared?.showMeetingFileTranscript(taskID: task.id)
+                                    }
                                 }
                             )
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -42,9 +51,10 @@ extension FeatureSettingsView {
                 onImportDroppedFiles: importDroppedMeetingFiles
             )
         }
+        // The settings shell owns the outer insets. Unlike a fully scrolling
+        // feature page, this split layout must not inset the pinned upload card
+        // again or reserve a scroll-indicator gutter for the entire page.
         .padding(.top, 2)
-        .padding(.bottom, 12)
-        .padding(.trailing, SettingsUIStyle.contentScrollTrailingGutter)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -116,6 +126,8 @@ private struct MeetingFileTaskRow: View {
     let onPrioritize: () -> Void
     let onRetry: () -> Void
     let onOpenDetails: () -> Void
+    let onRemove: () -> Void
+    let onViewTranscript: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -141,10 +153,16 @@ private struct MeetingFileTaskRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                actionButtons
+                VStack(alignment: .trailing, spacing: 6) {
+                    actionButtons
+                    if task.progressStage == .identifyingSpeakers, task.status != .completed {
+                        Button(featureSettingsLocalized("View Transcription"), action: onViewTranscript)
+                            .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
+                    }
+                }
             }
 
-            if task.status == .processing || task.status == .cancelling || task.status == .completed {
+            if task.status == .preparing || task.status == .processing || task.status == .waitingForResources || task.status == .cancelling {
                 ProgressView(value: task.progressFraction, total: 1)
                     .progressViewStyle(.linear)
                     .tint(statusColor)
@@ -160,13 +178,23 @@ private struct MeetingFileTaskRow: View {
     @ViewBuilder
     private var actionButtons: some View {
         switch task.status {
-        case .processing, .cancelling:
+        case .preparing, .processing, .waitingForResources, .cancelling:
             Button(featureSettingsLocalized(task.status == .cancelling ? "Cancelling…" : "Cancel"), action: onCancel)
                 .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
                 .disabled(task.status == .cancelling)
         case .completed:
-            Button(featureSettingsLocalized("Details"), action: onOpenDetails)
-                .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
+            HStack(spacing: 6) {
+                Button(role: .destructive, action: onRemove) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(SettingsPillButtonStyle(tone: .destructive, horizontalPadding: 8, height: 27))
+                .help(featureSettingsLocalized("Delete"))
+                .accessibilityLabel(Text(featureSettingsLocalized("Delete")))
+
+                Button(featureSettingsLocalized("Details"), action: onOpenDetails)
+                    .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
+            }
         case .failed, .cancelled:
             Button(featureSettingsLocalized("Retry"), action: onRetry)
                 .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
@@ -197,7 +225,9 @@ private struct MeetingFileTaskRow: View {
             metadata(label: featureSettingsLocalized("Created"), value: createdTimeText)
             metadata(label: featureSettingsLocalized("Elapsed"), value: durationText(task.elapsedSeconds(now: now)))
             metadata(label: featureSettingsLocalized("Total Duration"), value: totalDurationText)
-            metadata(label: featureSettingsLocalized("Estimated Remaining"), value: estimatedRemainingText)
+            if task.status != .completed {
+                metadata(label: featureSettingsLocalized("Estimated Remaining"), value: estimatedRemainingText)
+            }
         }
         .fixedSize(horizontal: true, vertical: false)
     }
@@ -216,9 +246,6 @@ private struct MeetingFileTaskRow: View {
     }
 
     private var estimatedRemainingText: String {
-        if task.status == .completed {
-            return durationText(0)
-        }
         if let remaining = task.estimatedRemainingSeconds(now: now) {
             return durationText(remaining)
         }
@@ -243,19 +270,24 @@ private struct MeetingFileTaskRow: View {
         switch task.status {
         case .queued:
             return featureSettingsLocalized("Waiting")
+        case .preparing:
+            return featureSettingsLocalized("Preparing audio…")
         case .processing:
-            return featureSettingsLocalized("Processing")
+            return task.progressStage.displayTitle
+        case .waitingForResources:
+            return featureSettingsLocalized("Waiting for system resources…")
         case .cancelling:
             return featureSettingsLocalized("Cancelling…")
         case .completed:
             return featureSettingsLocalized("Completed")
         case .failed:
+            let heading = featureSettingsLocalized("Failed") + " · " + task.progressStage.displayTitle
             guard let errorMessage = task.errorMessage,
                   !errorMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             else {
-                return featureSettingsLocalized("Failed")
+                return heading
             }
-            return featureSettingsLocalized("Failed") + " · " + errorMessage
+            return heading + " · " + errorMessage
         case .cancelled:
             return featureSettingsLocalized("Cancelled")
         }
@@ -265,7 +297,7 @@ private struct MeetingFileTaskRow: View {
         switch task.status {
         case .queued:
             return .secondary
-        case .processing, .cancelling:
+        case .preparing, .processing, .waitingForResources, .cancelling:
             return .accentColor
         case .completed:
             return .green

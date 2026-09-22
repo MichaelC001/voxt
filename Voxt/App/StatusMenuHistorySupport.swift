@@ -1,9 +1,15 @@
 // Lightweight, cached presentation for the status menu; no storage reads on hover.
 
+import AppKit
 import Foundation
 
 enum StatusMenuHistorySupport {
     static let recentLimit = 5
+    static let recentPreviewMaxWidth: CGFloat = 100
+
+    private static let recentPreviewAttributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.menuFont(ofSize: NSFont.systemFontSize)
+    ]
 
     static func filters(availability: FeatureAvailabilitySettings) -> [HistoryFilterTab] {
         HistoryFilterTab.allCases.filter {
@@ -24,11 +30,22 @@ enum StatusMenuHistorySupport {
     }
 
     static func previewTitle(for entry: TranscriptionHistoryListEntry) -> String {
-        // Bound both text layout and menu width, without changing the copied text.
         let preview = entry.previewText.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
-        let prefix = String(preview.prefix(48))
         // SQLite length()/substr() count Unicode code points, not Swift graphemes.
         let wasTruncatedByRepository = entry.textLength > entry.previewText.unicodeScalars.count
-        return prefix + (preview.count > 48 || wasTruncatedByRepository ? "…" : "")
+        let needsEllipsis = wasTruncatedByRepository || renderedWidth(of: preview) > recentPreviewMaxWidth
+        guard needsEllipsis else { return preview }
+
+        var result = ""
+        for character in preview {
+            let candidate = result + String(character) + "…"
+            guard renderedWidth(of: candidate) <= recentPreviewMaxWidth else { break }
+            result.append(character)
+        }
+        return result.isEmpty ? "…" : result + "…"
+    }
+
+    private static func renderedWidth(of text: String) -> CGFloat {
+        (text as NSString).size(withAttributes: recentPreviewAttributes).width
     }
 }

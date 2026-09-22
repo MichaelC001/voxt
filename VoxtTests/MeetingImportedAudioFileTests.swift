@@ -75,6 +75,107 @@ final class MeetingImportedAudioFileTests: XCTestCase {
         XCTAssertEqual(finalAsset.sessionStartOffset, 60, accuracy: 0.001)
         XCTAssertEqual(finalAsset.durationSeconds, 1, accuracy: 0.05)
         XCTAssertTrue(finalAsset.samples.contains { abs($0) > 0.01 })
+        XCTAssertNil(imported.loadAsset(MeetingAudioAssetDescriptor(
+            source: .mixed, sampleRate: 16_000, startSample: 0, sampleCount: 61 * 16_000
+        )))
+        XCTAssertNil(imported.loadAsset(MeetingAudioAssetDescriptor(
+            source: .mixed, sampleRate: 16_000, startSample: Int.max, sampleCount: 1
+        )))
+    }
+
+    func testPreparationPublishesOnlyValidatedOutputAndPreservesOriginal() async throws {
+        let directory = try TemporaryDirectory()
+        let source = try makeSmallSource(in: directory.url)
+        let original = try Data(contentsOf: source)
+        let destination = directory.url.appendingPathComponent("prepared.wav")
+        let audio = try await MeetingImportedAudioFile.prepare(from: source, to: destination)
+        XCTAssertEqual(audio.standardizedAudioURL, destination)
+        XCTAssertEqual(try MeetingImportedAudioFile.validatedPreparedFile(at: destination).sampleCount, audio.sampleCount)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.appendingPathExtension("partial").path))
+        XCTAssertEqual(try Data(contentsOf: source), original)
+
+        let archive = try await MeetingImportedAudioFile.copyPreparedForAnalysis(from: destination)
+        defer { try? FileManager.default.removeItem(at: archive.standardizedAudioURL) }
+        XCTAssertNotEqual(archive.standardizedAudioURL, destination)
+        XCTAssertEqual(archive.sampleCount, audio.sampleCount)
+        XCTAssertEqual(try Data(contentsOf: archive.standardizedAudioURL), try Data(contentsOf: destination))
+        try FileManager.default.removeItem(at: archive.standardizedAudioURL)
+        XCTAssertNoThrow(try MeetingImportedAudioFile.validatedPreparedFile(at: destination))
+    }
+
+    func testCancelledPreparationRemovesPartialFile() async throws {
+        let directory = try TemporaryDirectory()
+        let source = try makeSmallSource(in: directory.url)
+        let destination = directory.url.appendingPathComponent("cancelled.wav")
+        let partial = destination.appendingPathExtension("partial")
+        do {
+            _ = try await MeetingImportedAudioFile.prepare(from: source, to: destination, checkpoint: {
+                if FileManager.default.fileExists(atPath: partial.path) { throw CancellationError() }
+            })
+            XCTFail("Expected cancellation after the partial file was created")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: partial.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+    }
+
+    func testPreparationRejectsSourceDurationOutputAndDiskLimitsWithoutPublishing() async throws {
+        let directory = try TemporaryDirectory()
+        let source = try makeSmallSource(in: directory.url)
+        var sourceLimit = MeetingFilePreparationLimits()
+        sourceLimit.maximumSourceBytes = 1
+        var durationLimit = MeetingFilePreparationLimits()
+        durationLimit.maximumDurationSeconds = 0.01
+        var outputLimit = MeetingFilePreparationLimits()
+        outputLimit.maximumOutputBytes = 46
+        var diskLimit = MeetingFilePreparationLimits()
+        diskLimit.minimumFreeDiskBytes = .max
+        for (index, limits) in [sourceLimit, durationLimit, outputLimit, diskLimit].enumerated() {
+            let destination = directory.url.appendingPathComponent("rejected-\(index).wav")
+            do {
+                _ = try await MeetingImportedAudioFile.prepare(from: source, to: destination, limits: limits)
+                XCTFail("Unsafe input was accepted")
+            } catch {}
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.appendingPathExtension("partial").path))
+        }
+    }
+
+    func testPreparedCacheRejectsTruncationAndWrongSampleRate() throws {
+        let directory = try TemporaryDirectory()
+        let source = try makeSmallSource(in: directory.url)
+        XCTAssertThrowsError(try MeetingImportedAudioFile.validatedPreparedFile(at: source)) // 8 kHz, not canonical
+        let truncated = directory.url.appendingPathComponent("truncated.wav")
+        try Data(repeating: 0, count: 46).write(to: truncated)
+        XCTAssertThrowsError(try MeetingImportedAudioFile.validatedPreparedFile(at: truncated))
+    }
+
+    func testDecoderBuffersAndActualDecodedSampleCountAreBounded() throws {
+        XCTAssertEqual(try MeetingImportedWAVFormat.validatedIncomingSampleCount(
+            floatByteCount: 16, currentSampleCount: 6, maximumSampleCount: 10
+        ), 4)
+        XCTAssertThrowsError(try MeetingImportedWAVFormat.validatedIncomingSampleCount(
+            floatByteCount: 16, currentSampleCount: 7, maximumSampleCount: 10
+        ))
+        XCTAssertThrowsError(try MeetingImportedWAVFormat.validatedIncomingSampleCount(
+            floatByteCount: MeetingFilePreparationLimits.maximumDecoderBufferBytes + 4,
+            currentSampleCount: 0, maximumSampleCount: .max
+        ))
+        XCTAssertThrowsError(try MeetingImportedWAVFormat.validatedIncomingSampleCount(
+            floatByteCount: 3, currentSampleCount: 0, maximumSampleCount: 10
+        ))
+        XCTAssertLessThanOrEqual(MeetingFilePreparationLimits.conversionBufferBytes, 64 * 1024)
+        XCTAssertLessThanOrEqual(MeetingFilePreparationLimits.copyBufferBytes, 1024 * 1024)
+    }
+
+    private func makeSmallSource(in directory: URL) throws -> URL {
+        let url = directory.appendingPathComponent("source.wav")
+        try MeetingAudioChunkWAVExporter.write(
+            samples: Array(repeating: Float(0.1), count: 8_000), sampleRate: 8_000, to: url
+        )
+        return url
     }
 
     func testWAVDataByteCountRejectsValuesThatOverflowRIFFChunkSize() throws {

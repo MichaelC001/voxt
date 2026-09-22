@@ -30,7 +30,6 @@ struct FeatureSettingsView: View {
     @State private var toastMessage = ""
     @State private var toastDismissTask: Task<Void, Never>?
     @State var isFilesDisableBlockedAlertPresented = false
-    @State private var permissionRefreshRevision = 0
     @State private var appleIntelligenceRefreshRevision = 0
     @State var scrollToBottomRequestRevision = 0
 
@@ -105,7 +104,6 @@ struct FeatureSettingsView: View {
             meetingDiarizationModelManager.ensureSelectedModelInstalled()
         }
         .onReceive(NotificationCenter.default.publisher(for: .voxtPermissionsDidChange)) { _ in
-            permissionRefreshRevision += 1
             refreshRemindersLists()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -148,14 +146,10 @@ struct FeatureSettingsView: View {
         Binding(
             get: get,
             set: { newValue in
-                let previousSettings = featureSettings
                 set(newValue)
                 FeatureSettingsStore.save(featureSettings, defaults: .standard)
                 reloadFeatureSettings()
-                handleFeatureSettingsMutation(
-                    previousSettings: previousSettings,
-                    currentSettings: featureSettings
-                )
+                refreshRemindersLists()
             }
         )
     }
@@ -170,59 +164,8 @@ struct FeatureSettingsView: View {
     }
 
     func handleFeatureSettingsStorageChange() {
-        let previousSettings = featureSettings
         reloadFeatureSettings()
-        handleFeatureSettingsMutation(
-            previousSettings: previousSettings,
-            currentSettings: featureSettings
-        )
-    }
-
-    func handleFeatureSettingsMutation(
-        previousSettings: FeatureSettings,
-        currentSettings: FeatureSettings
-    ) {
         refreshRemindersLists()
-
-        let appContextWasEnabled = previousSettings.rewrite.appContext.enabled
-        let appContextIsEnabled = currentSettings.rewrite.appContext.enabled
-        if !appContextWasEnabled, appContextIsEnabled {
-            showToast(
-                AppLocalization.localizedString(
-                    "App context may include sensitive app text or screenshots. If LLM debug logging is enabled, logs may include prompt content."
-                ),
-                duration: 3.8
-            )
-        }
-
-        let screenshotContextWasEnabled = previousSettings.rewrite.appContext.screenshotEnabled
-        let screenshotContextIsEnabled = currentSettings.rewrite.appContext.screenshotEnabled
-        guard !screenshotContextWasEnabled, screenshotContextIsEnabled else { return }
-        requestRewriteScreenshotContextPermissionIfNeeded()
-    }
-
-    func requestRewriteScreenshotContextPermissionIfNeeded() {
-        guard !ScreenCapturePermission.isGranted() else { return }
-        let granted = ScreenCapturePermission.requestAccess()
-        if granted {
-            permissionRefreshRevision += 1
-            showToast(AppLocalization.localizedString("Screen recording permission granted."))
-        } else {
-            PermissionGuidance.openSettings(for: SettingsPermissionKind.screenCapture)
-            showToast(
-                AppLocalization.localizedString(
-                    "Screen recording permission is required for Screenshot Context. You can grant it in Settings > Permissions."
-                ),
-                duration: 3.2
-            )
-        }
-    }
-
-    var rewriteScreenshotContextBadgeText: String? {
-        _ = permissionRefreshRevision
-        guard featureSettings.rewrite.appContext.screenshotEnabled else { return nil }
-        guard !ScreenCapturePermission.isGranted() else { return nil }
-        return featureSettingsLocalized("Needs Permission")
     }
 
     func chooseObsidianVaultDirectory() {

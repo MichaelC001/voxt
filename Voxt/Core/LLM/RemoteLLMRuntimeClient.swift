@@ -136,10 +136,7 @@ struct RemoteLLMRuntimeClient {
         if provider.usesResponsesAPI {
             let trimmedPreviousResponseID = request.previousResponseID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let inputPayload: Any
-            let currentUserInputPayload = responsesUserInputPayload(
-                text: prompt,
-                attachments: request.attachments
-            )
+            let currentUserInputPayload = prompt
 
             if usesResponsesConversation {
                 if !trimmedPreviousResponseID.isEmpty {
@@ -147,7 +144,6 @@ struct RemoteLLMRuntimeClient {
                 } else {
                     inputPayload = responsesInputMessages(
                         currentUserInput: prompt,
-                        currentAttachments: request.attachments,
                         conversationHistory: request.conversationHistory
                     )
                 }

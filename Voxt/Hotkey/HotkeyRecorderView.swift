@@ -5,7 +5,6 @@ import SwiftUI
 import AppKit
 import Carbon
 import ApplicationServices
-import IOKit.hid
 
 struct HotkeyRecorderView: NSViewRepresentable {
     @Binding var isRecording: Bool
@@ -65,7 +64,6 @@ final class KeyCaptureView: NSView {
     private var pendingModifierCaptureTask: Task<Void, Never>?
     private var pendingModifierCapture: PendingModifierCapture?
     private var localEventMonitor: Any?
-    private var hidMonitor: HotkeyRecorderHIDMonitor?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var hasCapturedChordDuringCurrentRecording = false
@@ -130,9 +128,8 @@ final class KeyCaptureView: NSView {
         currentSidedModifiers = []
         currentModifierFlags = []
         pendingModifierCapture = nil
-        startHIDMonitor()
         startEventTap()
-        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged, .otherMouseDown]) { [weak self] event in
             guard let self, self.isRecording else { return event }
             if self.eventTap != nil {
                 return nil
@@ -143,6 +140,13 @@ final class KeyCaptureView: NSView {
                 return nil
             case .flagsChanged:
                 self.flagsChanged(with: event)
+                return nil
+            case .otherMouseDown:
+                self.captureMouseButtonDown(
+                    buttonNumber: event.buttonNumber,
+                    modifiers: event.modifierFlags,
+                    sidedModifiers: self.currentSidedModifiers
+                )
                 return nil
             default:
                 return event
@@ -158,7 +162,6 @@ final class KeyCaptureView: NSView {
         currentSidedModifiers = []
         currentModifierFlags = []
         pendingModifierCapture = nil
-        stopHIDMonitor()
         stopEventTap()
         onRecorderMessageChange?(nil)
         if let localEventMonitor {
@@ -169,10 +172,8 @@ final class KeyCaptureView: NSView {
 
     private func startEventTap() {
         stopEventTap()
-        guard EventListeningPermissionManager.requestInputMonitoring(prompt: true) else {
-            onRecorderMessageChange?("Input Monitoring is required to capture fn-based shortcuts such as fn+space reliably.")
-            return
-        }
+        // Local events remain available without global authorization.
+        guard AccessibilityPermissionManager.isTrusted() else { return }
 
         let eventMask: CGEventMask =
             (1 << CGEventType.keyDown.rawValue) |
@@ -193,60 +194,16 @@ final class KeyCaptureView: NSView {
         onRecorderMessageChange?(nil)
     }
 
-    private func startHIDMonitor() {
-        stopHIDMonitor()
-        let monitor = HotkeyRecorderHIDMonitor()
-        monitor.onFunctionKeyChange = { [weak self] isDown in
-            self?.handleHIDFunctionKeyChange(isDown: isDown)
-        }
-        monitor.onSpaceKeyChange = { [weak self] isDown in
-            self?.handleHIDSpaceKeyChange(isDown: isDown)
-        }
-        monitor.start()
-        hidMonitor = monitor
-    }
-
-    private func stopHIDMonitor() {
-        hidMonitor?.stop()
-        hidMonitor = nil
-    }
-
     private func stopEventTap() {
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
         }
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
         eventTap = nil
         runLoopSource = nil
-    }
-
-    private func handleHIDFunctionKeyChange(isDown: Bool) {
-        guard isRecording else { return }
-        if isDown {
-            currentModifierFlags.insert(.function)
-            VoxtLog.hotkey("Hotkey recorder hid fn down.", verbose: true)
-            scheduleModifierOnlyCaptureIfNeeded(keyCode: UInt16(kVK_Function), modifiers: currentModifierFlags)
-        } else {
-            currentModifierFlags.remove(.function)
-            VoxtLog.hotkey("Hotkey recorder hid fn up.", verbose: true)
-            if currentModifierFlags.isEmpty {
-                finalizePendingModifierCaptureIfNeeded(reason: "hid modifier release")
-            }
-        }
-    }
-
-    private func handleHIDSpaceKeyChange(isDown: Bool) {
-        guard isRecording else { return }
-        guard currentModifierFlags.contains(.function) else { return }
-        VoxtLog.hotkey("Hotkey recorder hid space \(isDown ? "down" : "up"). modifiers=\(HotkeyPreference.modifierSymbols(for: currentModifierFlags))", verbose: true)
-        guard isDown else { return }
-        captureKeyDown(
-            keyCode: UInt16(kVK_Space),
-            modifiers: currentModifierFlags,
-            sidedModifiers: currentSidedModifiers
-        )
     }
 
     private func createEventTap(eventMask: CGEventMask) -> (tap: CFMachPort, location: CGEventTapLocation)? {
@@ -261,7 +218,7 @@ final class KeyCaptureView: NSView {
             if let tap = CGEvent.tapCreate(
                 tap: tapLocation,
                 place: .tailAppendEventTap,
-                options: .listenOnly,
+                options: .defaultTap,
                 eventsOfInterest: eventMask,
                 callback: callback,
                 userInfo: Unmanaged.passUnretained(self).toOpaque()
@@ -274,7 +231,17 @@ final class KeyCaptureView: NSView {
 
     private func handleTapEvent(type: CGEventType, event: CGEvent) {
         guard isRecording else { return }
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: true) }
+            return
+        }
+        guard NSApp.isActive else { return }
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        if type == .keyDown, keyCode == UInt16(kVK_Escape) {
+            pendingModifierCaptureTask?.cancel()
+            onCancel?()
+            return
+        }
         switch type {
         case .keyDown:
             VoxtLog.hotkey("Hotkey recorder keyDown(tap). keyCode=\(keyCode), modifiers=\(HotkeyPreference.modifierSymbols(for: combinedModifiers(with: modifierFlags(from: event.flags).intersection(.hotkeyRelevant))))", verbose: true)
@@ -482,74 +449,6 @@ final class KeyCaptureView: NSView {
         if modifiers.contains(.shift) { count += 1 }
         if modifiers.contains(.function) { count += 1 }
         return count
-    }
-}
-
-private final class HotkeyRecorderHIDMonitor {
-    var onFunctionKeyChange: ((Bool) -> Void)?
-    var onSpaceKeyChange: ((Bool) -> Void)?
-
-    private var manager: IOHIDManager?
-
-    func start() {
-        stop()
-
-        let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
-        let matchers: [[String: Int]] = [
-            [
-                kIOHIDDeviceUsagePageKey as String: kHIDPage_GenericDesktop,
-                kIOHIDDeviceUsageKey as String: kHIDUsage_GD_Keyboard
-            ],
-            [
-                kIOHIDDeviceUsagePageKey as String: kHIDPage_GenericDesktop,
-                kIOHIDDeviceUsageKey as String: kHIDUsage_GD_Keypad
-            ]
-        ]
-
-        IOHIDManagerSetDeviceMatchingMultiple(manager, matchers as CFArray)
-        IOHIDManagerRegisterInputValueCallback(
-            manager,
-            { context, _, _, value in
-                guard let context else { return }
-                let monitor = Unmanaged<HotkeyRecorderHIDMonitor>.fromOpaque(context).takeUnretainedValue()
-                monitor.handleInputValue(value)
-            },
-            Unmanaged.passUnretained(self).toOpaque()
-        )
-        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
-        let openResult = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
-        guard openResult == kIOReturnSuccess else {
-            VoxtLog.hotkey("Hotkey recorder hid monitor open failed. status=\(openResult)")
-            IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
-            return
-        }
-
-        self.manager = manager
-        VoxtLog.hotkey("Hotkey recorder hid monitor started.")
-    }
-
-    func stop() {
-        guard let manager else { return }
-        IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue)
-        IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
-        self.manager = nil
-        VoxtLog.hotkey("Hotkey recorder hid monitor stopped.")
-    }
-
-    private func handleInputValue(_ value: IOHIDValue) {
-        let element = IOHIDValueGetElement(value)
-        let usagePage = IOHIDElementGetUsagePage(element)
-        let usage = IOHIDElementGetUsage(element)
-        let isDown = IOHIDValueGetIntegerValue(value) != 0
-
-        if usagePage == 0xFF, usage == 0x03 {
-            onFunctionKeyChange?(isDown)
-            return
-        }
-
-        if usagePage == kHIDPage_KeyboardOrKeypad, usage == kHIDUsage_KeyboardSpacebar {
-            onSpaceKeyChange?(isDown)
-        }
     }
 }
 

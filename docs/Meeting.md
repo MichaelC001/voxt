@@ -26,14 +26,14 @@ This is not true diarization yet.
 1. Open the main window, then go to `General > Output`
 2. Turn on `Meeting Notes (Beta)`
 3. Grant the required permissions:
-   - microphone
-   - accessibility / input monitoring for the hotkey path
-   - system audio capture permission
+   - microphone access when using a microphone source
+   - Accessibility for global shortcuts, not Input Monitoring
+   - macOS requests system audio capture when starting a meeting with system/mixed audio. If denied, enable access in System Settings and retry. Microphone-only recording, file import and ordinary output-device mute do not need it
 
 After enabling it:
 
 - the meeting shortcut appears in the main window's `Hotkey` page
-- meeting-related permissions appear in the main window's `Permissions` page
+- the `Permissions` page explains meeting system audio and links to System Settings; it does not infer authorization through private APIs
 - meeting history becomes available in History filters
 
 ## Supported ASR Engines

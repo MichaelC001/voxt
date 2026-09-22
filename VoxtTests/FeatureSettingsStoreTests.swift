@@ -352,43 +352,41 @@ final class FeatureSettingsStoreTests: XCTestCase {
         }
     }
 
-    func testLoadDefaultsRewriteAppContextToDisabled() throws {
-        try withEphemeralDefaults { defaults in
-            let settings = FeatureSettingsStore.load(defaults: defaults)
-
-            XCTAssertFalse(settings.rewrite.appContext.enabled)
-            XCTAssertFalse(settings.rewrite.appContext.textEnabled)
-            XCTAssertFalse(settings.rewrite.appContext.screenshotEnabled)
-        }
-    }
-
-    func testSavePersistsRewriteAppContextSubsettings() throws {
+    func testMigrationDropsRetiredContextSettingsWithoutChangingOtherPreferences() throws {
         try withEphemeralDefaults { defaults in
             var settings = FeatureSettingsStore.load(defaults: defaults)
-            settings.rewrite.appContext.textEnabled = true
-            settings.rewrite.appContext.screenshotEnabled = false
-
+            settings.transcription.prompt = "Keep my custom transcription prompt."
+            settings.rewrite.prompt = "Keep my custom screenshot instructions verbatim."
             FeatureSettingsStore.save(settings, defaults: defaults)
-            let reloaded = FeatureSettingsStore.load(defaults: defaults)
-
-            XCTAssertTrue(reloaded.rewrite.appContext.enabled)
-            XCTAssertTrue(reloaded.rewrite.appContext.textEnabled)
-            XCTAssertFalse(reloaded.rewrite.appContext.screenshotEnabled)
-        }
-    }
-
-    func testLoadDoesNotBackfillRewriteAppContextFromTranscriptionSettings() throws {
-        try withEphemeralDefaults { defaults in
-            var settings = FeatureSettingsStore.load(defaults: defaults)
-            settings.transcription.appContext.enabled = true
-            settings.rewrite.appContext.enabled = false
-
-            FeatureSettingsStore.save(settings, defaults: defaults)
-            let reloaded = FeatureSettingsStore.load(defaults: defaults)
-
-            XCTAssertFalse(reloaded.rewrite.appContext.enabled)
-            XCTAssertFalse(reloaded.rewrite.appContext.textEnabled)
-            XCTAssertFalse(reloaded.rewrite.appContext.screenshotEnabled)
+            let expected = FeatureSettingsStore.load(defaults: defaults)
+            let raw = try XCTUnwrap(defaults.string(forKey: AppPreferenceKey.featureSettings))
+            let data = try XCTUnwrap(raw.data(using: .utf8))
+            let original = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let oldContexts: [[String: Any]] = [
+                ["enabled": true],
+                ["enabled": true, "textEnabled": true, "screenshotEnabled": true]
+            ]
+            for oldContext in oldContexts {
+                var legacy = original
+                for feature in ["transcription", "rewrite"] {
+                    var value = try XCTUnwrap(legacy[feature] as? [String: Any])
+                    value["appContext"] = oldContext
+                    legacy[feature] = value
+                }
+                let legacyData = try JSONSerialization.data(withJSONObject: legacy, options: .sortedKeys)
+                let legacyRaw = try XCTUnwrap(String(data: legacyData, encoding: .utf8))
+                defaults.set(legacyRaw, forKey: AppPreferenceKey.featureSettings)
+                XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults), expected)
+                // Reads must not migrate/write through SwiftUI observation.
+                XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.featureSettings), legacyRaw)
+                FeatureSettingsStore.migrateIfNeeded(defaults: defaults)
+                let migrated = try XCTUnwrap(defaults.string(forKey: AppPreferenceKey.featureSettings))
+                XCTAssertFalse(migrated.contains("appContext"))
+                XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults), expected)
+                FeatureSettingsStore.migrateIfNeeded(defaults: defaults)
+                XCTAssertEqual(FeatureSettingsStore.load(defaults: defaults), expected)
+                XCTAssertFalse(try XCTUnwrap(defaults.string(forKey: AppPreferenceKey.featureSettings)).contains("appContext"))
+            }
         }
     }
 
@@ -410,28 +408,6 @@ final class FeatureSettingsStoreTests: XCTestCase {
             XCTAssertEqual(reloaded.transcription.notes.panel.hideDelay, 0.1)
             XCTAssertFalse(reloaded.transcription.notes.panel.isTranslucent)
         }
-    }
-
-    func testAppContextSettingsEnableToggleTurnsOnBothSubsettings() {
-        var settings = TranscriptionAppContextSettings()
-
-        settings.enabled = true
-
-        XCTAssertTrue(settings.textEnabled)
-        XCTAssertTrue(settings.screenshotEnabled)
-        XCTAssertTrue(settings.enabled)
-    }
-
-    func testAppContextSettingsDisableWhenBothSubsettingsAreOff() {
-        var settings = TranscriptionAppContextSettings(
-            textEnabled: true,
-            screenshotEnabled: true
-        )
-
-        settings.textEnabled = false
-        settings.screenshotEnabled = false
-
-        XCTAssertFalse(settings.enabled)
     }
 
     func testMeetingRuntimePreferencesDoNotUseMeetingVADBackend() throws {

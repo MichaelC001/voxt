@@ -27,7 +27,11 @@ struct MeetingDetailPlaybackPane: View {
     @ViewBuilder
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if viewModel.mode == .history {
+            if viewModel.mode == .fileDraft {
+                Text(AppLocalization.localizedString("Audio playback will be available after the meeting is saved."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if viewModel.mode == .history {
                 if playbackController.isAvailable {
                     waveformToolbar
 

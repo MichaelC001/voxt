@@ -4,6 +4,24 @@
 import Foundation
 
 enum MeetingSpeakerAnalysisPipeline {
+    /// File analysis must not silently save a successful history entry if speaker
+    /// processing fails. Its completed ASR checkpoint remains available for retry.
+    static func analyzedFileSegments(
+        from segments: [MeetingTranscriptSegment],
+        descriptors: [MeetingAudioAssetDescriptor],
+        loadAsset: @escaping @Sendable (MeetingAudioAssetDescriptor) async -> MeetingAudioAsset?,
+        options: MeetingSpeakerDiarizationOptions = .init(),
+        engine: any MeetingSpeakerDiarizationEngine = SortformerMeetingSpeakerDiarizationEngine(),
+        progress: (@Sendable (Double) async -> Void)? = nil
+    ) async throws -> [MeetingTranscriptSegment] {
+        let eligible = descriptors.filter { $0.durationSeconds >= options.minimumAudioDurationSeconds }
+        let turns = try await engine.diarizeFile(
+            descriptors: eligible, loadAsset: loadAsset, options: options, progress: progress
+        )
+        try Task.checkCancellation()
+        return assembledSegments(from: segments, turns: turns, options: options)
+    }
+
     static func analyzedSegmentsPreservingStructuredSpeakerData(
         from segments: [MeetingTranscriptSegment],
         assets: [MeetingAudioAsset],
@@ -63,7 +81,7 @@ enum MeetingSpeakerAnalysisPipeline {
             }
             return assembledSegments(from: segments, turns: turns, options: options)
         } catch {
-            VoxtLog.meetingWarning("Meeting speaker analysis failed: \(error.localizedDescription)")
+            VoxtLog.meetingWarning("Meeting speaker analysis failed.")
             return segments
         }
     }
@@ -107,7 +125,7 @@ enum MeetingSpeakerAnalysisPipeline {
             )
             return assembledSegments(from: segments, turns: turns, options: options)
         } catch {
-            VoxtLog.meetingWarning("Meeting speaker analysis failed: \(error.localizedDescription)")
+            VoxtLog.meetingWarning("Meeting speaker analysis failed.")
             return segments
         }
     }

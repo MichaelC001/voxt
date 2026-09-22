@@ -175,9 +175,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     )
     lazy var meetingFileTaskQueue = MeetingFileTaskQueue(
-        analyzer: { @MainActor [weak self] sourceURL, progress in
+        analyzer: { @MainActor [weak self] sourceURL, originalFileName, progress in
             guard let self else { throw CancellationError() }
-            return try await self.analyzeImportedMeetingFile(at: sourceURL, progress: progress)
+            return try await self.analyzeImportedMeetingFile(
+                at: sourceURL, originalFileName: originalFileName, progress: progress
+            )
         },
         cancelActiveAnalysis: { @MainActor [weak self] in
             await self?.cancelImportedMeetingFileAnalysis()
@@ -188,6 +190,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         },
         rollbackAnalysis: { @MainActor [weak self] entry in
             _ = self?.historyStore.delete(id: entry.id)
+        },
+        onAnalysisCompleted: { @MainActor [weak self] taskID, entry in
+            guard let self, self.meetingDetailWindowManager.hasFileTranscriptWindow(taskID: taskID) else { return }
+            self.showMeetingDetailWindow(for: entry, replacingFileTaskID: taskID, activate: false)
+        },
+        onTaskRemoved: { @MainActor [weak self] taskID in
+            self?.meetingDetailWindowManager.closeFileTranscript(taskID: taskID)
         }
     )
     var statusItem: NSStatusItem?

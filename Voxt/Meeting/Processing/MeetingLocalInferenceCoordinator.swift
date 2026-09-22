@@ -9,6 +9,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
     case liveASRPartial
     case realtimeTranslation
     case fileASR
+    case fileSpeakerAnalysis
     case finalASR
     case speakerAnalysis
     case detailTranslation
@@ -20,7 +21,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
         case .liveASRFinal: return 95
         case .liveASRPartial: return 85
         case .realtimeTranslation: return 70
-        case .fileASR: return 10
+        case .fileASR, .fileSpeakerAnalysis: return 10
         case .finalASR: return 60
         case .speakerAnalysis: return 50
         case .detailTranslation: return 40
@@ -30,7 +31,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
 
     var waitsWhileRecording: Bool {
         switch self {
-        case .fileASR, .finalASR, .speakerAnalysis, .detailTranslation, .summary:
+        case .fileASR, .fileSpeakerAnalysis, .finalASR, .speakerAnalysis, .detailTranslation, .summary:
             return true
         case .liveASRFeed, .liveASRFinal, .liveASRPartial, .realtimeTranslation:
             return false
@@ -41,7 +42,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
         switch self {
         case .liveASRFeed, .liveASRFinal, .finalASR:
             return false
-        case .liveASRPartial, .realtimeTranslation, .fileASR, .speakerAnalysis, .detailTranslation, .summary:
+        case .liveASRPartial, .realtimeTranslation, .fileASR, .fileSpeakerAnalysis, .speakerAnalysis, .detailTranslation, .summary:
             return true
         }
     }
@@ -50,7 +51,7 @@ nonisolated enum MeetingLocalInferenceWorkClass: String, Sendable {
         switch self {
         case .liveASRFeed, .liveASRFinal, .finalASR:
             return false
-        case .liveASRPartial, .realtimeTranslation, .fileASR, .speakerAnalysis, .detailTranslation, .summary:
+        case .liveASRPartial, .realtimeTranslation, .fileASR, .fileSpeakerAnalysis, .speakerAnalysis, .detailTranslation, .summary:
             return true
         }
     }
@@ -85,7 +86,11 @@ nonisolated enum MeetingLocalInferenceCoordinatorError: LocalizedError, Sendable
 }
 
 actor MeetingLocalInferenceCoordinator {
-    static let shared = MeetingLocalInferenceCoordinator()
+    static let shared = MeetingLocalInferenceCoordinator(
+        maintainFileCache: { MeetingFileInferenceCache.trimIfNeeded(underPressure: $0) },
+        readMemoryPressure: { MeetingMemoryPressureMonitor.currentFileConstraint() },
+        beginFileWorkUnit: { MeetingFileInferenceCache.beginWorkUnit() }
+    )
 
     private struct Waiter {
         let id: UUID
@@ -104,8 +109,24 @@ actor MeetingLocalInferenceCoordinator {
     private var sequence: Int64 = 0
     private var recordingActive = false
     private var memoryPressureConstrained = false
+    private var memoryPressureSampleAvailable = false
     private var statistics = MeetingLocalInferenceStatistics()
     private let clock = ContinuousClock()
+    private let maintainFileCache: @Sendable (Bool) -> Void
+    private let readMemoryPressure: @Sendable () -> Bool?
+    private let beginFileWorkUnit: @Sendable () -> (@Sendable () -> Void)
+
+    // Isolated coordinators in tests must not initialize or mutate the MLX GPU
+    // allocator. The shared production instance installs the file cache hooks.
+    init(
+        maintainFileCache: @escaping @Sendable (Bool) -> Void = { _ in },
+        readMemoryPressure: @escaping @Sendable () -> Bool? = { nil },
+        beginFileWorkUnit: @escaping @Sendable () -> (@Sendable () -> Void) = { {} }
+    ) {
+        self.maintainFileCache = maintainFileCache
+        self.readMemoryPressure = readMemoryPressure
+        self.beginFileWorkUnit = beginFileWorkUnit
+    }
 
     func setRecordingActive(_ isActive: Bool) {
         recordingActive = isActive
@@ -113,20 +134,45 @@ actor MeetingLocalInferenceCoordinator {
     }
 
     func setMemoryPressureConstrained(_ isConstrained: Bool) {
+        if memoryPressureConstrained != isConstrained {
+            VoxtLog.meeting("Meeting memory pressure changed. source=notification, constrained=\(isConstrained)")
+        }
         memoryPressureConstrained = isConstrained
         scheduleNextIfPossible()
+    }
+
+    private func fileMemoryBlocked() -> Bool {
+        let sample = readMemoryPressure()
+        memoryPressureSampleAvailable = sample != nil
+        // Do not change the notification-based policy for unrelated live/LLM
+        // callers. Only bounded file work treats a known warning as nonblocking.
+        return sample ?? memoryPressureConstrained
     }
 
     func withPermit<T: Sendable>(
         _ workClass: MeetingLocalInferenceWorkClass,
         operation: @escaping @Sendable () async throws -> T
     ) async throws -> T {
-        let token = try await acquire(workClass)
-        defer { release(token) }
-        try Task.checkCancellation()
-        let value = try await operation()
-        statistics.completedCount += 1
-        return value
+        do {
+            let token = try await acquire(workClass)
+            let isFile = workClass == .fileASR || workClass == .fileSpeakerAnalysis
+            let restoreCacheLimit: (@Sendable () -> Void)? = isFile ? beginFileWorkUnit() : nil
+            defer {
+                if isFile {
+                    // Work has actually returned (including errors/cancellation).
+                    // Trim before admitting another operation, not during native feed.
+                    maintainFileCache(fileMemoryBlocked())
+                }
+                restoreCacheLimit?()
+                release(token)
+            }
+            try Task.checkCancellation()
+            let value = try await operation()
+            statistics.completedCount += 1
+            return value
+        } catch {
+            throw error
+        }
     }
 
     func currentStatistics() -> MeetingLocalInferenceStatistics {
@@ -141,10 +187,15 @@ actor MeetingLocalInferenceCoordinator {
         try Task.checkCancellation()
         statistics.submittedCount += 1
 
+        if workClass == .fileASR || workClass == .fileSpeakerAnalysis {
+            return try await acquireFilePermit(workClass)
+        }
+
         if workClass.isThermallyDeferrable {
             switch ProcessInfo.processInfo.thermalState {
             case .serious, .critical:
                 statistics.thermalDeferralCount += 1
+                VoxtLog.meetingWarning("Local inference admission rejected. workClass=\(workClass.rawValue), reason=thermal-pressure, thermalState=\(ProcessInfo.processInfo.thermalState.rawValue)")
                 throw MeetingLocalInferenceCoordinatorError.thermallyConstrained
             case .nominal, .fair:
                 break
@@ -155,6 +206,7 @@ actor MeetingLocalInferenceCoordinator {
 
         if memoryPressureConstrained, workClass.isMemoryDeferrable {
             statistics.memoryDeferralCount += 1
+            VoxtLog.meetingWarning("Local inference admission rejected. workClass=\(workClass.rawValue), reason=memory-pressure")
             throw MeetingLocalInferenceCoordinatorError.memoryConstrained
         }
 
@@ -165,6 +217,7 @@ actor MeetingLocalInferenceCoordinator {
         }
         guard waiters.count < Self.maximumQueuedWork else {
             statistics.overloadedCount += 1
+            VoxtLog.meetingWarning("Local inference admission rejected. workClass=\(workClass.rawValue), reason=inference-queue-full, queuedCount=\(waiters.count)")
             throw MeetingLocalInferenceCoordinatorError.overloaded
         }
 
@@ -237,8 +290,71 @@ actor MeetingLocalInferenceCoordinator {
         waiter.continuation.resume(returning: token)
     }
 
-    private func canRun(_ workClass: MeetingLocalInferenceWorkClass) -> Bool {
-        !(recordingActive && workClass.waitsWhileRecording) &&
-            !(memoryPressureConstrained && workClass.isMemoryDeferrable)
+    private func acquireFilePermit(_ workClass: MeetingLocalInferenceWorkClass) async throws -> UUID {
+        // The file queue is serial. Recheck pressure AND lane availability on
+        // every admission, including recovery after waiting for another caller.
+        // No native work or permit is left running while sleeping.
+        var didWait = false
+        defer {
+            if didWait {
+                postFileResourceWait(isWaiting: false)
+            }
+        }
+        var retryDelayMilliseconds = 250
+        var reclaimedForPressure = false
+        var loggedWait = false
+        while true {
+            try Task.checkCancellation()
+            var fileMemoryConstrained = fileMemoryBlocked()
+            if !fileMemoryConstrained { reclaimedForPressure = false }
+            if activeToken == nil {
+                // An inherited multi-GB cache can prevent the very recovery we
+                // are waiting for. Reclaim once per pressure episode; subsequent
+                // polls only trim if unused buffers again exceed the threshold.
+                maintainFileCache(fileMemoryConstrained && !reclaimedForPressure)
+                reclaimedForPressure = fileMemoryConstrained
+                fileMemoryConstrained = fileMemoryBlocked()
+            }
+            try Task.checkCancellation()
+            if activeToken == nil,
+               canRun(workClass, memoryBlocked: fileMemoryConstrained),
+               !waiters.contains(where: { canRun($0.workClass) }) {
+                let token = UUID()
+                activeToken = token
+                return token
+            }
+            if !didWait {
+                didWait = true
+                postFileResourceWait(isWaiting: true)
+            }
+            if !loggedWait {
+                VoxtLog.meeting("File analysis is waiting for system resources.")
+                loggedWait = true
+            }
+            try await Task.sleep(for: .milliseconds(retryDelayMilliseconds))
+            retryDelayMilliseconds = min(retryDelayMilliseconds * 2, 5_000)
+            scheduleNextIfPossible()
+        }
+    }
+
+    private func postFileResourceWait(isWaiting: Bool) {
+        guard let taskID = MeetingFileTaskContext.taskID else { return }
+        NotificationCenter.default.post(
+            name: .voxtMeetingFileResourceWaitDidChange,
+            object: nil,
+            userInfo: [
+                "taskID": taskID.uuidString,
+                "isWaiting": isWaiting
+            ]
+        )
+    }
+
+    private func canRun(_ workClass: MeetingLocalInferenceWorkClass, memoryBlocked: Bool? = nil) -> Bool {
+        let thermalState = ProcessInfo.processInfo.thermalState
+        let thermalBlocked = workClass.isThermallyDeferrable
+            && (thermalState == .serious || thermalState == .critical)
+        return !(recordingActive && workClass.waitsWhileRecording)
+            && !((memoryBlocked ?? memoryPressureConstrained) && workClass.isMemoryDeferrable)
+            && !thermalBlocked
     }
 }

@@ -24,7 +24,6 @@ struct SettingsView: View {
     @ObservedObject var mainWindowState: MainWindowVisibilityState
     @AppStorage(AppPreferenceKey.interfaceLanguage) private var interfaceLanguageRaw = AppInterfaceLanguage.system.rawValue
     @AppStorage(AppPreferenceKey.appEnhancementEnabled) private var appEnhancementEnabled = true
-    @AppStorage(AppPreferenceKey.muteSystemAudioWhileRecording) private var muteSystemAudioWhileRecording = false
     @AppStorage(AppPreferenceKey.transcriptionEngine) private var transcriptionEngineRaw = TranscriptionEngine.mlxAudio.rawValue
     @AppStorage(AppPreferenceKey.featureSettings) private var featureSettingsRaw = ""
     @AppStorage(AppPreferenceKey.remoteASRProviderConfigurations) private var remoteASRProviderConfigurationsRaw = ""
@@ -225,9 +224,6 @@ struct SettingsView: View {
                 selectedFeatureTab = .features
             }
         }
-        .onChange(of: muteSystemAudioWhileRecording) { _, _ in
-            refreshPermissionBadge()
-        }
         .onChange(of: transcriptionEngineRaw) { _, _ in
             refreshPermissionBadge()
         }
@@ -366,6 +362,15 @@ struct SettingsView: View {
                            meetingFileTaskQueue.hasFinishedTasks {
                             Button(AppLocalization.localizedString("Clear Finished Tasks")) {
                                 meetingFileTaskQueue.clearFinishedTasks()
+                                NotificationCenter.default.post(
+                                    name: .voxtFeatureSettingsToastRequested,
+                                    object: nil,
+                                    userInfo: [
+                                        "message": AppLocalization.localizedString(
+                                            "Completed tasks are available in Meeting History."
+                                        )
+                                    ]
+                                )
                             }
                             .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 11, height: 26))
                         }
@@ -673,7 +678,6 @@ struct SettingsView: View {
         let featureSettings = FeatureSettingsStore.load(defaults: .standard)
         let context = SettingsPermissionRequirementResolver.requirementContext(
             selectedEngine: engine,
-            muteSystemAudioWhileRecording: muteSystemAudioWhileRecording,
             featureSettings: featureSettings
         )
 

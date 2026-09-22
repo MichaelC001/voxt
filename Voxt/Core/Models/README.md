@@ -15,7 +15,8 @@ ASR and Custom LLM managers share one complete shutdown task per instance, so re
 ## Runtime and download components
 
 - `LocalModelManagerCatalog`: existing nested state/snapshot values and stateless catalog forwarding; manager-owned Published state and task dictionaries stay private.
-- `CustomLLMRequestRuntime`: generation policy, chat/image inputs, output parsing and diagnostics formatting. Mutable container lifetime and diagnostic publication remain in the manager.
+- `CustomLLMRequestRuntime`: generation policy, text-only chat inputs, output parsing and diagnostics formatting. Mutable container lifetime and diagnostic publication remain in the manager. Image inputs and screenshot debug payloads have been removed.
+- `CustomLLMModelCatalog.requiresVLMFactory`: selects the loading architecture, not an exposed image capability. MLXVLM remains necessary for existing Qwen3-VL, Ministral-3 and Gemma-4 checkpoints even when requests contain only text.
 - `LocalTokenizerLoader`: adapter between Tokenizers and MLXLMCommon tokenizer contracts.
 - `GGUFTranslationRuntime`: llama backend/model/context/sampler ownership and UTF-8 accumulation, separate from download/install UI state.
 - `ResumableDownloadTypes`, `ResumableDownloadAttemptDelegate`, `ResumableModelDownloadSupport`: shared resumable transport, delegate synchronization, sidecar and retry handling for ASR/LLM/GGUF.

@@ -510,13 +510,11 @@ final class LLMDebugViewModel: ObservableObject {
     @Published private(set) var isModelInitializing = false
     @Published private(set) var statusMessage = ""
 
-    private unowned let appDelegate: AppDelegate
     private let customLLMManager: CustomLLMModelManager
     private var remoteConfigurations: [String: RemoteProviderConfiguration]
     private var sessionPromptOverrides: [String: String] = [:]
 
     init(appDelegate: AppDelegate) {
-        self.appDelegate = appDelegate
         customLLMManager = appDelegate.customLLMManager
         remoteConfigurations = RemoteModelConfigurationStore.loadConfigurations(
             from: UserDefaults.standard.string(forKey: AppPreferenceKey.remoteLLMProviderConfigurations) ?? ""
@@ -637,10 +635,9 @@ final class LLMDebugViewModel: ObservableObject {
         Task {
             let startedAt = Date()
             let values = self.mergedVariableValues(for: preset)
-            let resolvedValues = await self.valuesWithRuntimeContext(for: values, preset: preset, model: model)
             let promptResolution = ModelDebugPromptResolver.resolve(
                 preset: preset,
-                values: resolvedValues
+                values: values
             )
             do {
                 let output = try await run(
@@ -716,23 +713,6 @@ final class LLMDebugViewModel: ObservableObject {
         preset.defaultValues.merging(variableValues) { _, rhs in rhs }
     }
 
-    private func valuesWithRuntimeContext(
-        for values: [String: String],
-        preset: LLMDebugPresetOption,
-        model: LLMDebugModelOption
-    ) async -> [String: String] {
-        guard case .rewrite = preset.kind else { return values }
-        guard FeatureSettingsStore.load(defaults: .standard).rewrite.appContext.enabled else {
-            return values
-        }
-        guard let capture = await captureRewriteAppContext(for: model) else {
-            return values
-        }
-        var resolved = values
-        resolved["__VOXT_DEBUG_REWRITE_APP_CONTEXT_CAPTURE__"] = serializedRewriteAppContextCapture(capture)
-        return resolved
-    }
-
     private func applyGroupPrompt(_ prompt: String, groupID: UUID, defaults: UserDefaults) {
         guard let data = defaults.data(forKey: AppPreferenceKey.appBranchGroups),
               var groups = try? JSONDecoder().decode([AppBranchGroup].self, from: data),
@@ -750,49 +730,6 @@ final class LLMDebugViewModel: ObservableObject {
         case .remote:
             return false
         }
-    }
-
-    private func captureRewriteAppContext(for model: LLMDebugModelOption) async -> TranscriptionAppContextCapture? {
-        let provider: LLMExecutionProvider
-        switch model.selection {
-        case .local(let repo):
-            provider = .customLLM(repo: repo)
-        case .remote(let remoteProvider, let configuration):
-            provider = .remote(provider: remoteProvider, configuration: configuration)
-        }
-        let snapshot = appDelegate.captureEnhancementContextSnapshot()
-        let capabilities = TranscriptionAppContextCapabilityResolver.capabilities(for: provider)
-        return await TranscriptionAppContextCaptureService.capture(
-            snapshot: snapshot,
-            modelCapabilities: capabilities,
-            settings: FeatureSettingsStore.load(defaults: .standard).rewrite.appContext,
-            browserURLResolver: { [weak appDelegate] bundleID in
-                guard let appDelegate else { return nil }
-                guard appDelegate.isBrowserBundleID(bundleID) else { return nil }
-                return appDelegate.activeBrowserTabURL(frontmostBundleID: bundleID)
-            }
-        )
-    }
-
-    private func serializedRewriteAppContextCapture(_ capture: TranscriptionAppContextCapture) -> String? {
-        let payload = DebugRewriteAppContextPayload(
-            textContext: capture.textContext,
-            attachments: capture.attachments.compactMap { attachment in
-                switch attachment {
-                case .image(let image):
-                    return .image(
-                        DebugRewriteImageAttachmentPayload(
-                            base64Data: image.data.base64EncodedString(),
-                            mimeType: image.mimeType,
-                            detail: image.detail.rawValue,
-                            filename: image.filename
-                        )
-                    )
-                }
-            }
-        )
-        guard let data = try? JSONEncoder().encode(payload) else { return nil }
-        return String(data: data, encoding: .utf8)
     }
 
     private func run(

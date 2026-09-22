@@ -125,12 +125,16 @@ final class MeetingSessionCoordinator {
 
     func analyzeImportedFile(
         at sourceURL: URL,
+        sourceIsPreparedAudio: Bool = false,
+        archivePreparedAudio: Bool = true,
         progress: @escaping @MainActor @Sendable (MeetingFileAnalysisProgress) -> Void
     ) async throws -> MeetingSessionResult {
         guard !isActive else { throw MeetingFileAnalysisError.sessionAlreadyActive }
         let pipeline = MeetingImportedFilePipeline(
             modelManager: mlxModelManager,
-            engineContext: resolvedEngineContext()
+            engineContext: resolvedEngineContext(),
+            sourceIsPreparedAudio: sourceIsPreparedAudio,
+            archivePreparedAudio: archivePreparedAudio
         )
         return try await importedFileAnalyzer.analyze(
             at: sourceURL, after: cleanupTask, using: pipeline, progress: progress

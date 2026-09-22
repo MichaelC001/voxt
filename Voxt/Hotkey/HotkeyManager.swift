@@ -5,7 +5,6 @@ import Foundation
 import Carbon
 import AppKit
 import ApplicationServices
-import IOKit.hid
 
 /// Monitors a global hotkey via a CGEvent tap.
 /// - Press and hold hotkey key  → calls `onKeyDown`
@@ -126,7 +125,6 @@ nonisolated final class HotkeyManager: @unchecked Sendable {
     private let deferredEventProcessingQueue = DispatchQueue(label: "com.voxt.hotkey.deferredEventProcessing")
     private let eventTapStateLockWaitTimeout: TimeInterval = 0.015
     private var didPromptAccessibility = false
-    private var didPromptInputMonitoring = false
     private var lastEventAt: Date?
     private let staleTapStateResetIdleThreshold: TimeInterval = 2.0
 
@@ -286,18 +284,13 @@ nonisolated final class HotkeyManager: @unchecked Sendable {
     }
 
     private func preflightAndPromptPermissionsIfNeeded() -> Bool {
-        let currentStatus = EventListeningPermissionManager.status()
-        let accessibilityGranted = currentStatus.accessibilityGranted
-        let inputMonitoringGranted = currentStatus.inputMonitoringGranted
-
-        guard accessibilityGranted, inputMonitoringGranted else {
+        // The modifying (.defaultTap) backend uses Accessibility authorization.
+        // Input Monitoring is a different backend's requirement, not a prerequisite.
+        let accessibilityGranted = AccessibilityPermissionManager.isTrusted()
+        guard accessibilityGranted else {
             if !accessibilityGranted, !didPromptAccessibility {
                 didPromptAccessibility = true
                 _ = AccessibilityPermissionManager.request(prompt: true)
-            }
-            if !inputMonitoringGranted, !didPromptInputMonitoring {
-                didPromptInputMonitoring = true
-                _ = EventListeningPermissionManager.requestInputMonitoring(prompt: true)
             }
             VoxtLog.hotkey("Hotkey preflight blocked. \(permissionStatusText())")
             return false

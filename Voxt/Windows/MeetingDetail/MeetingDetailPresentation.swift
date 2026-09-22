@@ -9,6 +9,8 @@ extension MeetingDetailViewModel {
             return !segments.isEmpty
         case .live:
             return isPaused && !segments.isEmpty
+        case .fileDraft:
+            return false
         }
     }
 
@@ -60,6 +62,11 @@ extension MeetingDetailViewModel {
                     isAvailable: false,
                     message: AppLocalization.localizedString("Meeting summary is unavailable.")
                 )
+        case .fileDraft:
+            return MeetingSummaryProviderStatus(
+                isAvailable: false,
+                message: AppLocalization.localizedString("Transcription ready — speaker analysis incomplete")
+            )
         case .live:
             return MeetingSummaryProviderStatus(
                 isAvailable: false,
@@ -69,6 +76,7 @@ extension MeetingDetailViewModel {
     }
 
     var transcriptPresentationMode: TranscriptPresentationMode {
+        guard mode != .fileDraft else { return .timeline }
         let resolved = TranscriptPresentationMode(rawValue: transcriptPresentationModeRaw) ?? .timeline
         guard captureMode.capabilities.allowsSpeakerFeatures || resolved != .speakerMarks else {
             return .timeline
@@ -77,21 +85,23 @@ extension MeetingDetailViewModel {
     }
 
     var transcriptSpeakerDisplayMode: TranscriptSpeakerDisplayMode {
+        guard mode != .fileDraft else { return .source }
         guard captureMode.capabilities.allowsSpeakerFeatures else { return .source }
         return TranscriptSpeakerDisplayMode(rawValue: transcriptSpeakerDisplayModeRaw) ?? .source
     }
 
     var availableTranscriptPresentationModes: [TranscriptPresentationMode] {
-        captureMode.capabilities.allowsSpeakerFeatures
+        mode != .fileDraft && captureMode.capabilities.allowsSpeakerFeatures
             ? TranscriptPresentationMode.allCases
             : [.timeline]
     }
 
     var showsSpeakerDisplayModePicker: Bool {
-        captureMode.capabilities.allowsSpeakerFeatures
+        mode != .fileDraft && captureMode.capabilities.allowsSpeakerFeatures
     }
 
     func export() throws {
+        guard canExport else { return }
         try MeetingTranscriptExporter.export(
             segments: segments,
             defaultFilename: MeetingTranscriptExporter.defaultFilename(prefix: "Voxt-Meeting")

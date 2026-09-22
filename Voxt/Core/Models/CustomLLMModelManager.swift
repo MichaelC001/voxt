@@ -207,7 +207,6 @@ class CustomLLMModelManager: ObservableObject {
             )
             let params = CustomLLMRequestRuntime.generationParameters(for: request, behavior: behavior, settings: settings, tuning: generationTuning)
             session.generateParameters = params
-            let inputImages = CustomLLMRequestRuntime.userInputImages(from: request.attachments)
 
             let modelStartedAt = Date()
             let setupMs = Int(modelStartedAt.timeIntervalSince(overallStartedAt) * 1000) - containerSnapshot.elapsedMs
@@ -222,7 +221,7 @@ class CustomLLMModelManager: ObservableObject {
             var lastPublishedPreview = ""
             for try await event in session.streamDetails(
                 to: request.prompt,
-                images: inputImages,
+                images: [],
                 videos: []
             ) {
                 try Task.checkCancellation()
@@ -392,15 +391,15 @@ class CustomLLMModelManager: ObservableObject {
         }
         try Task.checkCancellation()
         guard revision == storageRevision else { throw CancellationError() }
-        if CustomLLMModelCatalog.supportsImageInput(repo: repo) {
+        let requiresVLMFactory = CustomLLMModelCatalog.requiresVLMFactory(repo: repo)
+        if requiresVLMFactory {
             _ = MLXVLM.TrampolineModelFactory.modelFactory()
         }
-        let supportsVision = CustomLLMModelCatalog.supportsImageInput(repo: repo)
         let container = try await inferenceLoadCoordinator.value(for: repo) {
             try await MemoryEfficientModelContainerLoader.load(
                 from: directory,
                 using: LocalTokenizerLoader(),
-                supportsVision: supportsVision
+                requiresVLMFactory: requiresVLMFactory
             )
         }
         try Task.checkCancellation()

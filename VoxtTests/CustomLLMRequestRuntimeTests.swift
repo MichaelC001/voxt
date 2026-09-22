@@ -87,7 +87,7 @@ final class CustomLLMRequestRuntimeTests: XCTestCase {
             request: LLMCompiledRequest(
                 taskLabel: label, instructions: instructions, prompt: prompt,
                 debugInput: prompt, fallbackText: "fallback", inputCharacterCount: prompt.count,
-                outputTokenBudgetHint: budget, attachments: [], conversationHistory: [],
+                outputTokenBudgetHint: budget, conversationHistory: [],
                 previousResponseID: nil, responseFormat: nil
             ),
             repo: "test/repo"
