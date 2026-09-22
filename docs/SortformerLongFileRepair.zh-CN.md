@@ -56,7 +56,7 @@ popLen = min(fifoLen - fifoMax, spkcacheUpdatePeriod)
 - 返回/异常/取消的清理由 `withPermit` 的 defer 在原生工作真正退出后、释放许可之前执行。继承的旧大缓存在首次准入前也检查；内存压力等待期间、协调器通道空闲时，每次压力周期额外清理一次闲置缓存。其他工作占有通道时不在等待线程进行维护。
 - 256 MiB 是**工作单元之间的缓存保留阈值**，不是硬性总内存/单次推理峰值上限。全局 allocator 可能被其他模型重新填充；其余调用者仍拥有自己的活跃数据，不能声称该协调器覆盖所有 MLX 调用。
 - 文件准入/等待使用只读 `kern.memorystatus_vm_pressure_level` 可选探测，按 dispatch 的 normal/warning/critical 值解释。系统确实报告 normal 才能解除旧标志；探测失败、未知值或仍有压力时保留原保护，不以低 RSS 或等待超时猜测恢复。该接口可用性仍需目标 macOS 验证。
-- 每 15 秒输出真实的 `memoryPressure`、`pressureProbeAvailable`、通道占用和排队数；记录 normal/pressure 状态变化与缓存回收前后 active/cache。继续沿用原有可取消等待和进度，不增加新的状态机、自动重跑或模型卸载流程。
+- 当时每 15 秒输出压力和通道状态，并记录缓存回收前后数值。该高频诊断已在后续整理中默认关闭，不再作为当前日志策略。
 
 证据：锁定的 mlx-swift 0.31.6 `Source/MLX/Memory.swift` 中 `clearCache()` 通过 eval lock 调用 `mlx_clear_cache`；XNU `bsd/kern/kern_memorystatus_notify.c` 的 sysctl handler 将当前压力转换为 NOTE_MEMORYSTATUS 单值后输出。仅做只读探测，有明确不支持时回退，未更改任何依赖或系统设置。
 

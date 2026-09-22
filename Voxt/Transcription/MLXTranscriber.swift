@@ -1713,24 +1713,18 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         modelManager.beginActiveUse()
         defer { modelManager.endActiveUse() }
         defer { isModelInitializing = false }
-        let loadStarted = ContinuousClock.now
-        MeetingFileTrace.event("asr-model-load-requested", "repo=\(modelManager.currentModelRepo)")
         let model = try await modelManager.loadModel()
-        MeetingFileTrace.event("asr-model-ready", "elapsed=\(loadStarted.duration(to: .now))")
         let audioSamples = try prepareInputSamples(samples, sampleRate: sampleRate)
         let audioDurationSeconds = Double(samples.count) / safeSampleRate(sampleRate)
         let inferenceConfiguration = resolvedInferenceConfiguration(
             for: .postStopFinal,
             audioDurationSeconds: audioDurationSeconds
         )
-        let inferenceStarted = ContinuousClock.now
-        MeetingFileTrace.event("asr-inference-started", "audioSeconds=\(audioDurationSeconds), inputSamples=\(samples.count)")
         let inferenceResult = try await runStreamingInference(
             model: model,
             audioSamples: audioSamples,
             inferenceConfiguration: inferenceConfiguration
         )
-        MeetingFileTrace.event("asr-inference-returned", "elapsed=\(inferenceStarted.duration(to: .now)), structuredSegments=\(inferenceResult.structuredSegments.count)")
         latestSenseVoiceMetadata = inferenceResult.senseVoiceMetadata
         let rawCandidate = normalizeText(inferenceResult.rawText)
         let candidate = normalizeText(MLXTranscriptionPlanning.removingKnownASRContextLeakage(from: rawCandidate))

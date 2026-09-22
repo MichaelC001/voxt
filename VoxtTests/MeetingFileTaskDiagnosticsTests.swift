@@ -4,37 +4,37 @@ import XCTest
 
 @MainActor
 final class MeetingFileTaskDiagnosticsTests: XCTestCase {
-    func testTemporaryTraceSwitchSupportsDebugDefaultAndReleaseOptIn() {
-        XCTAssertTrue(MeetingFileTrace.resolvedEnabled(environmentValue: nil, debugBuild: true))
-        XCTAssertFalse(MeetingFileTrace.resolvedEnabled(environmentValue: nil, debugBuild: false))
-        XCTAssertFalse(MeetingFileTrace.resolvedEnabled(environmentValue: "0", debugBuild: true))
-        XCTAssertTrue(MeetingFileTrace.resolvedEnabled(environmentValue: "1", debugBuild: false))
-        XCTAssertFalse(MeetingFileTrace.resolvedEnabled(environmentValue: "OFF", debugBuild: true))
+    func testDetailedFileTraceIsExplicitlyOptIn() {
+        XCTAssertFalse(MeetingFileTrace.resolvedEnabled(environmentValue: nil))
+        XCTAssertFalse(MeetingFileTrace.resolvedEnabled(environmentValue: "0"))
+        XCTAssertFalse(MeetingFileTrace.resolvedEnabled(environmentValue: "OFF"))
+        XCTAssertTrue(MeetingFileTrace.resolvedEnabled(environmentValue: "1"))
+        XCTAssertTrue(MeetingFileTrace.resolvedEnabled(environmentValue: " true "))
     }
 
     func testTraceWithoutFileTaskContextDoesNotEvaluateDetails() {
         var evaluations = 0
         func details() -> String { evaluations += 1; return "unused" }
-        MeetingFileTrace.$taskID.withValue(nil) {
+        MeetingFileTaskContext.$taskID.withValue(nil) {
             MeetingFileTrace.event("outside-file-task", details())
         }
         XCTAssertEqual(evaluations, 0)
     }
 
-    func testTraceTaskIdentityIsScopedAndInheritedByChildTasks() async {
+    func testTaskContextIsScopedAndInheritedByChildTasks() async {
         let id = UUID()
-        XCTAssertNil(MeetingFileTrace.taskID)
-        await MeetingFileTrace.$taskID.withValue(id) {
-            XCTAssertEqual(MeetingFileTrace.taskID, id)
-            let inherited = await Task { MeetingFileTrace.taskID }.value
+        XCTAssertNil(MeetingFileTaskContext.taskID)
+        await MeetingFileTaskContext.$taskID.withValue(id) {
+            XCTAssertEqual(MeetingFileTaskContext.taskID, id)
+            let inherited = await Task { MeetingFileTaskContext.taskID }.value
             XCTAssertEqual(inherited, id)
-            let capturedID = MeetingFileTrace.taskID
+            let capturedID = MeetingFileTaskContext.taskID
             let detached = await Task.detached {
-                MeetingFileTrace.$taskID.withValue(capturedID) { MeetingFileTrace.taskID }
+                MeetingFileTaskContext.$taskID.withValue(capturedID) { MeetingFileTaskContext.taskID }
             }.value
             XCTAssertEqual(detached, id)
         }
-        XCTAssertNil(MeetingFileTrace.taskID)
+        XCTAssertNil(MeetingFileTaskContext.taskID)
     }
 
     func testAdmissionFailuresHaveStableReasons() {

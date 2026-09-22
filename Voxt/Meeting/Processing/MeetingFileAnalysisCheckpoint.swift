@@ -53,7 +53,7 @@ actor MeetingFileAnalysisCheckpointStore {
             }
             return checkpoint
         } catch {
-            VoxtLog.meetingWarning("File ASR checkpoint decode failed. taskID=\(taskID), error=\(error.localizedDescription)")
+            VoxtLog.meetingWarning("File ASR checkpoint decode failed. taskID=\(taskID)")
             try? fileManager.removeItem(at: url)
             return nil
         }
@@ -69,7 +69,7 @@ actor MeetingFileAnalysisCheckpointStore {
             try encoder.encode(checkpoint).write(to: url, options: .atomic)
             try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         } catch {
-            VoxtLog.meetingWarning("File ASR checkpoint write failed. taskID=\(checkpoint.taskID), error=\(error.localizedDescription)")
+            VoxtLog.meetingWarning("File ASR checkpoint write failed. taskID=\(checkpoint.taskID)")
         }
     }
 

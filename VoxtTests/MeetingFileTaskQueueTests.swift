@@ -278,7 +278,7 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         var originalNames: [String] = []
         let queue = MeetingFileTaskQueue(
             analyzer: { url, originalName, _ in
-                XCTAssertNotNil(MeetingFileTrace.taskID)
+                XCTAssertNotNil(MeetingFileTaskContext.taskID)
                 await probe.begin("analysis")
                 originalNames.append(originalName)
                 let audio = try MeetingImportedAudioFile.validatedPreparedFile(at: url)
@@ -290,7 +290,7 @@ final class MeetingFileTaskQueueTests: XCTestCase {
             cancelActiveAnalysis: {},
             canStart: { true },
             preparer: { source, destination, limits, checkpoint, progress in
-                XCTAssertNotNil(MeetingFileTrace.taskID)
+                XCTAssertNotNil(MeetingFileTaskContext.taskID)
                 await probe.begin("preparation")
                 let audio = try await MeetingImportedAudioFile.prepare(
                     from: source, to: destination, limits: limits, checkpoint: checkpoint, progress: progress

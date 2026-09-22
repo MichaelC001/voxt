@@ -1,29 +1,18 @@
 import Darwin
 import Foundation
 
-/// Temporary file-task instrumentation. Remove these call sites independently of
-/// processing logic. Debug defaults on; VOXT_FILE_TASK_TRACE=0 disables it and
-/// VOXT_FILE_TASK_TRACE=1 enables it in Release. Uses existing bounded log storage.
+/// Opt-in diagnostics only. Both Debug and Release are quiet by default.
+/// Set VOXT_FILE_TASK_TRACE=1 for a reproduction; task lifecycle/errors are
+/// recorded separately and do not depend on this switch.
 nonisolated enum MeetingFileTrace {
-    @TaskLocal static var taskID: UUID?
+    static let isEnabled = resolvedEnabled(
+        environmentValue: ProcessInfo.processInfo.environment["VOXT_FILE_TASK_TRACE"]
+    )
 
-    static let isEnabled: Bool = {
-        #if DEBUG
-        let debugBuild = true
-        #else
-        let debugBuild = false
-        #endif
-        return resolvedEnabled(
-            environmentValue: ProcessInfo.processInfo.environment["VOXT_FILE_TASK_TRACE"],
-            debugBuild: debugBuild
-        )
-    }()
-
-    static func resolvedEnabled(environmentValue: String?, debugBuild: Bool) -> Bool {
-        switch environmentValue?.lowercased() {
-        case "0", "false", "off": return false
+    static func resolvedEnabled(environmentValue: String?) -> Bool {
+        switch environmentValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "1", "true", "on": return true
-        default: return debugBuild
+        default: return false
         }
     }
 
@@ -32,7 +21,7 @@ nonisolated enum MeetingFileTrace {
         taskID explicitID: UUID? = nil,
         _ details: @autoclosure () -> String = ""
     ) {
-        guard isEnabled, let id = explicitID ?? taskID else { return }
+        guard isEnabled, let id = explicitID ?? MeetingFileTaskContext.taskID else { return }
         VoxtLog.meeting("[FileTaskTrace] taskID=\(id), event=\(name), \(details()), \(resourceSnapshot())")
     }
 

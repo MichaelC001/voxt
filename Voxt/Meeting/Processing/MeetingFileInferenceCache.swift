@@ -16,7 +16,6 @@ nonisolated enum MeetingFileInferenceCache {
         let applied = min(previous, retainedCacheThresholdBytes)
         if applied != previous { Memory.cacheLimit = applied }
         if Memory.cacheMemory > applied { Memory.clearCache() }
-        MeetingFileTrace.event("file-cache-scope", "cacheLimitBytes=\(applied)")
         return {
             // All file units share one permit. Do not overwrite an explicit
             // setting made by another caller while this unit was running.
@@ -38,10 +37,5 @@ nonisolated enum MeetingFileInferenceCache {
         // Called after file native work returns, before its permit is released,
         // or before admission while this coordinator's lane is idle.
         Memory.clearCache()
-        let after = Memory.snapshot()
-        VoxtLog.meeting(
-            "File inference cache reclaimed. pressure=\(underPressure), cacheBeforeBytes=\(before.cacheMemory), cacheAfterBytes=\(after.cacheMemory), activeBeforeBytes=\(before.activeMemory), activeAfterBytes=\(after.activeMemory)"
-        )
-        MeetingFileTrace.event("file-cache-reclaimed", "pressure=\(underPressure), cacheBeforeBytes=\(before.cacheMemory), cacheAfterBytes=\(after.cacheMemory), activeAfterBytes=\(after.activeMemory)")
     }
 }

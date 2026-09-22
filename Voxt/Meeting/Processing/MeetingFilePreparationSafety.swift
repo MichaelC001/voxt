@@ -30,7 +30,6 @@ nonisolated struct MeetingFilePreparationLimits: Sendable {
             ?? values.volumeAvailableCapacity.map(Int64.init)
         let (required, overflow) = max(0, additionalBytes).addingReportingOverflow(max(0, minimumFreeDiskBytes))
         guard !overflow, let available, available >= required else {
-            MeetingFileTrace.event("disk-budget-rejected", "availableBytes=\(available.map(String.init) ?? "unknown"), requiredBytes=\(required), overflow=\(overflow)")
             throw MeetingFileTaskStagingError.insufficientDiskSpace
         }
     }
@@ -51,13 +50,7 @@ nonisolated final class MeetingFilePreparationResources: @unchecked Sendable {
     }
 
     func waitUntilAvailable() async throws {
-        let startedAt = ContinuousClock.now
-        var lastTrace: ContinuousClock.Instant?
-        defer {
-            if lastTrace != nil {
-                MeetingFileTrace.event("resource-wait-ended", "elapsed=\(startedAt.duration(to: .now)), cancelled=\(Task.isCancelled)")
-            }
-        }
+        var loggedWait = false
         while true {
             try Task.checkCancellation()
             let thermal = ProcessInfo.processInfo.thermalState
@@ -66,9 +59,9 @@ nonisolated final class MeetingFilePreparationResources: @unchecked Sendable {
             if !memoryPressure, thermal != .serious, thermal != .critical {
                 return
             }
-            if lastTrace == nil || lastTrace!.duration(to: .now) >= .seconds(15) {
-                MeetingFileTrace.event("resource-wait", "memoryPressure=\(memoryPressure), thermalState=\(thermal.rawValue), elapsed=\(startedAt.duration(to: .now))")
-                lastTrace = .now
+            if !loggedWait {
+                VoxtLog.meeting("File preparation is waiting for system resources.")
+                loggedWait = true
             }
             try await Task.sleep(for: .milliseconds(250))
         }

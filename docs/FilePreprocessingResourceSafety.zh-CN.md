@@ -64,15 +64,11 @@
 
 对已有失败任务，在清理/重试前读取 `~/Library/Application Support/Voxt/meeting-file-tasks/tasks.json` 的 `progressStage`、`errorMessage`、`processedMediaDurationSeconds`、`startedAt`、`completedAt`（沙盒运行时可能在容器下）。`processedMediaDurationSeconds` 是进度估计，不是精确失败块位置；新 ASR 错误日志中的块范围用于精确定位。分享时无需发送源路径、文件名或媒体内容。预处理成功、后续 ASR 失败仍应分别诊断。
 
-### 临时详细日志开关与查看方法
+### 日志策略
 
-详细诊断集中在 `MeetingFileTrace.swift`，统一前缀 `[FileTaskTrace]`。Debug 构建默认开启，Release 默认关闭；环境变量 `VOXT_FILE_TASK_TRACE=1` 强制开启，`VOXT_FILE_TASK_TRACE=0` 强制关闭，修改后重启进程。Xcode 中可在 Scheme → Run → Arguments → Environment Variables 设置。开关只影响临时详细日志，不关闭常规失败和阶段日志。
+常规日志只保留任务开始、阶段切换、资源等待开始、失败和完成。默认不再输出解码/复制进度、队列心跳、ASR 分块、说话人 feed、许可进出或缓存回收快照。
 
-通过任务局部上下文携带 task ID，跨 detached 预处理/归档复制任务时显式传递，不使用全局可变的“当前任务 ID”。调用同一 ASR/说话人/推理模块的实时会议没有文件任务上下文时，不输出这组详细日志。后续删除临时日志可集中搜索 `MeetingFileTrace`，不需要修改处理策略。
-
-覆盖事件：入队、预处理准入/缓存复用、媒体预检、解码开始/进度/发布/失败清理、标准化归档副本复制、ASR 窗口及分块开始/结束、模型准备、推理准入与返回、说话人窗口/回退、历史保存，以及取消和退出。解码/复制进度最多每 5 秒一条；队列心跳与资源等待最多每 15 秒一条；ASR/说话人按窗口或分块边界记录，不按采样或 token 输出。心跳依赖主线程调度，不是卡死看门狗。
-
-每条详细事件附带进程当前 RSS 和温度状态：`processRSSBytes` 是进程级瞬时采样，不是任务独占内存、完整峰值、physical footprint 或 GPU 内存。不要用日志中的 buffer 大小代替 RSS。日志仅包含结构化状态、时长、数量、随机 ID 和错误类别/代码，不包含媒体内容、识别文本或完整文件路径。
+需要复现时才设置 `VOXT_FILE_TASK_TRACE=1` 并重启；Debug 和 Release 默认都关闭。详细事件仍由 `MeetingFileTrace` 输出，前缀为 `[FileTaskTrace]`，仅包含状态、数量、随机 ID 和错误类别，不包含媒体内容或文件路径。任务 ID 由独立的 `MeetingFileTaskContext` 传递，不依赖日志开关。
 
 沿用现有滚动日志存储（单文件约 2 MiB，保留 5 个归档），不另建无界日志文件：
 

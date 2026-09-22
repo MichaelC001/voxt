@@ -130,7 +130,6 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
             updateFrames: config.modulesConfig.spkcacheUpdatePeriod,
             usesAOSC: config.modulesConfig.useAosc
         )
-        MeetingFileTrace.event("speaker-feed-policy", "samplesPerFeed=\(policy.samplesPerFeed), updateFrames=\(config.modulesConfig.spkcacheUpdatePeriod), fifoLimit=\(MeetingSpeakerFeedPolicy.fifoMaximumFrames), cacheLimit=\(policy.cacheMaximumFrames), usesAOSC=\(config.modulesConfig.useAosc)")
         var state = model.initStreamingState()
         var previousDescriptor: MeetingAudioAssetDescriptor?
         var turns: [MeetingSpeakerTurn] = []
@@ -139,13 +138,6 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
 
         for (index, descriptor) in descriptors.enumerated() {
             try Task.checkCancellation()
-            let windowStarted = ContinuousClock.now
-            var windowCompleted = false
-            MeetingFileTrace.event("speaker-window-started", "window=\(index + 1)/\(descriptors.count), audioStartSeconds=\(descriptor.sessionStartOffset), durationSeconds=\(descriptor.durationSeconds)")
-            defer {
-                MeetingFileTrace.event(windowCompleted ? "speaker-window-completed" : "speaker-window-stopped",
-                    "window=\(index + 1), turns=\(turns.count), elapsed=\(windowStarted.duration(to: .now)), cancelled=\(Task.isCancelled)")
-            }
             if let previousDescriptor {
                 let expectedStart = previousDescriptor.sessionStartOffset + previousDescriptor.durationSeconds
                 let isContinuous = descriptor.source == previousDescriptor.source
@@ -177,7 +169,6 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
                 let end = min(offset + policy.samplesPerFeed, prepared.count)
                 let samples = Array(prepared[offset..<end])
                 let inputState = state
-                let feedStarted = ContinuousClock.now
                 let audioOffset = asset.sessionStartOffset + Double(offset) / Double(policy.sampleRate)
                 let result: (DiarizationOutput, StreamingState)
                 if fileAnalysis {
@@ -189,12 +180,7 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
                 }
                 try Task.checkCancellation() // feed's detached native work must exit first
                 let (output, newState) = result
-                do {
-                    try policy.validate(fifoFrames: newState.fifoLen, cacheFrames: newState.spkcacheLen)
-                } catch {
-                    MeetingFileTrace.event("speaker-state-limit-exceeded", "fifoFrames=\(newState.fifoLen), cacheFrames=\(newState.spkcacheLen), audioStartSeconds=\(audioOffset)")
-                    throw error
-                }
+                try policy.validate(fifoFrames: newState.fifoLen, cacheFrames: newState.spkcacheLen)
                 state = newState
                 // feed offsets use subsampled frame counts; anchor to real samples
                 // at every call so feature padding cannot accumulate timestamp drift.
@@ -209,15 +195,9 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
                         startSeconds: range.lowerBound, endSeconds: range.upperBound, confidence: nil
                     )
                 })
-                MeetingFileTrace.event("speaker-feed-completed", "window=\(index + 1), audioStartSeconds=\(audioOffset), samples=\(samples.count), fifoFrames=\(state.fifoLen), cacheFrames=\(state.spkcacheLen), elapsed=\(feedStarted.duration(to: .now))")
                 offset = end
                 await progress?((Double(index) + Double(offset) / Double(prepared.count)) / Double(descriptorCount))
             }
-            if fileAnalysis, MeetingFileTrace.isEnabled {
-                let memory = Memory.snapshot()
-                MeetingFileTrace.event("speaker-memory", "window=\(index + 1), fifoFrames=\(state.fifoLen), cacheFrames=\(state.spkcacheLen), mlxActiveBytes=\(memory.activeMemory), mlxCacheBytes=\(memory.cacheMemory)")
-            }
-            windowCompleted = true
         }
         return turns
     }
@@ -240,11 +220,7 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
         )
         try Task.checkCancellation()
         if enforceTimeLimit {
-            do { try policy.validateFeedDuration(startedAt.duration(to: .now)) }
-            catch {
-                MeetingFileTrace.event("speaker-feed-too-slow", "elapsed=\(startedAt.duration(to: .now)), samples=\(samples.count)")
-                throw error
-            }
+            try policy.validateFeedDuration(startedAt.duration(to: .now))
         }
         return result
     }
@@ -253,14 +229,12 @@ actor SortformerMeetingSpeakerDiarizationEngine: MeetingSpeakerDiarizationEngine
         if let model {
             return model
         }
-        MeetingFileTrace.event("speaker-model-load-started")
         let directory = await MeetingSortformerModelStorage.validatedModelDirectory()
         guard let directory else {
             throw MeetingVADModelError.modelNotDownloaded
         }
         let loaded = try SortformerModel.fromModelDirectory(directory)
         model = loaded
-        MeetingFileTrace.event("speaker-model-load-completed")
         return loaded
     }
 }

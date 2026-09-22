@@ -26,14 +26,12 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
     ) async throws -> MeetingSessionResult {
         try Task.checkCancellation()
         progress(MeetingFileAnalysisProgress(stage: .preparing, stageFraction: sourceIsPreparedAudio ? 1 : 0))
-        let startedAt = ContinuousClock.now
         var stage = "audio-validation"
-        MeetingFileTrace.event("pipeline-started", "preparedInput=\(sourceIsPreparedAudio), engine=\(engineContext.engine.rawValue)")
         do {
             let sourceIsPreparedAudio = sourceIsPreparedAudio
-            let traceTaskID = MeetingFileTrace.taskID
+            let traceTaskID = MeetingFileTaskContext.taskID
             let preparationTask = Task.detached(priority: .utility) {
-                try await MeetingFileTrace.$taskID.withValue(traceTaskID) {
+                try await MeetingFileTaskContext.$taskID.withValue(traceTaskID) {
                     if sourceIsPreparedAudio {
                         return try MeetingImportedAudioFile.validatedPreparedFile(at: sourceURL)
                     }
@@ -66,7 +64,7 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
             )
 
             stage = "transcribing"
-            let taskID = MeetingFileTrace.taskID
+            let taskID = MeetingFileTaskContext.taskID
             let checkpointStore = MeetingFileAnalysisCheckpointStore.shared
             let modelFingerprint = Self.modelFingerprint(for: engineContext)
             let storedCheckpoint: MeetingFileASRCheckpoint?
@@ -79,17 +77,13 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                     : nil
                 if candidate != nil, storedCheckpoint == nil {
                     await checkpointStore.clear(taskID: taskID)
-                    MeetingFileTrace.event("asr-checkpoint-discarded", "reason=configuration-or-input-mismatch")
+                    VoxtLog.meetingWarning("File ASR checkpoint discarded because the input or model changed. taskID=\(taskID)")
                 }
             } else {
                 storedCheckpoint = nil
             }
             let startingDescriptorIndex = storedCheckpoint?.completedDescriptorCount ?? 0
             let initialSegments = storedCheckpoint?.segments ?? []
-            MeetingFileTrace.event(
-                "transcription-started",
-                "durationSeconds=\(importedAudio.durationSeconds), windows=\(importedAudio.assetDescriptors.count), resumeFromWindow=\(startingDescriptorIndex)"
-            )
             progress(MeetingFileAnalysisProgress(stage: .transcribing))
             let transcriptSegments: [MeetingTranscriptSegment]
             do {
@@ -130,19 +124,16 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                                 updatedAt: Date()
                             )
                         )
-                        MeetingFileTrace.event("asr-checkpoint-saved", "completedWindows=\(completedDescriptorCount), segments=\(segments.count)")
                     }
                 )
             }
             try Task.checkCancellation()
-            MeetingFileTrace.event("transcription-completed", "segments=\(transcriptSegments.count), elapsed=\(startedAt.duration(to: .now))")
             guard !MeetingTranscriptFormatter.meaningfulSegments(for: transcriptSegments).isEmpty else {
                 throw MeetingFileAnalysisError.noTranscript
             }
 
             await releaseASRResourcesAtStageBoundary()
             stage = "identifyingSpeakers"
-            MeetingFileTrace.event("speaker-analysis-requested", "segments=\(transcriptSegments.count)")
             progress(MeetingFileAnalysisProgress(stage: .identifyingSpeakers))
             // The file engine acquires/releases a permit per small feed, not for
             // the entire recording. Keep native speaker state continuous inside it.
@@ -159,15 +150,14 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
             )
             try Task.checkCancellation()
 
-            MeetingFileTrace.event("speaker-analysis-returned", "segments=\(finalSegments.count)")
             stage = "saving"
             progress(MeetingFileAnalysisProgress(stage: .saving))
             if sourceIsPreparedAudio, archivePreparedAudio {
                 // History moves its input. Create an independent copy only after
                 // analysis succeeds and only when an archive was requested.
-                let traceID = MeetingFileTrace.taskID
+                let traceID = MeetingFileTaskContext.taskID
                 let archiveTask = Task.detached(priority: .utility) {
-                    try await MeetingFileTrace.$taskID.withValue(traceID) {
+                    try await MeetingFileTaskContext.$taskID.withValue(traceID) {
                         try await MeetingImportedAudioFile.copyPreparedForAnalysis(from: sourceURL)
                     }
                 }
@@ -186,10 +176,11 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
                 audioDurationSeconds: importedAudio.durationSeconds,
                 archivedAudioURL: preparedAudioURL
             )
-            MeetingFileTrace.event("pipeline-result-ready", "elapsed=\(startedAt.duration(to: .now)), segments=\(finalSegments.count)")
             return result
         } catch {
-            MeetingFileTrace.event("pipeline-stopped", "stage=\(stage), elapsed=\(startedAt.duration(to: .now)), \(MeetingFileTaskDiagnostics.errorSummary(error))")
+            if !(error is CancellationError) {
+                VoxtLog.meetingError("File analysis stopped. stage=\(stage), \(MeetingFileTaskDiagnostics.errorSummary(error))")
+            }
             if let preparedAudioURL {
                 try? FileManager.default.removeItem(at: preparedAudioURL)
             }
@@ -204,7 +195,6 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
         holdsModelUse = false
         modelManager.endActiveUse()
         modelManager.releaseLoadedModelIfIdle(reason: "file-asr-stage-completed")
-        MeetingFileTrace.event("asr-resources-released-before-speaker-analysis")
     }
 
     private static func modelFingerprint(for context: MeetingASREngineContext) -> String {
@@ -234,8 +224,6 @@ final class MeetingImportedFilePipeline: MeetingImportedFileAnalyzing {
     }
 
     func finish(keepingResult: Bool) async {
-        MeetingFileTrace.event("pipeline-cleanup-started", "keepingResult=\(keepingResult)")
-        defer { MeetingFileTrace.event("pipeline-cleanup-completed", "keepingResult=\(keepingResult), cancelled=\(Task.isCancelled)") }
         await transcriber?.cancelPendingWork()
         transcriber = nil
         if holdsModelUse {

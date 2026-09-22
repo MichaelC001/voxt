@@ -153,12 +153,8 @@ actor MeetingLocalInferenceCoordinator {
         _ workClass: MeetingLocalInferenceWorkClass,
         operation: @escaping @Sendable () async throws -> T
     ) async throws -> T {
-        let submittedAt = ContinuousClock.now
-        MeetingFileTrace.event("inference-permit-requested", "workClass=\(workClass.rawValue), queuedCount=\(waiters.count), recordingActive=\(recordingActive), memoryPressure=\(memoryPressureConstrained)")
         do {
             let token = try await acquire(workClass)
-            let admittedAt = ContinuousClock.now
-            MeetingFileTrace.event("inference-permit-admitted", "workClass=\(workClass.rawValue), waitElapsed=\(submittedAt.duration(to: admittedAt))")
             let isFile = workClass == .fileASR || workClass == .fileSpeakerAnalysis
             let restoreCacheLimit: (@Sendable () -> Void)? = isFile ? beginFileWorkUnit() : nil
             defer {
@@ -169,14 +165,12 @@ actor MeetingLocalInferenceCoordinator {
                 }
                 restoreCacheLimit?()
                 release(token)
-                MeetingFileTrace.event("inference-permit-released", "workClass=\(workClass.rawValue), operationElapsed=\(admittedAt.duration(to: .now))")
             }
             try Task.checkCancellation()
             let value = try await operation()
             statistics.completedCount += 1
             return value
         } catch {
-            MeetingFileTrace.event("inference-stopped", "workClass=\(workClass.rawValue), elapsed=\(submittedAt.duration(to: .now)), \(MeetingFileTaskDiagnostics.errorSummary(error))")
             throw error
         }
     }
@@ -304,12 +298,11 @@ actor MeetingLocalInferenceCoordinator {
         defer {
             if didWait {
                 postFileResourceWait(isWaiting: false)
-                MeetingFileTrace.event("file-permit-wait-ended", "workClass=\(workClass.rawValue), cancelled=\(Task.isCancelled)")
             }
         }
         var retryDelayMilliseconds = 250
         var reclaimedForPressure = false
-        var lastWaitLog: ContinuousClock.Instant?
+        var loggedWait = false
         while true {
             try Task.checkCancellation()
             var fileMemoryConstrained = fileMemoryBlocked()
@@ -333,11 +326,10 @@ actor MeetingLocalInferenceCoordinator {
             if !didWait {
                 didWait = true
                 postFileResourceWait(isWaiting: true)
-                MeetingFileTrace.event("file-permit-wait-started", "workClass=\(workClass.rawValue), recordingActive=\(recordingActive), fileMemoryBlocked=\(fileMemoryConstrained)")
             }
-            if lastWaitLog == nil || lastWaitLog!.duration(to: .now) >= .seconds(15) {
-                MeetingFileTrace.event("file-permit-wait", "workClass=\(workClass.rawValue), recordingActive=\(recordingActive), fileMemoryBlocked=\(fileMemoryConstrained), pressureProbeAvailable=\(memoryPressureSampleAvailable), laneOccupied=\(activeToken != nil), queuedCount=\(waiters.count)")
-                lastWaitLog = .now
+            if !loggedWait {
+                VoxtLog.meeting("File analysis is waiting for system resources.")
+                loggedWait = true
             }
             try await Task.sleep(for: .milliseconds(retryDelayMilliseconds))
             retryDelayMilliseconds = min(retryDelayMilliseconds * 2, 5_000)
@@ -346,7 +338,7 @@ actor MeetingLocalInferenceCoordinator {
     }
 
     private func postFileResourceWait(isWaiting: Bool) {
-        guard let taskID = MeetingFileTrace.taskID else { return }
+        guard let taskID = MeetingFileTaskContext.taskID else { return }
         NotificationCenter.default.post(
             name: .voxtMeetingFileResourceWaitDidChange,
             object: nil,
