@@ -138,7 +138,6 @@ enum MeetingFinalTranscriptionPass {
                     completedDurationBeforeDescriptor + descriptorDuration
                 )
             }
-            windowCompleted = true
             try await checkpoint?(segments, descriptorIndex + 1)
         }
         try Task.checkCancellation()
