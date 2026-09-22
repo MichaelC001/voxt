@@ -386,13 +386,17 @@ final class MeetingFileTaskQueue: ObservableObject {
         let finishedTasks = tasks.filter(\.isTerminal)
         tasks.removeAll(where: \.isTerminal)
         for task in finishedTasks {
-            onTaskRemoved(task.id)
-            Task { await MeetingFileAnalysisCheckpointStore.shared.clear(taskID: task.id) }
-            try? fileManager.removeItem(at: stagedURL(for: task))
-            if let legacyName = task.legacyStagedFileName {
-                try? fileManager.removeItem(at: storageDirectoryURL.appendingPathComponent(legacyName))
-            }
+            removeFinishedTaskArtifacts(task)
         }
+        restoreStagingReservations()
+        persist()
+    }
+
+    func removeFinishedTask(taskID: UUID) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskID }),
+              tasks[index].isTerminal else { return }
+        let task = tasks.remove(at: index)
+        removeFinishedTaskArtifacts(task)
         restoreStagingReservations()
         persist()
     }
@@ -709,6 +713,15 @@ final class MeetingFileTaskQueue: ObservableObject {
         let duration = task.mediaDurationSeconds.map { String(format: "%.2f", $0) } ?? "unknown"
         let fraction = String(format: "%.4f", task.progressFraction)
         return "taskID=\(task.id), stage=\(task.progressStage.diagnosticName), elapsedSeconds=\(elapsed), processedAudioSeconds=\(processed), totalAudioSeconds=\(duration), progress=\(fraction), thermalState=\(ProcessInfo.processInfo.thermalState.rawValue)"
+    }
+
+    private func removeFinishedTaskArtifacts(_ task: MeetingFileTask) {
+        onTaskRemoved(task.id)
+        Task { await MeetingFileAnalysisCheckpointStore.shared.clear(taskID: task.id) }
+        try? fileManager.removeItem(at: stagedURL(for: task))
+        if let legacyName = task.legacyStagedFileName {
+            try? fileManager.removeItem(at: storageDirectoryURL.appendingPathComponent(legacyName))
+        }
     }
 
     private func stage(sourceURL: URL, taskID: UUID, stagedFileName: String) {

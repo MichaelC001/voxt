@@ -362,6 +362,15 @@ struct SettingsView: View {
                            meetingFileTaskQueue.hasFinishedTasks {
                             Button(AppLocalization.localizedString("Clear Finished Tasks")) {
                                 meetingFileTaskQueue.clearFinishedTasks()
+                                NotificationCenter.default.post(
+                                    name: .voxtFeatureSettingsToastRequested,
+                                    object: nil,
+                                    userInfo: [
+                                        "message": AppLocalization.localizedString(
+                                            "Completed tasks are available in Meeting History."
+                                        )
+                                    ]
+                                )
                             }
                             .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 11, height: 26))
                         }

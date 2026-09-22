@@ -2271,6 +2271,7 @@
 "Details" = "详情";
 "Prioritize" = "优先处理";
 "Clear Finished Tasks" = "清理已结束任务";
+"Completed tasks are available in Meeting History." = "已完成任务可在会议历史中查看。";
 "Queued" = "入队时间";
 "Created" = "创建时间";
 "Elapsed" = "已耗时";

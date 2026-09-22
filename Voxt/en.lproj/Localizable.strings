@@ -2271,6 +2271,7 @@
 "Details" = "Details";
 "Prioritize" = "Prioritize";
 "Clear Finished Tasks" = "Clear Finished Tasks";
+"Completed tasks are available in Meeting History." = "Completed tasks are available in Meeting History.";
 "Queued" = "Queued";
 "Created" = "Created";
 "Elapsed" = "Elapsed";

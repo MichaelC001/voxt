@@ -146,7 +146,7 @@ enum MeetingWaveformBuilder {
 
 enum MeetingWaveformTimelineSupport {
     static let minimumZoomScale: CGFloat = 1
-    static let maximumZoomScale: CGFloat = 8
+    static let maximumZoomScale: CGFloat = 12
 
     static func clampedZoomScale(_ scale: CGFloat) -> CGFloat {
         min(max(scale, minimumZoomScale), maximumZoomScale)

@@ -29,6 +29,9 @@ extension FeatureSettingsView {
                                 onOpenDetails: {
                                     AppDelegate.shared?.showMeetingFileTaskDetail(taskID: task.id)
                                 },
+                                onRemove: {
+                                    meetingFileTaskQueue.removeFinishedTask(taskID: task.id)
+                                },
                                 onViewTranscript: {
                                     Task { @MainActor in
                                         await AppDelegate.shared?.showMeetingFileTranscript(taskID: task.id)
@@ -123,6 +126,7 @@ private struct MeetingFileTaskRow: View {
     let onPrioritize: () -> Void
     let onRetry: () -> Void
     let onOpenDetails: () -> Void
+    let onRemove: () -> Void
     let onViewTranscript: () -> Void
 
     var body: some View {
@@ -158,7 +162,7 @@ private struct MeetingFileTaskRow: View {
                 }
             }
 
-            if task.status == .preparing || task.status == .processing || task.status == .waitingForResources || task.status == .cancelling || task.status == .completed {
+            if task.status == .preparing || task.status == .processing || task.status == .waitingForResources || task.status == .cancelling {
                 ProgressView(value: task.progressFraction, total: 1)
                     .progressViewStyle(.linear)
                     .tint(statusColor)
@@ -179,8 +183,18 @@ private struct MeetingFileTaskRow: View {
                 .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
                 .disabled(task.status == .cancelling)
         case .completed:
-            Button(featureSettingsLocalized("Details"), action: onOpenDetails)
-                .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
+            HStack(spacing: 6) {
+                Button(role: .destructive, action: onRemove) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(SettingsPillButtonStyle(tone: .destructive, horizontalPadding: 8, height: 27))
+                .help(featureSettingsLocalized("Delete"))
+                .accessibilityLabel(Text(featureSettingsLocalized("Delete")))
+
+                Button(featureSettingsLocalized("Details"), action: onOpenDetails)
+                    .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
+            }
         case .failed, .cancelled:
             Button(featureSettingsLocalized("Retry"), action: onRetry)
                 .buttonStyle(SettingsPillButtonStyle(horizontalPadding: 10, height: 27))
@@ -211,7 +225,9 @@ private struct MeetingFileTaskRow: View {
             metadata(label: featureSettingsLocalized("Created"), value: createdTimeText)
             metadata(label: featureSettingsLocalized("Elapsed"), value: durationText(task.elapsedSeconds(now: now)))
             metadata(label: featureSettingsLocalized("Total Duration"), value: totalDurationText)
-            metadata(label: featureSettingsLocalized("Estimated Remaining"), value: estimatedRemainingText)
+            if task.status != .completed {
+                metadata(label: featureSettingsLocalized("Estimated Remaining"), value: estimatedRemainingText)
+            }
         }
         .fixedSize(horizontal: true, vertical: false)
     }
@@ -230,9 +246,6 @@ private struct MeetingFileTaskRow: View {
     }
 
     private var estimatedRemainingText: String {
-        if task.status == .completed {
-            return durationText(0)
-        }
         if let remaining = task.estimatedRemainingSeconds(now: now) {
             return durationText(remaining)
         }

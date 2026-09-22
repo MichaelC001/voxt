@@ -2266,6 +2266,7 @@
 "Details" = "詳細";
 "Prioritize" = "優先処理";
 "Clear Finished Tasks" = "終了済みタスクを消去";
+"Completed tasks are available in Meeting History." = "完了したタスクは会議履歴で確認できます。";
 "Queued" = "追加時刻";
 "Created" = "作成時刻";
 "Elapsed" = "経過時間";

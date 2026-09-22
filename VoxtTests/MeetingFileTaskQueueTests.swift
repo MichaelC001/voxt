@@ -90,6 +90,33 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         await queue.shutdown()
     }
 
+    func testRemoveFinishedTaskRemovesOnlyTheRequestedTask() async throws {
+        let storage = try TemporaryDirectory()
+        let firstURL = try makeSourceFile(named: "remove-first.wav")
+        let secondURL = try makeSourceFile(named: "remove-second.wav")
+        var removedTaskIDs: [UUID] = []
+
+        let queue = MeetingFileTaskQueue(
+            analyzer: { _, _, _ in Self.makeHistoryEntry() },
+            cancelActiveAnalysis: {},
+            canStart: { true },
+            onTaskRemoved: { removedTaskIDs.append($0) },
+            storageDirectoryURL: storage.url.appendingPathComponent("tasks", isDirectory: true)
+        )
+
+        queue.enqueue(urls: [firstURL, secondURL])
+        try await waitUntilAllTasksAreTerminal(queue)
+        let firstTaskID = try XCTUnwrap(queue.tasks.first?.id)
+        let secondTaskID = try XCTUnwrap(queue.tasks.last?.id)
+
+        queue.removeFinishedTask(taskID: firstTaskID)
+
+        XCTAssertNil(queue.task(id: firstTaskID))
+        XCTAssertEqual(queue.task(id: secondTaskID)?.status, .completed)
+        XCTAssertEqual(removedTaskIDs, [firstTaskID])
+        await queue.shutdown()
+    }
+
     func testCancellingCurrentTaskContinuesWithNextQueuedTask() async throws {
         let storage = try TemporaryDirectory()
         let firstURL = try makeSourceFile(named: "cancel-me.wav")
