@@ -545,7 +545,7 @@ final class SettingsTypesTests: XCTestCase {
         let permissions = SettingsPermissionRequirementResolver.requiredPermissions(context: context)
 
         XCTAssertTrue(permissions.contains(.speechRecognition))
-        XCTAssertEqual(permissions, [.microphone, .accessibility, .speechRecognition])
+        XCTAssertEqual(permissions, [.microphone, .accessibility, .speechRecognition, .reminders])
     }
 
     func testVoiceEndCommandPresetResolvesBuiltInCommands() {

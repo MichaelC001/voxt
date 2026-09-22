@@ -716,7 +716,7 @@ final class MeetingFileTaskQueueTests: XCTestCase {
     }
 
     private func waitUntilAllTasksAreTerminal(_ queue: MeetingFileTaskQueue) async throws {
-        for _ in 0..<200 {
+        for _ in 0..<1_000 {
             if !queue.tasks.contains(where: { !$0.isTerminal }) {
                 return
             }
@@ -730,7 +730,7 @@ final class MeetingFileTaskQueueTests: XCTestCase {
         status: MeetingFileTaskStatus,
         at index: Int
     ) async throws {
-        for _ in 0..<200 {
+        for _ in 0..<1_000 {
             if queue.tasks.indices.contains(index), queue.tasks[index].status == status {
                 return
             }

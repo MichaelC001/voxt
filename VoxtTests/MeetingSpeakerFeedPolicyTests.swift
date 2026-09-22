@@ -76,9 +76,15 @@ final class MeetingFileSpeakerFailureTests: XCTestCase {
     func testFileSpeakerFailureDoesNotBecomeSuccessfulTranscriptOnlyHistory() async {
         let segment = MeetingTranscriptSegment(speaker: .them, startSeconds: 0, endSeconds: 2, text: "preserved ASR")
         let descriptor = MeetingAudioAssetDescriptor(source: .mixed, sampleRate: 16_000, startSample: 0, sampleCount: 32_000)
+        let asset = MeetingAudioAsset(
+            source: .mixed,
+            samples: Array(repeating: 0, count: descriptor.sampleCount),
+            sampleRate: descriptor.sampleRate,
+            sessionStartOffset: 0
+        )
         do {
             _ = try await MeetingSpeakerAnalysisPipeline.analyzedFileSegments(
-                from: [segment], descriptors: [descriptor], loadAsset: { _ in nil }, engine: FailingSpeakerEngine()
+                from: [segment], descriptors: [descriptor], loadAsset: { _ in asset }, engine: FailingSpeakerEngine()
             )
             XCTFail("Speaker errors must propagate so the ASR checkpoint is retained")
         } catch {
@@ -96,6 +102,13 @@ private struct FailingSpeakerEngine: MeetingSpeakerDiarizationEngine {
                         loadAsset: @escaping @Sendable (MeetingAudioAssetDescriptor) async -> MeetingAudioAsset?,
                         continuousAudioURL: URL?, options: MeetingSpeakerDiarizationOptions,
                         progress: (@Sendable (Double) async -> Void)?) async throws -> [MeetingSpeakerTurn] {
+        throw MeetingSpeakerFeedError.stateLimitExceeded
+    }
+
+    func diarizeFile(descriptors: [MeetingAudioAssetDescriptor],
+                     loadAsset: @escaping @Sendable (MeetingAudioAssetDescriptor) async -> MeetingAudioAsset?,
+                     options: MeetingSpeakerDiarizationOptions,
+                     progress: (@Sendable (Double) async -> Void)?) async throws -> [MeetingSpeakerTurn] {
         throw MeetingSpeakerFeedError.stateLimitExceeded
     }
 }

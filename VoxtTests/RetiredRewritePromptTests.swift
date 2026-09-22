@@ -2,6 +2,21 @@ import XCTest
 @testable import Voxt
 
 final class RetiredRewritePromptTests: XCTestCase {
+    private func withEphemeralDefaults(
+        _ body: (UserDefaults) throws -> Void
+    ) rethrows {
+        let suiteName = "RetiredRewritePromptTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Expected ephemeral UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        try body(defaults)
+    }
+
     func testRetiredDefaultsMigrateButEditedPromptsSurvive() throws {
         try withEphemeralDefaults { defaults in
             defaults.set(AppInterfaceLanguage.english.rawValue, forKey: AppPreferenceKey.interfaceLanguage)
