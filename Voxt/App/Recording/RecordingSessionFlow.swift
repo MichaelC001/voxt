@@ -218,13 +218,9 @@ extension AppDelegate {
             transcriptionHotkeyStartBehavior == .tap ||
             transcriptionHotkeyStartBehavior == .doubleTap
         hotkeyManager.setCommonStopKeyEnabled(shouldEnableCommonStopKey)
-        // Show the UI and play the cue immediately. Device-level mute also
-        // mutes Voxt, so wait for the cue to finish before muting in the
-        // background. Recording starts only after mute completes, preventing
-        // system playback from entering the first captured frames.
-        let startSoundDuration = interactionSoundsEnabled
-            ? interactionSoundPlayer.playStart()
-            : 0
+        // Finish this synchronous wake path first so the UI can render. The
+        // cue starts on the next main-actor turn, then plays to completion
+        // before device mute and capture begin.
         let startCapture: @MainActor () -> Void = { [weak self] in
             guard let self,
                   self.isSessionActive,
@@ -240,17 +236,32 @@ extension AppDelegate {
         }
 
         guard muteSystemAudioWhileRecording else {
+            if interactionSoundsEnabled {
+                interactionSoundPlayer.playStart()
+            }
             startCapture()
             return
         }
 
         let sessionID = activeRecordingSessionID
         pendingRecordingStartTask = Task { @MainActor [weak self] in
+            // Let the overlay's first frame be submitted before opening the
+            // audio player. This avoids racing AppKit presentation and audio
+            // device state changes on the wake path.
+            await Task.yield()
+            guard !Task.isCancelled, let self,
+                  !self.isApplicationTerminating,
+                  self.activeRecordingSessionID == sessionID,
+                  self.isSessionActive,
+                  self.recordingStoppedAt == nil else { return }
+
+            let startSoundDuration = self.interactionSoundsEnabled
+                ? self.interactionSoundPlayer.playStart()
+                : 0
             if startSoundDuration > 0 {
                 do { try await Task.sleep(for: .seconds(startSoundDuration)) } catch { return }
             }
-            guard !Task.isCancelled, let self,
-                  !self.isApplicationTerminating,
+            guard !Task.isCancelled,
                   self.activeRecordingSessionID == sessionID,
                   self.isSessionActive,
                   self.recordingStoppedAt == nil else { return }
