@@ -245,10 +245,10 @@ extension AppDelegate {
 
         let sessionID = activeRecordingSessionID
         pendingRecordingStartTask = Task { @MainActor [weak self] in
-            // Let the overlay's first frame be submitted before opening the
-            // audio player. This avoids racing AppKit presentation and audio
-            // device state changes on the wake path.
-            await Task.yield()
+            // Give AppKit a real render turn before AVAudioPlayer performs
+            // any setup. A yield alone can resume this task before the first
+            // overlay frame is committed.
+            do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
             guard !Task.isCancelled, let self,
                   !self.isApplicationTerminating,
                   self.activeRecordingSessionID == sessionID,
