@@ -393,6 +393,8 @@ extension AppDelegate {
         silenceMonitorTask = nil
         pauseLLMTask?.cancel()
         pauseLLMTask = nil
+        pendingRecordingStartTask?.cancel()
+        pendingRecordingStartTask = nil
     }
 
     func cancelSessionControlTasks() {
