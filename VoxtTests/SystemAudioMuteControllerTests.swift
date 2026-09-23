@@ -13,7 +13,7 @@ final class SystemAudioMuteControllerTests: XCTestCase {
         var canWrite = true
         var canRead = true
         var writes: [String] = []
-        var changed: (@MainActor () -> Void)?
+        var changed: (() -> Void)?
 
         func defaultOutputDevice() -> SystemAudioOutputDevice? { current }
         func muteState(of device: SystemAudioOutputDevice) -> Bool? {
@@ -26,7 +26,7 @@ final class SystemAudioMuteControllerTests: XCTestCase {
             writes.append("\(device.uid):\(muted)")
             return true
         }
-        func observe(device: SystemAudioOutputDevice?, onChange: @escaping @MainActor () -> Void) {
+        func observe(device: SystemAudioOutputDevice?, onChange: @escaping () -> Void) {
             changed = onChange
         }
         func stopObserving() { changed = nil }

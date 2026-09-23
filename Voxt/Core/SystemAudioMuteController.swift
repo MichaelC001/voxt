@@ -7,18 +7,17 @@ struct SystemAudioOutputDevice: Equatable {
     let uid: String
 }
 
-@MainActor
 protocol SystemAudioMuteDeviceAccess: AnyObject {
     func defaultOutputDevice() -> SystemAudioOutputDevice?
     func muteState(of device: SystemAudioOutputDevice) -> Bool?
     func setMuted(_ muted: Bool, on device: SystemAudioOutputDevice) -> Bool
-    func observe(device: SystemAudioOutputDevice?, onChange: @escaping @MainActor () -> Void)
+    func observe(device: SystemAudioOutputDevice?, onChange: @escaping () -> Void)
     func stopObserving()
 }
 
-@MainActor
-final class SystemAudioMuteController {
+final class SystemAudioMuteController: @unchecked Sendable {
     private let devices: any SystemAudioMuteDeviceAccess
+    private let operationQueue = DispatchQueue(label: "com.voxt.systemAudioMute", qos: .userInitiated)
     private var sessionID: UUID?
     private var outputDevice: SystemAudioOutputDevice?
     private var ownedMute: SystemAudioOutputDevice?
@@ -31,13 +30,29 @@ final class SystemAudioMuteController {
         self.devices = devices
     }
 
-    isolated deinit {
+    deinit {
         devices.stopObserving()
         restoreOwnedMute()
     }
 
     @discardableResult
     func muteSystemAudioIfNeeded() -> Bool {
+        operationQueue.sync {
+            performMuteSystemAudioIfNeeded()
+        }
+    }
+
+    func muteSystemAudioIfNeededAsync(completion: @escaping @MainActor (Bool) -> Void) {
+        operationQueue.async { [weak self] in
+            guard let self else { return }
+            let result = self.performMuteSystemAudioIfNeeded()
+            Task { @MainActor in
+                completion(result)
+            }
+        }
+    }
+
+    private func performMuteSystemAudioIfNeeded() -> Bool {
         if sessionID != nil {
             return outputDevice.flatMap { devices.muteState(of: $0) } == true
         }
@@ -49,6 +64,12 @@ final class SystemAudioMuteController {
     }
 
     func restoreSystemAudioIfNeeded() {
+        operationQueue.sync {
+            performRestoreSystemAudioIfNeeded()
+        }
+    }
+
+    private func performRestoreSystemAudioIfNeeded() {
         sessionID = nil // Invalidates already queued property notifications.
         devices.stopObserving()
         restoreOwnedMute()
@@ -73,19 +94,26 @@ final class SystemAudioMuteController {
 
     private func observeOutput(sessionID id: UUID) {
         devices.observe(device: outputDevice) { [weak self] in
-            guard let self, self.sessionID == id else { return }
-            let current = self.devices.defaultOutputDevice()
-            if current != self.outputDevice {
-                self.devices.stopObserving()
-                self.restoreOwnedMute()
-                _ = self.adoptCurrentOutput()
-                self.observeOutput(sessionID: id)
-            } else if let owned = self.ownedMute,
-                      self.devices.muteState(of: owned) == false {
-                // Respect an observed external unmute; do not fight the user or
-                // later unmute a state they set themselves in this session.
-                self.ownedMute = nil
+            guard let self else { return }
+            self.operationQueue.sync {
+                self.handleOutputChange(sessionID: id)
             }
+        }
+    }
+
+    private func handleOutputChange(sessionID id: UUID) {
+        guard self.sessionID == id else { return }
+        let current = devices.defaultOutputDevice()
+        if current != outputDevice {
+            devices.stopObserving()
+            restoreOwnedMute()
+            _ = adoptCurrentOutput()
+            observeOutput(sessionID: id)
+        } else if let owned = ownedMute,
+                  devices.muteState(of: owned) == false {
+            // Respect an observed external unmute; do not fight the user or
+            // later unmute a state they set themselves in this session.
+            ownedMute = nil
         }
     }
 
@@ -104,7 +132,6 @@ final class SystemAudioMuteController {
     }
 }
 
-@MainActor
 private final class CoreAudioMuteDeviceAccess: SystemAudioMuteDeviceAccess {
     private struct Observation {
         let object: AudioObjectID
@@ -143,7 +170,7 @@ private final class CoreAudioMuteDeviceAccess: SystemAudioMuteDeviceAccess {
         return AudioObjectSetPropertyData(device.id, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value) == noErr
     }
 
-    func observe(device: SystemAudioOutputDevice?, onChange: @escaping @MainActor () -> Void) {
+    func observe(device: SystemAudioOutputDevice?, onChange: @escaping () -> Void) {
         stopObserving()
         addObservation(object: AudioObjectID(kAudioObjectSystemObject), address: Self.defaultOutputAddress, onChange: onChange)
         if let device {

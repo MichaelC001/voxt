@@ -222,22 +222,38 @@ extension AppDelegate {
         if interactionSoundsEnabled {
             interactionSoundPlayer.playStart()
         }
-        if muteSystemAudioWhileRecording,
-           !systemAudioMuteController.muteSystemAudioIfNeeded() {
-            showOverlayStatus(
-                AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
-                clearAfter: 3
-            )
+        let startCapture: @MainActor () -> Void = { [weak self] in
+            guard let self,
+                  self.isSessionActive,
+                  self.recordingStoppedAt == nil else { return }
+            if outputMode != .rewrite, transcriptionCaptureMode == .standard {
+                OnboardingSessionEvent.started(
+                    id: self.activeRecordingSessionID,
+                    kind: outputMode == .translation ? .voiceTranslation : .transcription,
+                    windowNumber: NSApp.isActive ? NSApp.keyWindow?.windowNumber : nil
+                ).post()
+            }
+            self.startRecordingCapture(using: recordingEngine)
         }
 
-        if outputMode != .rewrite, transcriptionCaptureMode == .standard {
-            OnboardingSessionEvent.started(
-                id: activeRecordingSessionID,
-                kind: outputMode == .translation ? .voiceTranslation : .transcription,
-                windowNumber: NSApp.isActive ? NSApp.keyWindow?.windowNumber : nil
-            ).post()
+        if muteSystemAudioWhileRecording {
+            let sessionID = activeRecordingSessionID
+            systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
+                guard let self,
+                      self.activeRecordingSessionID == sessionID,
+                      self.isSessionActive,
+                      self.recordingStoppedAt == nil else { return }
+                if !muted {
+                    self.showOverlayStatus(
+                        AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
+                        clearAfter: 3
+                    )
+                }
+                startCapture()
+            }
+        } else {
+            startCapture()
         }
-        startRecordingCapture(using: recordingEngine)
     }
 
     func endRecording() {
