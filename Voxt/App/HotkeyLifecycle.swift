@@ -147,8 +147,6 @@ extension AppDelegate {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.pendingSystemAudioMuteTask?.cancel()
-                self?.pendingSystemAudioMuteTask = nil
                 self?.systemAudioMuteController.restoreSystemAudioIfNeeded()
                 self?.interactionSoundPlayer.reset()
                 self?.scheduleHotkeyTransientStateReset(reason: "workspaceWillSleep")
@@ -195,14 +193,10 @@ extension AppDelegate {
 
     func setupEscapeKeyMonitoring() {
         refreshOverlayShortcutEventGate()
+        // Global NSEvent monitors require Input Monitoring on some macOS
+        // versions. Global Escape is handled by HotkeyManager's Accessibility-
+        // backed event tap; keep only the local monitor as an in-app fallback.
         let overlayShortcutEventGate = self.overlayShortcutEventGate
-        globalEscapeKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard overlayShortcutEventGate.shouldDispatch(event) else { return }
-            guard let self else { return }
-            Task { @MainActor [weak self] in
-                self?.handleOverlayShortcutEvent(event)
-            }
-        }
         localEscapeKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard overlayShortcutEventGate.shouldDispatch(event) else { return event }
             return self?.handleOverlayShortcutEvent(event, shouldConsume: true) ?? event
@@ -243,7 +237,12 @@ extension AppDelegate {
         if overlayState.displayMode == .answer {
             return true
         }
-        guard HotkeyPreference.loadTriggerMode() == .tap else { return false }
+        // Escape must also cancel a debounced wake before recording becomes
+        // active. Once recording starts it cancels every trigger mode, not
+        // only tap mode.
+        if pendingTranscriptionStartTask != nil {
+            return true
+        }
         guard isSessionActive else { return false }
         guard !isSelectedTextTranslationFlow else { return false }
         return true
@@ -251,6 +250,11 @@ extension AppDelegate {
 
     func handleEscapeShortcut() -> Bool {
         guard shouldConsumeEscapeShortcut() else { return false }
+        if pendingTranscriptionStartTask != nil {
+            cancelPendingTranscriptionStart()
+            hotkeyManager.resetTransientState(reason: "escape-cancelled-pending-wake")
+            return true
+        }
         if isSessionActive {
             let shouldRestoreRewriteConversation = overlayState.isRewriteConversationActive
             cancelActiveRecordingSession()

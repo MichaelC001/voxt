@@ -214,28 +214,18 @@ extension AppDelegate {
             transcriptionHotkeyStartBehavior == .tap ||
             transcriptionHotkeyStartBehavior == .doubleTap
         hotkeyManager.setCommonStopKeyEnabled(shouldEnableCommonStopKey)
-        pendingSystemAudioMuteTask?.cancel()
-        pendingSystemAudioMuteTask = nil
-
-        let startSoundDuration = interactionSoundsEnabled ? interactionSoundPlayer.playStart() : 0
-        if muteSystemAudioWhileRecording {
-            let sessionID = activeRecordingSessionID
-            pendingSystemAudioMuteTask = Task { @MainActor [weak self] in
-                if startSoundDuration > 0 {
-                    do { try await Task.sleep(for: .seconds(startSoundDuration)) } catch { return }
-                }
-                guard !Task.isCancelled, let self, !self.isApplicationTerminating,
-                      self.activeRecordingSessionID == sessionID,
-                      self.isSessionActive, self.recordingStoppedAt == nil,
-                      self.muteSystemAudioWhileRecording else { return }
-                self.pendingSystemAudioMuteTask = nil
-                if !self.systemAudioMuteController.muteSystemAudioIfNeeded() {
-                    self.showOverlayStatus(
-                        AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
-                        clearAfter: 3
-                    )
-                }
-            }
+        // Mute synchronously before the interaction sound and microphone
+        // capture start. Delaying this until after the sound allowed playback
+        // already in progress to leak into the first recorded frames.
+        if muteSystemAudioWhileRecording,
+           !systemAudioMuteController.muteSystemAudioIfNeeded() {
+            showOverlayStatus(
+                AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
+                clearAfter: 3
+            )
+        }
+        if interactionSoundsEnabled {
+            interactionSoundPlayer.playStart()
         }
 
         if outputMode != .rewrite, transcriptionCaptureMode == .standard {
@@ -259,8 +249,6 @@ extension AppDelegate {
         VoxtLog.asr("Recording stop requested.")
 
         hotkeyManager.setCommonStopKeyEnabled(false)
-        pendingSystemAudioMuteTask?.cancel()
-        pendingSystemAudioMuteTask = nil
         recordingStoppedAt = Date()
         if transcriptionProcessingStartedAt == nil {
             transcriptionProcessingStartedAt = recordingStoppedAt
@@ -285,8 +273,6 @@ extension AppDelegate {
         sessionOutputDestinationContext = nil
 
         cancelSessionControlTasks()
-        pendingSystemAudioMuteTask?.cancel()
-        pendingSystemAudioMuteTask = nil
         recordingStoppedAt = Date()
         overlayState.isCompleting = false
         overlayState.statusMessage = ""

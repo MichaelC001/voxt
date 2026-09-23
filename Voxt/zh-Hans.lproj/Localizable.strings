@@ -300,7 +300,7 @@
 "Required for Apple Direct Dictation engine." = "用于 Apple 直接听写引擎。";
 "Required for global shortcuts and inserting text into other apps." = "用于全局快捷键及向其他应用写入文本。";
 "System Audio for Meetings" = "会议系统音频";
-"Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute." = "开始使用系统音源的会议时，由 macOS 请求授权。仅麦克风录音、导入文件和输出设备静音均不需要此权限。";
+"Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute." = "仅在使用系统音频的会议中需要。";
 "If access was denied, enable System Audio Recording for Voxt in System Settings, then retry the meeting." = "如果此前拒绝了授权，请在系统设置中为 Voxt 开启系统音频录制，然后重试会议。";
 "Enabled" = "已开启";
 "Disabled" = "未开启";

@@ -26,7 +26,11 @@ nonisolated final class HotkeyEventTapInstallation: @unchecked Sendable {
             let context = Unmanaged<CallbackContext>.fromOpaque(refcon).takeUnretainedValue()
             return context.handle(type, event) ? nil : Unmanaged.passUnretained(event)
         }
-        for location in [CGEventTapLocation.cghidEventTap, .cgSessionEventTap] {
+        // A modifying session tap is authorized by Accessibility and does not
+        // require Input Monitoring. Prefer it over the HID tap: on macOS the
+        // HID tap can be created but silently miss Fn/keyboard events when
+        // Input Monitoring is disabled.
+        for location in [CGEventTapLocation.cgSessionEventTap, .cghidEventTap] {
             guard let tap = CGEvent.tapCreate(
                 tap: location, place: .tailAppendEventTap, options: .defaultTap,
                 eventsOfInterest: eventMask, callback: callback,

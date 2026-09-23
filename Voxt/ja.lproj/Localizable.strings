@@ -292,7 +292,7 @@
 "Required for Apple Direct Dictation engine." = "Apple Direct Dictation エンジンに必要です。";
 "Required for global shortcuts and inserting text into other apps." = "グローバルショートカットと他アプリへのテキスト入力に必要です。";
 "System Audio for Meetings" = "会議のシステム音声";
-"Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute." = "システム音声を使う会議の開始時に macOS が権限を要求します。マイクのみの録音、ファイルの読み込み、出力デバイスのミュートには不要です。";
+"Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute." = "システム音声を使う会議でのみ必要です。";
 "If access was denied, enable System Audio Recording for Voxt in System Settings, then retry the meeting." = "アクセスを拒否した場合は、システム設定で Voxt のシステム音声収録を許可し、会議を再試行してください。";
 "Enabled" = "有効";
 "Disabled" = "無効";

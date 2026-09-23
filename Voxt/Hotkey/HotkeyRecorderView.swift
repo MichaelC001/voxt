@@ -214,7 +214,9 @@ final class KeyCaptureView: NSView {
             return Unmanaged.passUnretained(event)
         }
 
-        for tapLocation in [CGEventTapLocation.cghidEventTap, .cgSessionEventTap] {
+        // Prefer the Accessibility-backed session tap. The HID tap may be
+        // creatable while still missing Fn events without Input Monitoring.
+        for tapLocation in [CGEventTapLocation.cgSessionEventTap, .cghidEventTap] {
             if let tap = CGEvent.tapCreate(
                 tap: tapLocation,
                 place: .tailAppendEventTap,

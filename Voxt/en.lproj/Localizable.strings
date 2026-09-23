@@ -300,7 +300,7 @@
 "Required for Apple Direct Dictation engine." = "Required for Apple Direct Dictation engine.";
 "Required for global shortcuts and inserting text into other apps." = "Required for global shortcuts and inserting text into other apps.";
 "System Audio for Meetings" = "System Audio for Meetings";
-"Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute." = "Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute.";
+"Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute." = "Needed only for meetings using system audio.";
 "If access was denied, enable System Audio Recording for Voxt in System Settings, then retry the meeting." = "If access was denied, enable System Audio Recording for Voxt in System Settings, then retry the meeting.";
 "Enabled" = "Enabled";
 "Disabled" = "Disabled";

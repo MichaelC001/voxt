@@ -221,7 +221,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var workspaceSessionDidBecomeActiveObserver: NSObjectProtocol?
     var workspaceSessionDidResignActiveObserver: NSObjectProtocol?
     var audioInputDevicesObserver: AudioInputDeviceObserver?
-    var globalEscapeKeyMonitor: Any?
     var localEscapeKeyMonitor: Any?
     let overlayShortcutEventGate = OverlayShortcutEventGate()
     var inputDevicesRefreshTask: Task<Void, Never>?
@@ -239,7 +238,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var overlayReminderTask: Task<Void, Never>?
     var overlayStatusClearTask: Task<Void, Never>?
     var toastDismissTask: Task<Void, Never>?
-    var pendingSystemAudioMuteTask: Task<Void, Never>?
     var pendingSelectedTextTranslationRefreshTask: Task<Void, Never>?
     var pendingMeetingStartupTask: Task<Void, Never>?
     var pendingDeepIdleMemoryReclamationTask: Task<Void, Never>?
@@ -861,7 +859,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             overlayReminderTask,
             overlayStatusClearTask,
             toastDismissTask,
-            pendingSystemAudioMuteTask,
             pendingSelectedTextTranslationRefreshTask,
             pendingDeepIdleMemoryReclamationTask
         ].compactMap { $0 }
@@ -880,7 +877,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         overlayReminderTask = nil
         overlayStatusClearTask = nil
         toastDismissTask = nil
-        pendingSystemAudioMuteTask = nil
         pendingSelectedTextTranslationRefreshTask = nil
         pendingDeepIdleMemoryReclamationTask = nil
         pendingMeetingStartupTask = nil
@@ -927,10 +923,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             workspaceNotificationCenter.removeObserver(workspaceSessionDidResignActiveObserver)
             self.workspaceSessionDidResignActiveObserver = nil
         }
-        if let globalEscapeKeyMonitor {
-            NSEvent.removeMonitor(globalEscapeKeyMonitor)
-            self.globalEscapeKeyMonitor = nil
-        }
         if let localEscapeKeyMonitor {
             NSEvent.removeMonitor(localEscapeKeyMonitor)
             self.localEscapeKeyMonitor = nil
@@ -965,9 +957,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let workspaceSessionDidResignActiveObserver {
             workspaceNotificationCenter.removeObserver(workspaceSessionDidResignActiveObserver)
-        }
-        if let globalEscapeKeyMonitor {
-            NSEvent.removeMonitor(globalEscapeKeyMonitor)
         }
         if let localEscapeKeyMonitor {
             NSEvent.removeMonitor(localEscapeKeyMonitor)
