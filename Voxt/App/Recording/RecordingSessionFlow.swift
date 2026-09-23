@@ -34,8 +34,6 @@ extension AppDelegate {
         silenceMonitorTask = nil
         pauseLLMTask?.cancel()
         pauseLLMTask = nil
-        pendingRecordingStartTask?.cancel()
-        pendingRecordingStartTask = nil
         _ = cancelRecordingCaptureStartTask()
 
         speechTranscriber.stopRecording()
@@ -104,8 +102,6 @@ extension AppDelegate {
             return
         }
         releaseResidualRecordingResources(reason: "begin-recording")
-        pendingRecordingStartTask?.cancel()
-        pendingRecordingStartTask = nil
         prepareLegacySettingsForSession(outputMode: outputMode)
         synchronizeRuntimeASRStateForSession(outputMode: outputMode)
         let localASRStartContext = currentLocalASRStartContext()
@@ -145,6 +141,84 @@ extension AppDelegate {
         recordingLifecycle.begin()
         invalidateActiveLLMRequest()
         sessionOutputMode = outputMode
+        let isContinuingRewriteConversation = outputMode == .rewrite && overlayState.isRewriteConversationActive
+        if isContinuingRewriteConversation {
+            overlayState.sessionIconMode = .rewrite
+        } else {
+            overlayState.reset()
+            overlayState.presentRecording(iconMode: currentRecordingOverlayIconMode)
+        }
+        isSessionActive = true
+        let shouldEnableCommonStopKey = outputMode == .translation ||
+            outputMode == .rewrite ||
+            transcriptionHotkeyStartBehavior == .tap ||
+            transcriptionHotkeyStartBehavior == .doubleTap
+        hotkeyManager.setCommonStopKeyEnabled(shouldEnableCommonStopKey)
+        overlayWindow.show(state: overlayState, position: overlayPosition)
+
+        let sessionID = activeRecordingSessionID
+        Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .milliseconds(16)) } catch { return }
+            guard let self else { return }
+            self.continueRecordingStart(
+                outputMode: outputMode,
+                transcriptionCaptureMode: transcriptionCaptureMode,
+                recordingEngine: recordingEngine,
+                sessionID: sessionID,
+                isContinuingRewriteConversation: isContinuingRewriteConversation
+            )
+        }
+    }
+
+    private func continueRecordingStart(
+        outputMode: SessionOutputMode,
+        transcriptionCaptureMode: TranscriptionCaptureSessionMode,
+        recordingEngine: TranscriptionEngine,
+        sessionID: UUID,
+        isContinuingRewriteConversation: Bool
+    ) {
+        guard isSessionActive,
+              activeRecordingSessionID == sessionID,
+              recordingStoppedAt == nil else { return }
+
+        let startCapture: @MainActor () -> Void = { [weak self] in
+            guard let self,
+                  self.isSessionActive,
+                  self.recordingStoppedAt == nil else { return }
+            if outputMode != .rewrite, transcriptionCaptureMode == .standard {
+                OnboardingSessionEvent.started(
+                    id: self.activeRecordingSessionID,
+                    kind: outputMode == .translation ? .voiceTranslation : .transcription,
+                    windowNumber: NSApp.isActive ? NSApp.keyWindow?.windowNumber : nil
+                ).post()
+            }
+            self.startRecordingCapture(using: recordingEngine)
+        }
+
+        let shouldWaitForWakeCue = muteSystemAudioWhileRecording && interactionSoundsEnabled
+        if interactionSoundsEnabled {
+            interactionSoundPlayer.playStartAsync { [weak self] in
+                guard let self,
+                      self.activeRecordingSessionID == sessionID,
+                      self.isSessionActive,
+                      self.recordingStoppedAt == nil else { return }
+                guard self.muteSystemAudioWhileRecording else { return }
+                self.systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
+                    guard let self,
+                          self.activeRecordingSessionID == sessionID,
+                          self.isSessionActive,
+                          self.recordingStoppedAt == nil else { return }
+                    if !muted {
+                        self.showOverlayStatus(
+                            AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
+                            clearAfter: 3
+                        )
+                    }
+                    startCapture()
+                }
+            }
+        }
+
         enhancementContextSnapshot = nil
         sessionOutputDestinationContext = nil
         rewriteSessionHasSelectedSourceText = false
@@ -162,7 +236,6 @@ extension AppDelegate {
         )
         sessionTargetApplicationBundleID = sessionTargetBundleID
         sessionTargetApplicationPID = sessionTargetBundleID == nil ? nil : frontmostApplication?.processIdentifier
-        let isContinuingRewriteConversation = outputMode == .rewrite && overlayState.isRewriteConversationActive
         if outputMode == .rewrite, !isContinuingRewriteConversation {
             rewriteSessionSelectedSourceText = selectedContentTextFromSystemSelection() ?? ""
         } else {
@@ -204,7 +277,6 @@ extension AppDelegate {
             overlayState.transcribedText = ""
             overlayState.displayMode = .answer
         } else {
-            overlayState.reset()
             overlayState.statusMessage = ""
             overlayState.presentRecording(iconMode: currentRecordingOverlayIconMode)
         }
@@ -212,61 +284,9 @@ extension AppDelegate {
             prepareMicrophoneTranslationSessionState()
         }
 
-        isSessionActive = true
-        let shouldEnableCommonStopKey = outputMode == .translation ||
-            outputMode == .rewrite ||
-            transcriptionHotkeyStartBehavior == .tap ||
-            transcriptionHotkeyStartBehavior == .doubleTap
-        hotkeyManager.setCommonStopKeyEnabled(shouldEnableCommonStopKey)
-        // Finish this synchronous wake path first so the UI can render. The
-        // cue starts on the next main-actor turn, then plays to completion
-        // before device mute and capture begin.
-        let startCapture: @MainActor () -> Void = { [weak self] in
-            guard let self,
-                  self.isSessionActive,
-                  self.recordingStoppedAt == nil else { return }
-            if outputMode != .rewrite, transcriptionCaptureMode == .standard {
-                OnboardingSessionEvent.started(
-                    id: self.activeRecordingSessionID,
-                    kind: outputMode == .translation ? .voiceTranslation : .transcription,
-                    windowNumber: NSApp.isActive ? NSApp.keyWindow?.windowNumber : nil
-                ).post()
-            }
-            self.startRecordingCapture(using: recordingEngine)
-        }
-
-        guard muteSystemAudioWhileRecording else {
-            if interactionSoundsEnabled {
-                interactionSoundPlayer.playStart()
-            }
-            startCapture()
-            return
-        }
-
-        let sessionID = activeRecordingSessionID
-        pendingRecordingStartTask = Task { @MainActor [weak self] in
-            // Give AppKit a real render turn before AVAudioPlayer performs
-            // any setup. A yield alone can resume this task before the first
-            // overlay frame is committed.
-            do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
-            guard !Task.isCancelled, let self,
-                  !self.isApplicationTerminating,
-                  self.activeRecordingSessionID == sessionID,
-                  self.isSessionActive,
-                  self.recordingStoppedAt == nil else { return }
-
-            let startSoundDuration = self.interactionSoundsEnabled
-                ? self.interactionSoundPlayer.playStart()
-                : 0
-            if startSoundDuration > 0 {
-                do { try await Task.sleep(for: .seconds(startSoundDuration)) } catch { return }
-            }
-            guard !Task.isCancelled,
-                  self.activeRecordingSessionID == sessionID,
-                  self.isSessionActive,
-                  self.recordingStoppedAt == nil else { return }
-            self.pendingRecordingStartTask = nil
-            self.systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
+        guard !shouldWaitForWakeCue else { return }
+        if muteSystemAudioWhileRecording {
+            systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
                 guard let self,
                       self.activeRecordingSessionID == sessionID,
                       self.isSessionActive,
@@ -279,6 +299,8 @@ extension AppDelegate {
                 }
                 startCapture()
             }
+        } else {
+            startCapture()
         }
     }
 

@@ -241,7 +241,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var pendingSelectedTextTranslationRefreshTask: Task<Void, Never>?
     var pendingMeetingStartupTask: Task<Void, Never>?
     var pendingDeepIdleMemoryReclamationTask: Task<Void, Never>?
-    var pendingRecordingStartTask: Task<Void, Never>?
     var deepIdleMemoryReclamationID = UUID()
     var pendingApplicationTerminationTask: Task<Void, Never>?
     let llmRequests = LLMRequestLifecycle()
@@ -861,8 +860,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             overlayStatusClearTask,
             toastDismissTask,
             pendingSelectedTextTranslationRefreshTask,
-            pendingDeepIdleMemoryReclamationTask,
-            pendingRecordingStartTask
+            pendingDeepIdleMemoryReclamationTask
         ].compactMap { $0 }
         tasks.append(contentsOf: llmWarmupTasksByRepo.values)
         tasks.append(contentsOf: remoteLLMWarmupTasksByKey.values)
@@ -881,7 +879,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         toastDismissTask = nil
         pendingSelectedTextTranslationRefreshTask = nil
         pendingDeepIdleMemoryReclamationTask = nil
-        pendingRecordingStartTask = nil
         pendingMeetingStartupTask = nil
         pendingTranscriptionStartTask = nil
         llmWarmupTasksByRepo.removeAll()

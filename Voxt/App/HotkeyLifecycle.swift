@@ -147,8 +147,6 @@ extension AppDelegate {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.pendingRecordingStartTask?.cancel()
-                self?.pendingRecordingStartTask = nil
                 self?.systemAudioMuteController.restoreSystemAudioIfNeeded()
                 self?.interactionSoundPlayer.reset()
                 self?.scheduleHotkeyTransientStateReset(reason: "workspaceWillSleep")

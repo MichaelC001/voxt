@@ -4,32 +4,53 @@
 import AVFoundation
 import Foundation
 
-@MainActor
-final class InteractionSoundPlayer {
+final class InteractionSoundPlayer: @unchecked Sendable {
+    private let playbackQueue = DispatchQueue(label: "com.voxt.interactionSound", qos: .userInitiated)
     private let volume: Float = 0.22
     private var activePlayer: AVAudioPlayer?
 
     @discardableResult
     func playStart() -> TimeInterval {
-        let sounds = resolvedSounds(for: currentPreset())
-        return play(named: sounds.start)
+        playbackQueue.sync {
+            let sounds = resolvedSounds(for: currentPreset())
+            return play(named: sounds.start)
+        }
+    }
+
+    /// Starts playback off the main actor and invokes completion after the cue
+    /// duration. This keeps wake feedback from blocking AppKit's first frame.
+    func playStartAsync(completion: @escaping @MainActor () -> Void) {
+        playbackQueue.async { [weak self] in
+            guard let self else { return }
+            let sounds = self.resolvedSounds(for: self.currentPreset())
+            let duration = self.play(named: sounds.start)
+            self.playbackQueue.asyncAfter(deadline: .now() + duration) {
+                Task { @MainActor in completion() }
+            }
+        }
     }
 
     @discardableResult
     func playEnd() -> TimeInterval {
-        let sounds = resolvedSounds(for: currentPreset())
-        return play(named: sounds.end)
+        playbackQueue.sync {
+            let sounds = resolvedSounds(for: currentPreset())
+            return play(named: sounds.end)
+        }
     }
 
     @discardableResult
     func playPreview(preset: InteractionSoundPreset) -> TimeInterval {
-        let sounds = resolvedSounds(for: preset)
-        return play(named: sounds.start)
+        playbackQueue.sync {
+            let sounds = resolvedSounds(for: preset)
+            return play(named: sounds.start)
+        }
     }
 
     func reset() {
-        activePlayer?.stop()
-        activePlayer = nil
+        playbackQueue.sync {
+            activePlayer?.stop()
+            activePlayer = nil
+        }
     }
 
     private func currentPreset() -> InteractionSoundPreset {
