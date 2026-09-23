@@ -11,11 +11,13 @@ extension PermissionsSettingsView {
     enum PermissionState: Equatable, Sendable {
         case enabled
         case disabled
+        case onDemand
 
         var titleKey: LocalizedStringKey {
             switch self {
             case .enabled: return "Enabled"
             case .disabled: return "Disabled"
+            case .onDemand: return "On Demand"
             }
         }
 
@@ -23,6 +25,7 @@ extension PermissionsSettingsView {
             switch self {
             case .enabled: return .green
             case .disabled: return .orange
+            case .onDemand: return .secondary
             }
         }
     }

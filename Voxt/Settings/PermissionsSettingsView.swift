@@ -61,20 +61,10 @@ struct PermissionsSettingsView: View {
                 ForEach(requiredPermissionKinds) { kind in
                     permissionRow(kind)
                 }
+
+                systemAudioPermissionRow()
             }
             .settingsNavigationAnchor(.permissionsMain)
-
-            // Core Audio prompts when a user starts a meeting with system audio.
-            // There is no public preflight API; do not display a fabricated status.
-            PermissionsSettingsSection(
-                title: permissionsLocalized("System Audio for Meetings"),
-                description: permissionsLocalized("Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute.")
-            ) {
-                Button(permissionsLocalized("Open Settings")) {
-                    PermissionGuidance.openSystemAudioSettings()
-                }
-                .buttonStyle(SettingsPillButtonStyle())
-            }
 
             if appEnhancementEnabled {
                 Divider()
@@ -185,6 +175,36 @@ struct PermissionsSettingsView: View {
 
                 Button(permissionsLocalized("Open Settings")) {
                     openSettings(for: kind)
+                }
+                .buttonStyle(SettingsCompactActionButtonStyle())
+            }
+            .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+
+    private func systemAudioPermissionRow() -> some View {
+        // Core Audio prompts when a user starts a meeting with system audio.
+        // There is no public preflight API, so expose the state as on-demand
+        // instead of displaying a fabricated enabled/disabled result.
+        HStack(alignment: .center, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(permissionsLocalized("System Audio for Meetings"))
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary.opacity(0.92))
+
+                Text(permissionsLocalized("Requested by macOS when you start a meeting using system audio. Not needed for microphone-only recording, imported files, or output-device mute."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(alignment: .center, spacing: 8) {
+                statusBadge(for: .onDemand)
+
+                Button(permissionsLocalized("Open Settings")) {
+                    PermissionGuidance.openSystemAudioSettings()
                 }
                 .buttonStyle(SettingsCompactActionButtonStyle())
             }

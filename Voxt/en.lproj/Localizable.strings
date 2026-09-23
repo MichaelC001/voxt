@@ -304,6 +304,7 @@
 "If access was denied, enable System Audio Recording for Voxt in System Settings, then retry the meeting." = "If access was denied, enable System Audio Recording for Voxt in System Settings, then retry the meeting.";
 "Enabled" = "Enabled";
 "Disabled" = "Disabled";
+"On Demand" = "On Demand";
 "Request" = "Request";
 "Open Settings" = "Open Settings";
 "Check for Updates…" = "Check for Updates…";

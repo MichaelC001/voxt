@@ -304,6 +304,7 @@
 "If access was denied, enable System Audio Recording for Voxt in System Settings, then retry the meeting." = "如果此前拒绝了授权，请在系统设置中为 Voxt 开启系统音频录制，然后重试会议。";
 "Enabled" = "已开启";
 "Disabled" = "未开启";
+"On Demand" = "按需请求";
 "Request" = "请求开启";
 "Open Settings" = "打开设置";
 "Check for Updates…" = "检查更新…";
