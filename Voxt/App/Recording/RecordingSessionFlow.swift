@@ -34,6 +34,8 @@ extension AppDelegate {
         silenceMonitorTask = nil
         pauseLLMTask?.cancel()
         pauseLLMTask = nil
+        pendingRecordingStartTask?.cancel()
+        pendingRecordingStartTask = nil
         _ = cancelRecordingCaptureStartTask()
 
         speechTranscriber.stopRecording()
@@ -102,6 +104,8 @@ extension AppDelegate {
             return
         }
         releaseResidualRecordingResources(reason: "begin-recording")
+        pendingRecordingStartTask?.cancel()
+        pendingRecordingStartTask = nil
         prepareLegacySettingsForSession(outputMode: outputMode)
         synchronizeRuntimeASRStateForSession(outputMode: outputMode)
         let localASRStartContext = currentLocalASRStartContext()
@@ -214,14 +218,13 @@ extension AppDelegate {
             transcriptionHotkeyStartBehavior == .tap ||
             transcriptionHotkeyStartBehavior == .doubleTap
         hotkeyManager.setCommonStopKeyEnabled(shouldEnableCommonStopKey)
-        // Start the cue first so it can enter the audio pipeline, then mute
-        // immediately and start capture without waiting for the cue to finish.
-        // Device-level mute also affects Voxt, so this ordering is the closest
-        // permission-free approximation to muting other apps while keeping the
-        // wake cue responsive.
-        if interactionSoundsEnabled {
-            interactionSoundPlayer.playStart()
-        }
+        // Show the UI and play the cue immediately. Device-level mute also
+        // mutes Voxt, so wait for the cue to finish before muting in the
+        // background. Recording starts only after mute completes, preventing
+        // system playback from entering the first captured frames.
+        let startSoundDuration = interactionSoundsEnabled
+            ? interactionSoundPlayer.playStart()
+            : 0
         let startCapture: @MainActor () -> Void = { [weak self] in
             guard let self,
                   self.isSessionActive,
@@ -236,9 +239,23 @@ extension AppDelegate {
             self.startRecordingCapture(using: recordingEngine)
         }
 
-        if muteSystemAudioWhileRecording {
-            let sessionID = activeRecordingSessionID
-            systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
+        guard muteSystemAudioWhileRecording else {
+            startCapture()
+            return
+        }
+
+        let sessionID = activeRecordingSessionID
+        pendingRecordingStartTask = Task { @MainActor [weak self] in
+            if startSoundDuration > 0 {
+                do { try await Task.sleep(for: .seconds(startSoundDuration)) } catch { return }
+            }
+            guard !Task.isCancelled, let self,
+                  !self.isApplicationTerminating,
+                  self.activeRecordingSessionID == sessionID,
+                  self.isSessionActive,
+                  self.recordingStoppedAt == nil else { return }
+            self.pendingRecordingStartTask = nil
+            self.systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
                 guard let self,
                       self.activeRecordingSessionID == sessionID,
                       self.isSessionActive,
@@ -251,8 +268,6 @@ extension AppDelegate {
                 }
                 startCapture()
             }
-        } else {
-            startCapture()
         }
     }
 
