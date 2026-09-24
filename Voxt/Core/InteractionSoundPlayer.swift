@@ -8,7 +8,10 @@ final class InteractionSoundPlayer: @unchecked Sendable {
     private let playbackQueue = DispatchQueue(label: "com.voxt.interactionSound", qos: .userInitiated)
     // Keep cues clearly audible without competing with speech or meeting audio.
     private let volume: Float = 0.50
+    private let audibleLevelThreshold: Float = 0.001
+    private let completionSafetyMargin: TimeInterval = 0.08
     private var preparedPlayers: [String: AVAudioPlayer] = [:]
+    private var preparedPlaybackDelays: [String: TimeInterval] = [:]
     private var preparedPresetRawValue: String?
     private var activePlayer: AVAudioPlayer?
 
@@ -30,8 +33,9 @@ final class InteractionSoundPlayer: @unchecked Sendable {
         }
     }
 
-    /// Starts playback off the main actor and invokes completion after the cue
-    /// duration. This keeps wake feedback from blocking AppKit's first frame.
+    /// Starts playback off the main actor and invokes completion shortly after
+    /// the audible part of the cue. System sound files often contain a long
+    /// trailing silence that must not delay output muting.
     func playStartAsync(completion: (@MainActor () -> Void)? = nil) {
         playbackQueue.async { [weak self] in
             guard let self else { return }
@@ -62,6 +66,7 @@ final class InteractionSoundPlayer: @unchecked Sendable {
             activePlayer?.stop()
             activePlayer = nil
             preparedPlayers.removeAll(keepingCapacity: false)
+            preparedPlaybackDelays.removeAll(keepingCapacity: false)
             preparedPresetRawValue = nil
         }
     }
@@ -113,13 +118,14 @@ final class InteractionSoundPlayer: @unchecked Sendable {
             return 0
         }
         activePlayer = player
-        return player.duration
+        return preparedPlaybackDelays[role] ?? player.duration
     }
 
     private func preparePlayersIfNeeded(for preset: InteractionSoundPreset) {
         guard preparedPresetRawValue != preset.rawValue else { return }
 
         preparedPlayers.removeAll(keepingCapacity: true)
+        preparedPlaybackDelays.removeAll(keepingCapacity: true)
         preparedPresetRawValue = preset.rawValue
         let sounds = resolvedSounds(for: preset)
         for (role, name) in [("start", sounds.start), ("end", sounds.end)] {
@@ -131,12 +137,60 @@ final class InteractionSoundPlayer: @unchecked Sendable {
                 player.volume = volume
                 player.prepareToPlay()
                 preparedPlayers[role] = player
+                preparedPlaybackDelays[role] = audiblePlaybackDelay(for: url, fallback: player.duration)
             } catch {
                 VoxtLog.audioWarning(
                     "Interaction sound failed to prewarm. name=\(name), error=\(error.localizedDescription)"
                 )
             }
         }
+    }
+
+    private func audiblePlaybackDelay(for url: URL, fallback: TimeInterval) -> TimeInterval {
+        guard let file = try? AVAudioFile(forReading: url),
+              file.processingFormat.sampleRate > 0,
+              file.processingFormat.channelCount > 0,
+              let buffer = AVAudioPCMBuffer(
+                  pcmFormat: file.processingFormat,
+                  frameCapacity: 4096
+              ),
+              let channelData = buffer.floatChannelData else {
+            return fallback
+        }
+
+        let format = file.processingFormat
+        let channelCount = Int(format.channelCount)
+        let totalFrames = file.length
+        var frameOffset: AVAudioFramePosition = 0
+        var lastAudibleFrame: AVAudioFramePosition = 0
+
+        while frameOffset < totalFrames {
+            let framesToRead = AVAudioFrameCount(
+                min(Int64(buffer.frameCapacity), totalFrames - frameOffset)
+            )
+            do {
+                try file.read(into: buffer, frameCount: framesToRead)
+            } catch {
+                return fallback
+            }
+
+            let frameLength = Int(buffer.frameLength)
+            guard frameLength > 0 else { break }
+            for frameIndex in 0..<frameLength {
+                var peak: Float = 0
+                for channel in 0..<channelCount {
+                    peak = max(peak, abs(channelData[channel][frameIndex]))
+                }
+                if peak >= audibleLevelThreshold {
+                    lastAudibleFrame = frameOffset + AVAudioFramePosition(frameIndex + 1)
+                }
+            }
+            frameOffset += AVAudioFramePosition(frameLength)
+        }
+
+        guard lastAudibleFrame > 0 else { return fallback }
+        let audibleDuration = Double(lastAudibleFrame) / format.sampleRate
+        return min(fallback, audibleDuration + completionSafetyMargin)
     }
 
     private func soundURL(named name: String) -> URL? {
