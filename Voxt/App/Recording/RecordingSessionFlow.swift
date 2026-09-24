@@ -195,28 +195,38 @@ extension AppDelegate {
             self.startRecordingCapture(using: recordingEngine)
         }
 
-        let shouldWaitForWakeCue = muteSystemAudioWhileRecording && interactionSoundsEnabled
+        let shouldMuteOutput = muteSystemAudioWhileRecording
+        let muteOutputIfNeeded: @MainActor () -> Void = { [weak self] in
+            guard let self,
+                  shouldMuteOutput,
+                  self.activeRecordingSessionID == sessionID,
+                  self.isSessionActive,
+                  self.recordingStoppedAt == nil else { return }
+
+            self.systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
+                guard let self,
+                      self.activeRecordingSessionID == sessionID,
+                      self.isSessionActive,
+                      self.recordingStoppedAt == nil else { return }
+                if !muted {
+                    self.showOverlayStatus(
+                        AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
+                        clearAfter: 3
+                    )
+                }
+            }
+        }
+
         if interactionSoundsEnabled {
             interactionSoundPlayer.playStartAsync { [weak self] in
                 guard let self,
                       self.activeRecordingSessionID == sessionID,
                       self.isSessionActive,
                       self.recordingStoppedAt == nil else { return }
-                guard self.muteSystemAudioWhileRecording else { return }
-                self.systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
-                    guard let self,
-                          self.activeRecordingSessionID == sessionID,
-                          self.isSessionActive,
-                          self.recordingStoppedAt == nil else { return }
-                    if !muted {
-                        self.showOverlayStatus(
-                            AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
-                            clearAfter: 3
-                        )
-                    }
-                    startCapture()
-                }
+                muteOutputIfNeeded()
             }
+        } else {
+            muteOutputIfNeeded()
         }
 
         enhancementContextSnapshot = nil
@@ -284,24 +294,11 @@ extension AppDelegate {
             prepareMicrophoneTranslationSessionState()
         }
 
-        guard !shouldWaitForWakeCue else { return }
-        if muteSystemAudioWhileRecording {
-            systemAudioMuteController.muteSystemAudioIfNeededAsync { [weak self] muted in
-                guard let self,
-                      self.activeRecordingSessionID == sessionID,
-                      self.isSessionActive,
-                      self.recordingStoppedAt == nil else { return }
-                if !muted {
-                    self.showOverlayStatus(
-                        AppLocalization.localizedString("This output device could not be muted. Recording will continue."),
-                        clearAfter: 3
-                    )
-                }
-                startCapture()
-            }
-        } else {
-            startCapture()
-        }
+        // UI and microphone capture must not wait for either the cue or output
+        // mute. If mute is enabled, it is applied after the cue so the cue is
+        // audible; the capture path starts immediately after session setup.
+        startCapture()
+
     }
 
     func endRecording() {

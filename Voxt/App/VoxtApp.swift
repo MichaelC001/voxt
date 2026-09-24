@@ -534,6 +534,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         SystemNotificationSupport.configure()
+        interactionSoundPlayer.prewarm()
 
         fileTaskNotificationObserver = NotificationCenter.default.addObserver(
             forName: .voxtFileTaskNotificationTapped,

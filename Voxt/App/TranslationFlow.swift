@@ -185,7 +185,7 @@ extension AppDelegate {
         sessionOutputDestinationContext = nil
 
         if interactionSoundsEnabled {
-            interactionSoundPlayer.playStart()
+            interactionSoundPlayer.playStartAsync()
         }
 
         OnboardingSessionEvent.started(
