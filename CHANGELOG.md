@@ -6,6 +6,29 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.0-beta.2] - 2026-09-24
+
+### English
+
+#### Fixed
+- Fixed shortcut cancellation and recording mute timing so wake-up sounds play reliably before recording starts.
+- Improved wake-up responsiveness by rendering the wake-up interface before sound playback and moving system audio muting off the UI path.
+- Unified system-audio layout and permission guidance in the permissions settings.
+
+### 简体中文
+
+#### 修复
+- 修复快捷键取消和录音静音时序问题，确保唤醒提示音可靠播放后再开始录音。
+- 优化唤醒响应速度，优先显示唤醒界面，并将系统音频静音移出界面响应路径。
+- 统一权限设置中的系统音频布局和权限说明。
+
+### 日本語
+
+#### 修正
+- ショートカットのキャンセルと録音ミュートのタイミングを修正し、録音開始前にウェイクアップ音が確実に再生されるようにしました。
+- ウェイクアップ画面を音声再生より先に表示し、システム音声のミュート処理を UI の応答経路から切り離して応答性を改善しました。
+- 権限設定におけるシステム音声のレイアウトと権限案内を統一しました。
+
 ## [1.15.0-beta.1] - 2026-09-22
 
 ### English
