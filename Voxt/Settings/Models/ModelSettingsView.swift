@@ -40,6 +40,7 @@ struct ModelSettingsView: View {
     @AppStorage(AppPreferenceKey.modelStorageRootPath) var modelStorageRootPath = ""
     @AppStorage(AppPreferenceKey.interfaceLanguage) var interfaceLanguageRaw = AppInterfaceLanguage.system.rawValue
     @AppStorage(AppPreferenceKey.featureSettings) var featureSettingsRaw = ""
+    @AppStorage(AppPreferenceKey.hiddenModelVisibilityIDs) var hiddenModelVisibilityIDsRaw = ""
 
     let mlxModelManager: MLXModelManager
     let customLLMManager: CustomLLMModelManager
@@ -198,6 +199,10 @@ struct ModelSettingsView: View {
 
     private var allEntries: [ModelCatalogEntry] { catalogSnapshot.allEntries }
 
+    private var hiddenModelVisibilityIDs: Set<String> {
+        ModelVisibilityStore.decode(hiddenModelVisibilityIDsRaw)
+    }
+
     private var availableTags: [String] { catalogSnapshot.availableTags }
 
     private var availableTagGroups: [[String]] { catalogSnapshot.availableTagGroups }
@@ -256,14 +261,45 @@ struct ModelSettingsView: View {
     private func modelCatalogItemView(_ item: ModelCatalogDisplayItem) -> some View {
         switch item {
         case .row(let entry):
-            ModelCatalogRow(entry: entry)
+            ModelCatalogRow(
+                entry: entry,
+                visibilityAction: visibilityAction(for: entry)
+            )
         case .group(let group):
             ModelCatalogGroupCard(
                 group: group,
                 isExpanded: isModelGroupExpanded(group),
-                onToggle: { toggleModelGroup(group) }
+                onToggle: { toggleModelGroup(group) },
+                visibilityActionForEntry: { visibilityAction(for: $0) }
             )
         }
+    }
+
+    private func visibilityAction(for entry: ModelCatalogEntry) -> ModelTableAction? {
+        guard !entry.filterTags.contains(localized("Installed")) else { return nil }
+        let isHidden = ModelVisibilityStore.isModelHidden(entry.id, in: hiddenModelVisibilityIDs)
+        if isHidden {
+            return ModelTableAction(title: localized("Show")) {
+                showModel(entry.id)
+            }
+        }
+        return ModelTableAction(title: localized("Hide")) {
+            hideModel(entry.id)
+        }
+    }
+
+    private func updateHiddenModelVisibility(_ update: (inout Set<String>) -> Void) {
+        var values = hiddenModelVisibilityIDs
+        update(&values)
+        hiddenModelVisibilityIDsRaw = ModelVisibilityStore.encode(values)
+    }
+
+    private func hideModel(_ id: String) {
+        updateHiddenModelVisibility { $0.insert(ModelVisibilityStore.modelKey(id)) }
+    }
+
+    private func showModel(_ id: String) {
+        updateHiddenModelVisibility { $0.remove(ModelVisibilityStore.modelKey(id)) }
     }
 
     private func isModelGroupExpanded(_ group: ModelCatalogGroupSection) -> Bool {
@@ -583,7 +619,8 @@ struct ModelSettingsView: View {
 
         catalogSnapshot = ModelSettingsCatalogSnapshotBuilder.build(
             entries: entries,
-            selectedTags: selectedTags
+            selectedTags: selectedTags,
+            hiddenIDs: hiddenModelVisibilityIDs
         )
     }
 

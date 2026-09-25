@@ -1342,6 +1342,13 @@
 "Use different enhancement prompts for different apps or browser pages." = "Use different enhancement prompts for different apps or browser pages.";
 "Set the ASR and text model pairing used for rewrite mode, then tune the rewrite-specific prompt and follow-up shortcut." = "Set the ASR and text model pairing used for rewrite mode, then tune the rewrite-specific prompt and follow-up shortcut.";
 "More" = "More";
+"Hidden" = "Hidden";
+"Hide" = "Hide";
+"Show" = "Show";
+"Hide Model" = "Hide Model";
+"Show Model" = "Show Model";
+"Hide Series" = "Hide Series";
+"Show Series" = "Show Series";
 "Move the shared translation language setting here so the behavior stays feature-local." = "Move the shared translation language setting here so the behavior stays feature-local.";
 "Multilingual" = "Multilingual";
 "Supports Primary Language" = "Supports Primary Language";

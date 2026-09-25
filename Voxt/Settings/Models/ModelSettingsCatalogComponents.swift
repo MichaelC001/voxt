@@ -75,12 +75,12 @@ enum ModelCatalogTag {
         [
             [localized("Local"), localized("Remote")],
             [localized("Fast"), localized("Balanced"), localized("Accurate"), localized("Realtime")],
-            [localized("Installed"), localized("Configured"), localized("In Use")]
+            [localized("Installed"), localized("Configured"), localized("In Use"), localized("Hidden")]
         ]
     }
 
     static var statusFilterTags: Set<String> {
-        Set([localized("Installed"), localized("Configured"), localized("In Use")])
+        Set([localized("Installed"), localized("Configured"), localized("In Use"), localized("Hidden")])
     }
 
     static func toggledTags(current: Set<String>, tag: String) -> Set<String> {
@@ -147,6 +147,7 @@ enum ModelCatalogRowSurface {
 
 struct ModelCatalogRow: View {
     let entry: ModelCatalogEntry
+    let visibilityAction: ModelTableAction?
     let titleOverride: String?
     let showsEngine: Bool
     let showsTags: Bool
@@ -171,6 +172,7 @@ struct ModelCatalogRow: View {
 
     init(
         entry: ModelCatalogEntry,
+        visibilityAction: ModelTableAction? = nil,
         titleOverride: String? = nil,
         showsEngine: Bool = true,
         showsTags: Bool = true,
@@ -178,6 +180,7 @@ struct ModelCatalogRow: View {
         surface: ModelCatalogRowSurface = .card
     ) {
         self.entry = entry
+        self.visibilityAction = visibilityAction
         self.titleOverride = titleOverride
         self.showsEngine = showsEngine
         self.showsTags = showsTags
@@ -250,6 +253,11 @@ struct ModelCatalogRow: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 6) {
+                if let visibilityAction {
+                    Button(visibilityAction.title, action: visibilityAction.handler)
+                        .buttonStyle(SettingsCompactActionButtonStyle())
+                }
+
                 if let primaryAction = entry.primaryAction {
                     Button(role: primaryAction.role) {
                         primaryAction.handler()
@@ -316,15 +324,17 @@ struct ModelCatalogGroupCard: View {
     let group: ModelCatalogGroupSection
     let isExpanded: Bool
     let onToggle: () -> Void
+    let visibilityActionForEntry: (ModelCatalogEntry) -> ModelTableAction?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    onToggle()
-                }
-            } label: {
-                VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        onToggle()
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .center, spacing: 8) {
                         ModelLogoView(key: group.modelLogoKey, fallbackTitle: group.title, size: 18)
 
@@ -368,17 +378,20 @@ struct ModelCatalogGroupCard: View {
                     if !group.tags.isEmpty {
                         ModelRowTagStrip(tags: group.tags)
                     }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+
             }
-            .buttonStyle(.plain)
 
             if isExpanded {
                 VStack(spacing: 0) {
                     ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                         ModelCatalogRow(
                             entry: entry,
+                            visibilityAction: visibilityActionForEntry(entry),
                             titleOverride: entry.groupedVariantTitle,
                             showsEngine: false,
                             showsTags: false,
@@ -421,7 +434,7 @@ struct ModelCatalogGroupCard: View {
     }
 }
 
-private struct ModelRowActionMenuButton: NSViewRepresentable {
+struct ModelRowActionMenuButton: NSViewRepresentable {
     let actions: [ModelTableAction]
 
     func makeCoordinator() -> Coordinator {
@@ -457,7 +470,7 @@ private struct ModelRowActionMenuButton: NSViewRepresentable {
     }
 }
 
-private final class ModelRowActionMenuHostView: NSView {
+final class ModelRowActionMenuHostView: NSView {
     private let popupMenu = NSMenu()
     private let iconView = NSImageView()
     private var trackingAreaRef: NSTrackingArea?

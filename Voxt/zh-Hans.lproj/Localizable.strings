@@ -1286,6 +1286,13 @@
 "Use different enhancement prompts for different apps or browser pages." = "为不同应用或浏览器页面使用不同的增强提示词。";
 "Set the ASR and text model pairing used for rewrite mode, then tune the rewrite-specific prompt and follow-up shortcut." = "设置转写模式使用的 ASR 与文本模型组合，并调整转写专用提示词和连续追问快捷键。";
 "More" = "更多";
+"Hidden" = "已隐藏";
+"Hide" = "隐藏";
+"Show" = "显示";
+"Hide Model" = "隐藏模型";
+"Show Model" = "显示模型";
+"Hide Series" = "隐藏系列";
+"Show Series" = "显示系列";
 "Move the shared translation language setting here so the behavior stays feature-local." = "把原来的全局翻译语言设置移到这里，让行为保持在功能内独立生效。";
 "Multilingual" = "多语言";
 "Supports Primary Language" = "支持主语言";

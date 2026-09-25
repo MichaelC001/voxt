@@ -22,7 +22,8 @@ struct ModelSettingsCatalogSnapshot {
 enum ModelSettingsCatalogSnapshotBuilder {
     static func build(
         entries: [ModelCatalogEntry],
-        selectedTags: Set<String>
+        selectedTags: Set<String>,
+        hiddenIDs: Set<String> = []
     ) -> ModelSettingsCatalogSnapshot {
         let prioritizedEntries = prioritize(entries)
         let locationTags = Set(prioritizedEntries.flatMap(\.filterTags)).intersection(ModelCatalogTag.locationTags)
@@ -31,10 +32,17 @@ enum ModelSettingsCatalogSnapshotBuilder {
             selectedTags: selectedTags
         )
 
-        let tagSet = locationTags.union(Set(locationScopedEntries.flatMap(\.filterTags)))
+        var tagSet = locationTags.union(Set(locationScopedEntries.flatMap(\.filterTags)))
+        if prioritizedEntries.contains(where: { isHidden($0, hiddenIDs: hiddenIDs) }) {
+            tagSet.insert(AppLocalization.localizedString("Hidden"))
+        }
         let availableTags = ModelCatalogTag.priority.compactMap { tagSet.contains($0) ? $0 : nil }
         let availableTagGroups = groupedAvailableTags(from: availableTags)
-        let filteredEntries = filterEntries(prioritizedEntries, selectedTags: selectedTags)
+        let filteredEntries = filterEntries(
+            prioritizedEntries,
+            selectedTags: selectedTags,
+            hiddenIDs: hiddenIDs
+        )
 
         return ModelSettingsCatalogSnapshot(
             allEntries: prioritizedEntries,
@@ -95,12 +103,20 @@ enum ModelSettingsCatalogSnapshotBuilder {
 
     private static func filterEntries(
         _ entries: [ModelCatalogEntry],
-        selectedTags: Set<String>
+        selectedTags: Set<String>,
+        hiddenIDs: Set<String>
     ) -> [ModelCatalogEntry] {
-        guard !selectedTags.isEmpty else { return entries }
-        let selectedStatusTags = selectedTags.intersection(ModelCatalogTag.statusFilterTags)
-        let requiredTags = selectedTags.subtracting(selectedStatusTags)
-        return entries.filter { entry in
+        let hiddenTag = AppLocalization.localizedString("Hidden")
+        let visibilityFiltered = entries.filter { entry in
+            let hidden = isHidden(entry, hiddenIDs: hiddenIDs)
+            return selectedTags.contains(hiddenTag) ? hidden : !hidden
+        }
+        guard !selectedTags.isEmpty else { return visibilityFiltered }
+        let selectedStatusTags = selectedTags
+            .intersection(ModelCatalogTag.statusFilterTags)
+            .subtracting([hiddenTag])
+        let requiredTags = selectedTags.subtracting(ModelCatalogTag.statusFilterTags)
+        return visibilityFiltered.filter { entry in
             let entryTags = Set(entry.filterTags)
             guard requiredTags.isSubset(of: entryTags) else { return false }
             if selectedStatusTags.isEmpty {
@@ -108,5 +124,13 @@ enum ModelSettingsCatalogSnapshotBuilder {
             }
             return !entryTags.intersection(selectedStatusTags).isEmpty
         }
+    }
+
+    private static func isHidden(
+        _ entry: ModelCatalogEntry,
+        hiddenIDs: Set<String>
+    ) -> Bool {
+        !entry.filterTags.contains(AppLocalization.localizedString("Installed"))
+            && ModelVisibilityStore.isModelHidden(entry.id, in: hiddenIDs)
     }
 }

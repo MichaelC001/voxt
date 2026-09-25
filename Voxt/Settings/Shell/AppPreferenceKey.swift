@@ -37,6 +37,7 @@ enum AppPreferenceKey {
     static let modelStorageRootBookmark = "modelStorageRootBookmark"
     static let useHfMirror = "useHfMirror"
     static let modelDownloadSourceSelections = "modelDownloadSourceSelections"
+    static let hiddenModelVisibilityIDs = "hiddenModelVisibilityIDs"
     nonisolated static let hotkeyInputType = "hotkeyInputType"
     nonisolated static let hotkeyKeyCode = "hotkeyKeyCode"
     nonisolated static let hotkeyMouseButtonNumber = "hotkeyMouseButtonNumber"

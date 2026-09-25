@@ -10,6 +10,7 @@ private func localized(_ key: String) -> String {
 struct FeatureModelSelectorDialog: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppPreferenceKey.interfaceLanguage) private var interfaceLanguageRaw = AppInterfaceLanguage.system.rawValue
+    @AppStorage(AppPreferenceKey.hiddenModelVisibilityIDs) private var hiddenModelVisibilityIDsRaw = ""
 
     let title: String
     let entries: [FeatureModelSelectorEntry]
@@ -24,6 +25,10 @@ struct FeatureModelSelectorDialog: View {
         FeatureModelSelectorFiltering.defaultSelectedTags(entries: entries)
     }
 
+    private var hiddenModelVisibilityIDs: Set<String> {
+        ModelVisibilityStore.decode(hiddenModelVisibilityIDsRaw)
+    }
+
     private var locationScopedEntriesForTags: [FeatureModelSelectorEntry] {
         FeatureModelSelectorFiltering.locationScopedEntries(entries: entries, selectedTags: selectedTags)
     }
@@ -32,7 +37,8 @@ struct FeatureModelSelectorDialog: View {
         FeatureModelSelectorFiltering.availableTags(
             entries: entries,
             selectedTags: selectedTags,
-            locationScopedEntries: locationScopedEntriesForTags
+            locationScopedEntries: locationScopedEntriesForTags,
+            hiddenIDs: hiddenModelVisibilityIDs
         )
     }
 
@@ -52,7 +58,11 @@ struct FeatureModelSelectorDialog: View {
     }
 
     private var filteredEntries: [FeatureModelSelectorEntry] {
-        FeatureModelSelectorFiltering.filteredEntries(entries: entries, selectedTags: selectedTags)
+        FeatureModelSelectorFiltering.filteredEntries(
+            entries: entries,
+            selectedTags: selectedTags,
+            hiddenIDs: hiddenModelVisibilityIDs
+        )
     }
 
     private var displayItems: [FeatureModelSelectorDisplayItem] {
@@ -161,7 +171,8 @@ struct FeatureModelSelectorDialog: View {
         selectedTags = FeatureModelSelectorFiltering.toggledTags(
             current: selectedTags,
             tag: tag,
-            entries: entries
+            entries: entries,
+            hiddenIDs: hiddenModelVisibilityIDs
         )
     }
 
@@ -183,7 +194,8 @@ struct FeatureModelSelectorDialog: View {
                 },
                 onConfigure: FeatureModelConfigurationRouting.canConfigure(entry.selectionID)
                     ? { openConfiguration(for: entry.selectionID) }
-                    : nil
+                    : nil,
+                visibilityAction: visibilityAction(for: entry)
             )
         case .group(let group):
             FeatureModelSelectorGroupCard(
@@ -197,9 +209,37 @@ struct FeatureModelSelectorDialog: View {
                 },
                 onConfigure: { selectionID in
                     openConfiguration(for: selectionID)
-                }
+                },
+                visibilityActionForEntry: { visibilityAction(for: $0) }
             )
         }
+    }
+
+    private func visibilityAction(for entry: FeatureModelSelectorEntry) -> ModelTableAction? {
+        guard !entry.filterTags.contains(localized("Installed")) else { return nil }
+        let isHidden = ModelVisibilityStore.isModelHidden(entry.id, in: hiddenModelVisibilityIDs)
+        if isHidden {
+            return ModelTableAction(title: localized("Show")) {
+                showModel(entry.id)
+            }
+        }
+        return ModelTableAction(title: localized("Hide")) {
+            hideModel(entry.id)
+        }
+    }
+
+    private func updateHiddenModelVisibility(_ update: (inout Set<String>) -> Void) {
+        var values = hiddenModelVisibilityIDs
+        update(&values)
+        hiddenModelVisibilityIDsRaw = ModelVisibilityStore.encode(values)
+    }
+
+    private func hideModel(_ id: String) {
+        updateHiddenModelVisibility { $0.insert(ModelVisibilityStore.modelKey(id)) }
+    }
+
+    private func showModel(_ id: String) {
+        updateHiddenModelVisibility { $0.remove(ModelVisibilityStore.modelKey(id)) }
     }
 
     private func openConfiguration(for selectionID: FeatureModelSelectionID) {
@@ -247,7 +287,7 @@ struct FeatureModelSelectorDialog: View {
 
 enum FeatureModelSelectorFiltering {
     static var statusFilterTags: Set<String> {
-        Set<String>([localized("Installed"), localized("Configured"), localized("In Use")])
+        Set<String>([localized("Installed"), localized("Configured"), localized("In Use"), localized("Hidden")])
     }
 
     static func defaultSelectedTags(entries _: [FeatureModelSelectorEntry]) -> Set<String> {
@@ -270,25 +310,37 @@ enum FeatureModelSelectorFiltering {
     static func availableTags(
         entries: [FeatureModelSelectorEntry],
         selectedTags: Set<String>,
-        locationScopedEntries overrideEntries: [FeatureModelSelectorEntry]? = nil
+        locationScopedEntries overrideEntries: [FeatureModelSelectorEntry]? = nil,
+        hiddenIDs: Set<String> = []
     ) -> [String] {
         let scopedEntries = overrideEntries ?? self.locationScopedEntries(entries: entries, selectedTags: selectedTags)
         let locationTags = Set<String>(entries.flatMap(\.filterTags)).intersection(FeatureSelectorTagPriority.locationTags)
-        let tagSet = locationTags.union(Set<String>(scopedEntries.flatMap(\.filterTags)))
+        var tagSet = locationTags.union(Set<String>(scopedEntries.flatMap(\.filterTags)))
+        if entries.contains(where: { isHidden($0, hiddenIDs: hiddenIDs) }) {
+            tagSet.insert(localized("Hidden"))
+        }
         return FeatureSelectorTagPriority.priority.compactMap { tagSet.contains($0) ? $0 : nil }
     }
 
     static func filteredEntries(
         entries: [FeatureModelSelectorEntry],
-        selectedTags: Set<String>
+        selectedTags: Set<String>,
+        hiddenIDs: Set<String> = []
     ) -> [FeatureModelSelectorEntry] {
+        let hiddenTag = localized("Hidden")
+        let visibilityFiltered = entries.filter { entry in
+            let hidden = isHidden(entry, hiddenIDs: hiddenIDs)
+            return selectedTags.contains(hiddenTag) ? hidden : !hidden
+        }
         let matchingEntries: [FeatureModelSelectorEntry]
         if selectedTags.isEmpty {
-            matchingEntries = entries
+            matchingEntries = visibilityFiltered
         } else {
-            let selectedStatusTags = selectedTags.intersection(statusFilterTags)
-            let requiredTags = selectedTags.subtracting(selectedStatusTags)
-            matchingEntries = entries.filter { entry in
+            let selectedStatusTags = selectedTags
+                .intersection(statusFilterTags)
+                .subtracting([hiddenTag])
+            let requiredTags = selectedTags.subtracting(statusFilterTags)
+            matchingEntries = visibilityFiltered.filter { entry in
                 let entryTags = Set(entry.filterTags)
                 guard requiredTags.isSubset(of: entryTags) else { return false }
                 if selectedStatusTags.isEmpty {
@@ -313,7 +365,8 @@ enum FeatureModelSelectorFiltering {
     static func toggledTags(
         current: Set<String>,
         tag: String,
-        entries: [FeatureModelSelectorEntry]
+        entries: [FeatureModelSelectorEntry],
+        hiddenIDs: Set<String> = []
     ) -> Set<String> {
         var next = current
         if next.contains(tag) {
@@ -327,7 +380,19 @@ enum FeatureModelSelectorFiltering {
             }
             next.insert(tag)
         }
-        return next.intersection(Set<String>(availableTags(entries: entries, selectedTags: next)))
+        return next.intersection(Set<String>(availableTags(
+            entries: entries,
+            selectedTags: next,
+            hiddenIDs: hiddenIDs
+        )))
+    }
+
+    private static func isHidden(
+        _ entry: FeatureModelSelectorEntry,
+        hiddenIDs: Set<String>
+    ) -> Bool {
+        !entry.filterTags.contains(localized("Installed"))
+            && ModelVisibilityStore.isModelHidden(entry.id, in: hiddenIDs)
     }
 }
 
@@ -363,6 +428,7 @@ private struct FeatureModelSelectorRow: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onConfigure: (() -> Void)?
+    let visibilityAction: ModelTableAction?
     let titleOverride: String?
     let showsEngine: Bool
     let showsTags: Bool
@@ -394,6 +460,7 @@ private struct FeatureModelSelectorRow: View {
         isSelected: Bool,
         onSelect: @escaping () -> Void,
         onConfigure: (() -> Void)? = nil,
+        visibilityAction: ModelTableAction? = nil,
         titleOverride: String? = nil,
         showsEngine: Bool = true,
         showsTags: Bool = true,
@@ -404,6 +471,7 @@ private struct FeatureModelSelectorRow: View {
         self.isSelected = isSelected
         self.onSelect = onSelect
         self.onConfigure = onConfigure
+        self.visibilityAction = visibilityAction
         self.titleOverride = titleOverride
         self.showsEngine = showsEngine
         self.showsTags = showsTags
@@ -502,6 +570,11 @@ private struct FeatureModelSelectorRow: View {
                     }
                     .buttonStyle(SettingsCompactActionButtonStyle())
                 }
+
+                if let visibilityAction {
+                    Button(visibilityAction.title, action: visibilityAction.handler)
+                        .buttonStyle(SettingsCompactActionButtonStyle())
+                }
             }
         }
         .padding(.horizontal, 12)
@@ -549,6 +622,7 @@ private struct FeatureModelSelectorGroupCard: View {
     let onToggle: () -> Void
     let onSelect: (FeatureModelSelectionID) -> Void
     let onConfigure: (FeatureModelSelectionID) -> Void
+    let visibilityActionForEntry: (FeatureModelSelectorEntry) -> ModelTableAction?
 
     var body: some View {
         groupContent
@@ -575,12 +649,13 @@ private struct FeatureModelSelectorGroupCard: View {
     }
 
     private var groupHeader: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                onToggle()
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    onToggle()
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center, spacing: 8) {
                     ModelLogoView(key: group.modelLogoKey, fallbackTitle: group.title, size: 18)
 
@@ -624,11 +699,13 @@ private struct FeatureModelSelectorGroupCard: View {
                 if !group.tags.isEmpty {
                     FeatureSelectorTagStrip(tags: group.tags)
                 }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
         }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -643,6 +720,7 @@ private struct FeatureModelSelectorGroupCard: View {
                         onConfigure: FeatureModelConfigurationRouting.canConfigure(entry.selectionID)
                             ? { onConfigure(entry.selectionID) }
                             : nil,
+                        visibilityAction: visibilityActionForEntry(entry),
                         titleOverride: entry.groupedVariantTitle,
                         showsEngine: false,
                         showsTags: false,
@@ -793,7 +871,7 @@ private enum FeatureSelectorTagPriority {
         [
             [localized("Local"), localized("Remote")],
             [localized("Fast"), localized("Balanced"), localized("Accurate"), localized("Realtime")],
-            [localized("Installed"), localized("Configured"), localized("In Use")]
+            [localized("Installed"), localized("Configured"), localized("In Use"), localized("Hidden")]
         ]
     }
 

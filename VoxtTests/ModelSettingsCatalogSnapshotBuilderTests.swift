@@ -71,15 +71,70 @@ final class ModelSettingsCatalogSnapshotBuilderTests: XCTestCase {
         XCTAssertEqual(snapshot.filteredEntries.map(\.id), ["configured-remote"])
     }
 
+    func testBuildHidesModelByDefaultAndShowsItWithHiddenFilter() {
+        let hiddenID = "local-hidden"
+        let hiddenIDs = Set([ModelVisibilityStore.modelKey(hiddenID)])
+
+        let defaultSnapshot = ModelSettingsCatalogSnapshotBuilder.build(
+            entries: [
+                makeEntry(id: hiddenID, filterTags: [localTag]),
+                makeEntry(id: "local-visible", filterTags: [localTag])
+            ],
+            selectedTags: [],
+            hiddenIDs: hiddenIDs
+        )
+        XCTAssertEqual(defaultSnapshot.filteredEntries.map(\.id), ["local-visible"])
+        XCTAssertTrue(defaultSnapshot.availableTags.contains(hiddenTag))
+
+        let hiddenSnapshot = ModelSettingsCatalogSnapshotBuilder.build(
+            entries: [
+                makeEntry(id: hiddenID, filterTags: [localTag]),
+                makeEntry(id: "local-visible", filterTags: [localTag])
+            ],
+            selectedTags: [hiddenTag],
+            hiddenIDs: hiddenIDs
+        )
+        XCTAssertEqual(hiddenSnapshot.filteredEntries.map(\.id), [hiddenID])
+    }
+
+    func testBuildRemovesAGroupWhenAllChildEntriesAreHidden() {
+        let first = makeEntry(id: "qwen3-small", title: "Qwen3 Small", engine: "MLX Audio", filterTags: [localTag])
+        let second = makeEntry(id: "qwen3-large", title: "Qwen3 Large", engine: "MLX Audio", filterTags: [localTag])
+        let snapshot = ModelSettingsCatalogSnapshotBuilder.build(
+            entries: [first, second],
+            selectedTags: [],
+            hiddenIDs: [
+                ModelVisibilityStore.modelKey(first.id),
+                ModelVisibilityStore.modelKey(second.id)
+            ]
+        )
+
+        XCTAssertTrue(snapshot.filteredEntries.isEmpty)
+        XCTAssertTrue(snapshot.displayItems.isEmpty)
+    }
+
+    func testInstalledEntryCannotBeHiddenByStoredVisibilityID() {
+        let installedID = "installed-model"
+        let snapshot = ModelSettingsCatalogSnapshotBuilder.build(
+            entries: [makeEntry(id: installedID, filterTags: [localTag, installedTag])],
+            selectedTags: [],
+            hiddenIDs: [ModelVisibilityStore.modelKey(installedID)]
+        )
+
+        XCTAssertEqual(snapshot.filteredEntries.map(\.id), [installedID])
+    }
+
     private func makeEntry(
         id: String,
+        title: String? = nil,
+        engine: String = "MLX",
         filterTags: [String],
         usageLocations: [String] = []
     ) -> ModelCatalogEntry {
         ModelCatalogEntry(
             id: id,
-            title: id,
-            engine: "MLX",
+            title: title ?? id,
+            engine: engine,
             sizeText: "",
             ratingText: "",
             filterTags: filterTags,
@@ -97,4 +152,5 @@ final class ModelSettingsCatalogSnapshotBuilderTests: XCTestCase {
     private var fastTag: String { AppLocalization.localizedString("Fast") }
     private var installedTag: String { AppLocalization.localizedString("Installed") }
     private var configuredTag: String { AppLocalization.localizedString("Configured") }
+    private var hiddenTag: String { AppLocalization.localizedString("Hidden") }
 }

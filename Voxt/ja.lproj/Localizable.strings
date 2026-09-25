@@ -1196,6 +1196,13 @@
 "Use different enhancement prompts for different apps or browser pages." = "アプリやブラウザページごとに異なる強化プロンプトを使います。";
 "Set the ASR and text model pairing used for rewrite mode, then tune the rewrite-specific prompt and follow-up shortcut." = "書き換えモードで使う ASR とテキストモデルの組み合わせを設定し、書き換え専用プロンプトと続き録音ショートカットを調整します。";
 "More" = "その他";
+"Hidden" = "非表示";
+"Hide" = "非表示";
+"Show" = "表示";
+"Hide Model" = "モデルを非表示";
+"Show Model" = "モデルを表示";
+"Hide Series" = "シリーズを非表示";
+"Show Series" = "シリーズを表示";
 "Move the shared translation language setting here so the behavior stays feature-local." = "共通の翻訳言語設定をここへ移し、機能ごとの設定として扱います。";
 "Multilingual" = "多言語";
 "Supports Primary Language" = "主言語に対応";

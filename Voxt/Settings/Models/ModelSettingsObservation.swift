@@ -148,6 +148,9 @@ extension ModelSettingsView {
             .onChange(of: selectedTags) { _, _ in
                 handleCatalogFilterSelectionChange()
             }
+            .onChange(of: hiddenModelVisibilityIDsRaw) { _, _ in
+                refreshCatalogSnapshot()
+            }
             .onChange(of: isActive) { _, _ in
                 handleModelSettingsVisibilityChange()
             }

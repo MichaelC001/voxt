@@ -139,6 +139,35 @@ final class FeatureModelSelectorFilteringTests: XCTestCase {
         XCTAssertEqual(availableTags, [localized("Local"), localized("Fast")])
     }
 
+    func testHiddenEntriesAreExcludedByDefaultAndAvailableWithHiddenFilter() {
+        let hiddenEntry = makeEntry(
+            id: .localLLM("hidden"),
+            filterTags: [localized("Local"), localized("Fast")]
+        )
+        let visibleEntry = makeEntry(
+            id: .localLLM("visible"),
+            filterTags: [localized("Local"), localized("Fast")]
+        )
+        let hiddenIDs = Set([ModelVisibilityStore.modelKey(hiddenEntry.id)])
+
+        XCTAssertEqual(
+            FeatureModelSelectorFiltering.filteredEntries(
+                entries: [hiddenEntry, visibleEntry],
+                selectedTags: [],
+                hiddenIDs: hiddenIDs
+            ).map(\.id),
+            [visibleEntry.id]
+        )
+        XCTAssertEqual(
+            FeatureModelSelectorFiltering.filteredEntries(
+                entries: [hiddenEntry, visibleEntry],
+                selectedTags: [localized("Hidden")],
+                hiddenIDs: hiddenIDs
+            ).map(\.id),
+            [hiddenEntry.id]
+        )
+    }
+
     private func makeEntry(
         id: FeatureModelSelectionID,
         filterTags: [String],
