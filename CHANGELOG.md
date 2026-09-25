@@ -6,6 +6,35 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.0-beta.3] - 2026-09-25
+
+### English
+
+#### Changed
+- Added model visibility controls and a Hidden filter for unused models in model settings and feature selectors.
+- Moved the Settings entry into the settings sidebar for clearer navigation.
+
+#### Fixed
+- Reduced the delay before system audio is muted after the wake-up sound finishes.
+
+### 简体中文
+
+#### 改进
+- 模型设置和功能模型选择器支持隐藏暂时不用的模型，并可通过“已隐藏”筛选查看。
+- 将“设置”入口移入设置侧边栏，让导航更清晰。
+
+#### 修复
+- 缩短唤醒提示音播放完成后系统音频静音的等待时间，减少录音启动延迟。
+
+### 日本語
+
+#### 変更
+- モデル設定と機能モデル選択画面で、使用しないモデルを非表示にし、「非表示」フィルターで確認できるようにしました。
+- 「設定」項目を設定サイドバーに移動し、ナビゲーションを分かりやすくしました。
+
+#### 修正
+- ウェイクアップ音の再生終了後にシステム音声をミュートするまでの遅延を短縮しました。
+
 ## [1.15.0-beta.2] - 2026-09-24
 
 ### English
