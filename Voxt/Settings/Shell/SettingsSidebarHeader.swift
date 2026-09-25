@@ -52,7 +52,8 @@ struct SettingsSidebarHeader: View {
                 Button(action: onReturnToRoot) {
                     SettingsSidebarBackIcon()
                         .frame(width: 16, height: 16)
-                        .frame(width: 26, height: headerBadgeHeight)
+                        .padding(.horizontal, 15)
+                        .frame(height: headerBadgeHeight)
                         .contentShape(Capsule(style: .continuous))
                 }
                 .buttonStyle(SettingsSidebarHeaderBackButtonStyle())

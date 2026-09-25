@@ -26,7 +26,6 @@ struct SettingsSidebar: View {
     let onTapNotification: () -> Void
     let onTapWebsite: () -> Void
     let onTapFeedback: () -> Void
-    let onTapSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -159,8 +158,7 @@ struct SettingsSidebar: View {
                     onTapWebsite: onTapWebsite,
                     onTapNotification: onTapNotification,
                     hasUnreadNotification: hasUnreadNotification,
-                    onTapFeedback: onTapFeedback,
-                    onTapSettings: onTapSettings
+                    onTapFeedback: onTapFeedback
                 )
             }
             .frame(maxWidth: .infinity)
@@ -263,6 +261,13 @@ private struct SettingsSidebarMenuPager: View {
                     action: { onSelectTab(tab) }
                 )
             }
+
+            SettingsSidebarTabButton(
+                iconKind: .settings,
+                title: "Settings",
+                isActive: false,
+                action: { onSelectTab(.general) }
+            )
         }
     }
 

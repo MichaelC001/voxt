@@ -317,18 +317,6 @@ struct SettingsView: View {
                 },
                 onTapFeedback: {
                     isFeedbackDialogPresented = true
-                },
-                onTapSettings: {
-                    navigationRequest = nil
-                    if sidebarMode == .settings {
-                        sidebarMode = .root
-                        if Self.isSettingsTab(selectedTab) {
-                            selectedTab = .report
-                        }
-                    } else {
-                        sidebarMode = .settings
-                        selectedTab = .general
-                    }
                 }
             )
             .frame(width: SettingsUIStyle.sidebarWidth)

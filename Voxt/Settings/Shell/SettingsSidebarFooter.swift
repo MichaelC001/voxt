@@ -6,7 +6,6 @@ struct SettingsSidebarInfoBlock: View {
     let onTapNotification: () -> Void
     let hasUnreadNotification: Bool
     let onTapFeedback: () -> Void
-    let onTapSettings: () -> Void
 
     var body: some View {
         HStack(spacing: 6) {
@@ -49,14 +48,6 @@ struct SettingsSidebarInfoBlock: View {
                 .buttonStyle(SettingsSidebarInfoIconButtonStyle())
                 .accessibilityLabel(AppLocalization.localizedString("Feedback"))
                 .help(AppLocalization.localizedString("Feedback"))
-
-                Button(action: onTapSettings) {
-                    SettingsSidebarIconView(kind: .settings)
-                        .frame(width: 14, height: 14)
-                }
-                .buttonStyle(SettingsSidebarInfoIconButtonStyle())
-                .accessibilityLabel(AppLocalization.localizedString("Settings"))
-                .help(AppLocalization.localizedString("Settings"))
             }
         }
         .padding(.vertical, 4)
