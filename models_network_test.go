@@ -103,7 +103,7 @@ func TestNetworkUseTheirs(t *testing.T) {
 		s.Family.Conflicts = []string{actnow.KeyProxy}
 	})
 	a.navigate(modelsPath)
-	click(t, tt, "Network…")
+	click(t, tt, "Network")
 	if !has(tt, "Other ActNow apps use a different proxy.") || has(tt, "Other ActNow apps use a different download source.") {
 		t.Fatalf("no notice: %q", tt.Texts())
 	}

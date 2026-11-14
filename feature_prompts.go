@@ -31,7 +31,6 @@ func (a *app) translateSettings(c *ui.Context) {
 	t := c.Theme()
 	u := a.fui(hotkey.Translate)
 	f := &a.prefs.Features.Translate
-	sectionTitle(c, i18n.T("Translation"))
 	opts := []string{i18n.T("Automatic: %s", uitext.TargetLanguageLabel(session.TranslateTarget(settings.Settings{General: a.prefs.General}, i18n.Locale(), "")))}
 	for _, code := range compose.TargetLanguages {
 		opts = append(opts, uitext.TargetLanguageLabel(code))
@@ -74,7 +73,6 @@ func (a *app) translateSettings(c *ui.Context) {
 // answer shows in the answer card (Voxt's), nothing to choose there.
 func (a *app) rewriteSettings(c *ui.Context) {
 	f := &a.prefs.Features.Rewrite
-	sectionTitle(c, i18n.T("Rewriting"))
 	settingRow(c, "rw-cleanup", i18n.T("Clean up the instruction"),
 		i18n.T("Reads past fillers, false starts and corrections in what you say (\"shorter, no, more formal\"). It never changes the selected text by itself."), func() {
 			if ui.Switch(c.Key("rw-cleanup-switch"), &f.Cleanup).Label(i18n.T("Clean up the instruction")).Changed() {

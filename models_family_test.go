@@ -79,7 +79,7 @@ func TestModelDeleteShared(t *testing.T) {
 	}
 
 	// Remove from VoxtMini: the claim goes, the files stay for AudioSmith.
-	click(t, tt, "Delete Fast speech recognition…")
+	chooseMenu(t, tt, "More actions for Fast speech recognition", "Delete")
 	if !has(tt, `Remove "Fast speech recognition" from VoxtMini?`) ||
 		!has(tt, "AudioSmith also uses this model, so its files (712.8 MB) stay on this Mac.") {
 		t.Fatalf("no family dialog: %q", tt.Texts())
@@ -95,8 +95,8 @@ func TestModelDeleteShared(t *testing.T) {
 	// Delete for all apps…: asks again, then the files go and AudioSmith
 	// finds a tombstone.
 	useModels(t, a, models.ASRFast)
-	click(t, tt, "Delete Fast speech recognition…")
-	click(t, tt, "Delete for all apps…")
+	chooseMenu(t, tt, "More actions for Fast speech recognition", "Delete")
+	click(t, tt, "Delete for all apps")
 	if !has(tt, `Delete "Fast speech recognition" for all apps?`) || !has(tt, "AudioSmith will need to download it again (712.8 MB).") {
 		t.Fatalf("no second confirmation: %q", tt.Texts())
 	}
@@ -120,7 +120,7 @@ func TestModelDeleteCancelShared(t *testing.T) {
 	if !has(tt, "Shared with AudioSmith and Dicta") {
 		t.Fatalf("no Shared with: %q", tt.Texts())
 	}
-	click(t, tt, "Delete Translation model…")
+	chooseMenu(t, tt, "More actions for Translation model", "Delete")
 	if !has(tt, "AudioSmith and Dicta also use this model, so its files (1.1 GB) stay on this Mac.") {
 		t.Fatalf("dialog: %q", tt.Texts())
 	}
@@ -143,7 +143,7 @@ func TestModelDeleteBusy(t *testing.T) {
 	}
 	defer lock.Release()
 	a.navigate(modelsPath)
-	click(t, tt, "Delete Fast speech recognition…")
+	chooseMenu(t, tt, "More actions for Fast speech recognition", "Delete")
 	click(t, tt, "Delete Fast speech recognition")
 	if msg := "AudioSmith is downloading or using this model. Try again later."; !toasted(a, tt, msg) {
 		t.Errorf("no toast %q: %q", msg, tt.Texts())
@@ -279,7 +279,7 @@ func TestBorrowedModel(t *testing.T) {
 	if st := a.models.Status(models.LLMQwen3); !st.Installed || !st.Mine || !has(tt, "Shared with Dicta") {
 		t.Fatalf("used: %+v %q", st, tt.Texts())
 	}
-	click(t, tt, "Remove "+name+"…")
+	chooseMenu(t, tt, "More actions for "+name, "Remove")
 	if !has(tt, fmt.Sprintf("Remove %q from VoxtMini?", name)) {
 		t.Fatalf("dialog: %q", tt.Texts())
 	}

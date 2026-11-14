@@ -58,10 +58,10 @@ func (a *app) catHeader(c *ui.Context, it dictItem) {
 		}
 		cat := it.cat
 		moreMenu(c.Key("cat-more"), i18n.T("Actions of %s", cat.Name), func(m *ui.Menu) {
-			if m.Item(i18n.T("Rename…")).Chosen() {
+			if m.Item(i18n.T("Rename")).Chosen() {
 				a.openCategory(cat)
 			}
-			if m.Item(i18n.T("Delete…")).Chosen() {
+			if m.Item(i18n.T("Delete")).Chosen() {
 				d.catDel, d.delCat = true, cat
 			}
 		})

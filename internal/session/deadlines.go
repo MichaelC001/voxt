@@ -14,13 +14,24 @@ import (
 // pressure (about 100 tokens a second on mac-air, docs/eval.md).
 const llmPrefillPerChar = 5 * time.Millisecond
 
+// ThinkFactor stretches the first-token and whole deadlines of a request
+// to a model that thinks before it answers (Model.Thinks: its Thinking
+// switch, behavior.md 3.31a): the thought comes first and takes about
+// as long again as the answer's budget (llmrt.ThinkTokens) allows.
+const ThinkFactor = 3
+
 // llmDeadlines is a request over an input of chars characters, its
 // deadlines set (Config.LLMFirstToken…; behavior.md 5.5); its whole time
-// is at least floor.
-func (cfg *Config) llmDeadlines(req llm.Request, chars int, floor time.Duration) llm.Request {
+// is at least floor. A model that thinks gets ThinkFactor times the
+// first-token and whole deadlines (the stall stays: the thought streams).
+func (cfg *Config) llmDeadlines(req llm.Request, chars int, floor time.Duration, thinks bool) llm.Request {
 	req.FirstTokenTimeout = cfg.LLMFirstToken + time.Duration(chars)*llmPrefillPerChar
 	req.StallTimeout = cfg.LLMStall
 	req.Timeout = max(floor, req.FirstTokenTimeout+time.Duration(chars)*cfg.LLMPerChar)
+	if thinks {
+		req.FirstTokenTimeout *= ThinkFactor
+		req.Timeout *= ThinkFactor
+	}
 	return req
 }
 

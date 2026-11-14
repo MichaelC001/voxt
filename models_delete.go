@@ -5,7 +5,7 @@ package main
 // would do (models.Manager.Decide, off the main thread). When no other
 // app uses the model, the usual confirmation deletes it; when one does,
 // "Remove from VoxtMini" (the default) drops VoxtMini's claim and keeps
-// the files for it, and "Delete for all apps…" asks once more, then
+// the files for it, and "Delete for all apps" asks once more, then
 // deletes the files whoever uses them (the others see a tombstone). The
 // model's runtime lets it go first (local.Library.Delete).
 
@@ -25,7 +25,7 @@ type sharedDelete struct {
 	id    string
 	apps  []string // the other apps' names
 	bytes int64    // its files
-	// forAll: the second step, "Delete for all apps…" confirming.
+	// forAll: the second step, "Delete for all apps" confirming.
 	forAll bool
 }
 
@@ -184,7 +184,7 @@ func (a *app) modelSharedDialog(c *ui.Context) {
 			if ui.Button(c.Key("model-shared-cancel"), i18n.T("Cancel")).Clicked() {
 				a.modelShared = nil
 			}
-			if ui.Button(c.Key("model-shared-all"), i18n.T("Delete for all apps…")).Clicked() {
+			if ui.Button(c.Key("model-shared-all"), i18n.T("Delete for all apps")).Clicked() {
 				next := *sd
 				next.forAll = true
 				a.modelShared = &next

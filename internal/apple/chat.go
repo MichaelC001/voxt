@@ -24,7 +24,8 @@ const MaxAnswer = 2048
 // request, its deltas on the caller's goroutine. llm.Client wraps it
 // (Services.LLM): JSON repair, thinking stripped.
 type Chat struct {
-	h Caller
+	h      Caller
+	params func() Params // the user's settings; nil: none
 }
 
 var _ llm.Backend = (*Chat)(nil)
@@ -59,15 +60,19 @@ func (c *Chat) Chat(ctx context.Context, req llm.Request) (llm.Response, error) 
 	if len(p.Messages) == 0 {
 		return llm.Response{}, &llm.Error{Code: llm.CodeBadRequest, Params: map[string]string{"provider": IntelligenceID, "status": "0", "detail": "no messages"}}
 	}
-	budget, ok := Budget(prompt, req.MaxTokens)
-	if !ok {
-		return llm.Response{}, &llm.Error{Code: llm.CodeContextLength, Params: map[string]string{"provider": IntelligenceID, "model": IntelligenceID}}
-	}
-	p.MaxTokens = budget
+	want := req.MaxTokens
 	t := llm.DefaultTemperature(req.Skill)
 	if req.Temperature != nil {
 		t = *req.Temperature
 	}
+	if c.params != nil {
+		c.params().apply(&t, &want)
+	}
+	budget, ok := Budget(prompt, want)
+	if !ok {
+		return llm.Response{}, &llm.Error{Code: llm.CodeContextLength, Params: map[string]string{"provider": IntelligenceID, "model": IntelligenceID}}
+	}
+	p.MaxTokens = budget
 	p.Temperature = &t
 
 	start := time.Now()

@@ -114,3 +114,6 @@ uitext providers
 helper procio
 llmrt procio
 procio core
+omni knobs
+llmrt knobs
+apple knobs

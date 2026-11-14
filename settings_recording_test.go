@@ -49,14 +49,14 @@ func TestRecordingSwitches(t *testing.T) {
 	if !a.hotkeyPlan().Configure(true).PassEscape {
 		t.Error("Escape still cancels")
 	}
-	// The feature pages' shortcut tip no longer says so.
+	// The feature pages' tip no longer says so.
 	a.navigate("/transcribe")
 	frames(tt)
-	if _, ok := tt.Find("Tap: press to start, press again to stop. Double tap: press twice quickly. Long press: record while you hold the keys. Escape cancels."); ok {
-		t.Error("the shortcuts' tip still says Escape cancels")
+	if _, ok := tt.Find("Press a shortcut anywhere and speak: the text is typed at your cursor. Esc cancels a recording."); ok {
+		t.Error("the page's tip still says Esc cancels")
 	}
-	if _, ok := tt.Find("Tap: press to start, press again to stop. Double tap: press twice quickly. Long press: record while you hold the keys."); !ok {
-		t.Error("no shortcuts' tip")
+	if _, ok := tt.Find("Press a shortcut anywhere and speak: the text is typed at your cursor."); !ok {
+		t.Error("no page tip")
 	}
 	a.navigate("/settings/shortcuts")
 	frames(tt)
@@ -66,7 +66,7 @@ func TestRecordingSwitches(t *testing.T) {
 		t.Fatalf("end word %q", a.settingsForm.endChoice)
 	}
 	// A word of one's own.
-	a.settingsForm.endChoice = "Custom…"
+	a.settingsForm.endChoice = "Custom"
 	a.settingsForm.endCustom, a.settingsForm.endWord = true, "roger that"
 	a.updateSettings(func(s *settings.Settings) { s.Features.EndCommand.Word = "roger  that " })
 	if w := session.EndWord(a.settings.Get(), "en"); w != "roger that" || !a.settingsForm.endCustom || a.settingsForm.endWord != "roger that" {

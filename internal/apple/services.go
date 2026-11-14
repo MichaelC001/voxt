@@ -26,9 +26,10 @@ type Config struct {
 
 // Services are the local models and Apple's. Goroutine-safe.
 type Services struct {
-	cfg Config
-	mu  sync.Mutex
-	st  Status
+	cfg    Config
+	mu     sync.Mutex
+	st     Status
+	params Params // SetParams
 }
 
 var _ local.Services = (*Services)(nil)
@@ -154,5 +155,5 @@ func (s *Services) LLM(ctx context.Context, id string) (local.Chat, local.Model,
 	if m.ID != IntelligenceID {
 		return s.cfg.Local.LLM(ctx, m.ID)
 	}
-	return &llm.Client{Backend: &Chat{h: s.cfg.Helper}, Retry: llm.RetryPolicy{MaxAttempts: 1}}, m, nil
+	return &llm.Client{Backend: &Chat{h: s.cfg.Helper, params: s.paramsNow}, Retry: llm.RetryPolicy{MaxAttempts: 1}}, m, nil
 }

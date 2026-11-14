@@ -20,7 +20,7 @@ import (
 func TestOverlayStyleSettings(t *testing.T) {
 	a, _, tt := newTestApp(t)
 	a.navigate("/settings/overlay")
-	if !has(tt, "Preview") {
+	if !has(tt, "Position") {
 		t.Fatalf("section: %q", firstTexts(tt))
 	}
 	if _, ok := tt.Find("Preview of the overlay"); !ok {

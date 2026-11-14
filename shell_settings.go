@@ -165,8 +165,8 @@ func (a *app) settingsChanged(old, new settings.Settings) {
 	if old.Models.KeepLoaded != new.Models.KeepLoaded {
 		a.applyKeepLoaded(new.Models) // models_keep.go
 	}
-	if !reflect.DeepEqual(old.Models.LLMParams, new.Models.LLMParams) {
-		a.applyLLMParams(new.Models) // models_llm_params.go
+	if !reflect.DeepEqual(old.Models.Params, new.Models.Params) {
+		a.applyModelParams(new.Models) // models_settings.go
 	}
 	a.historySettingsChanged(old, new) // history_settings_ops.go
 	// The problems' cards: the language of their text may have changed

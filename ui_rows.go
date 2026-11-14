@@ -65,7 +65,7 @@ func sectionTitleTip(c *ui.Context, title, tip string) {
 }
 
 // sectionTitleAdd is sectionTitleTip with a small Add button on the
-// right of its row, for a card of items below it (shortcuts, apps), so
+// right of its row, for a card of items below it (App enhancement's apps), so
 // the card holds only its items. It reports a click.
 //
 // The row is as wide as the card. As the title starts on the card's left

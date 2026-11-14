@@ -78,7 +78,7 @@ func (r *run) cleanUp(text string) (string, string, error) {
 	for i, p := range parts {
 		draft := newDrafter(r, parts[:i+1], answers)
 		req := llm.Request{Messages: llmMessages(p.Output), Skill: llm.SkillTranscribeEnhance, OnDelta: draft.add}
-		resp, err := r.llmChat(r.m.cfg.llmDeadlines(req, utf8.RuneCountInString(p.Text), r.m.cfg.LLMTimeout))
+		resp, err := r.llmChat(r.m.cfg.llmDeadlines(req, utf8.RuneCountInString(p.Text), r.m.cfg.LLMTimeout, r.svc.LLMInfo.Thinks))
 		switch {
 		case r.ctx.Err() != nil:
 			return text, p.Profile(), r.ctx.Err()

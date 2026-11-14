@@ -30,7 +30,7 @@ func (a *app) loadRecordingForm() {
 		f.endChoice = word
 		return
 	}
-	f.endChoice, f.endWord = i18n.T("Custom…"), word
+	f.endChoice, f.endWord = i18n.T("Custom"), word
 }
 
 // recordingSettings is the section.
@@ -54,7 +54,7 @@ func (a *app) recordingSettings(c *ui.Context) {
 		return
 	}
 	settingRow(c, "end-word", i18n.T("End word"), "", func() {
-		custom := i18n.T("Custom…")
+		custom := i18n.T("Custom")
 		opts := append(slices.Clone(session.EndWords), custom)
 		if ui.Select(c.Key("end-word-select"), &f.endChoice, opts).Label(i18n.T("End word")).Width(px(t, 140)).Changed() {
 			if f.endChoice == custom {

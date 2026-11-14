@@ -48,7 +48,7 @@ func (a *app) commands() []command {
 	add("logs-panel", view, i18n.T("Show or hide the logs panel"), "Show or hide the logs panel", "⇧⌘L", true, func() { a.logsPanel = !a.logsPanel })
 	add("shortcuts", view, i18n.T("Keyboard shortcuts"), "Keyboard shortcuts", "?", true, func() { a.sheetOpen = true })
 	add("helper-restart", view, i18n.T("Restart the helper"), "Restart the helper", "", true, a.restartHelper)
-	add("check-updates", view, i18n.T("Check for Updates…"), "Check for Updates", "", a.upd != nil, a.checkForUpdates)
+	add("check-updates", view, i18n.T("Check for Updates"), "Check for Updates", "", a.upd != nil, a.checkForUpdates)
 	add("setup-guide", view, i18n.T("Open the setup guide"), "Open the setup guide onboarding", "", true, a.openOnboarding)
 
 	look := i18n.T("Appearance")
@@ -179,7 +179,7 @@ func (a *app) palette(c *ui.Context) {
 			// A text input rather than ui.SearchField, whose placeholder
 			// is not translated; Escape closes the palette.
 			search := ui.TextInputBase(c.Key("palette-search"), &a.paletteQuery).AutoFocus().Grow(1).FontSize(px(t, 15)).
-				Placeholder(i18n.T("Type a command or a page…")).Label(i18n.T("Search commands"))
+				Placeholder(i18n.T("Type a command or a page")).Label(i18n.T("Search commands"))
 			if search.Changed() {
 				a.paletteSel = 0
 			}
@@ -323,7 +323,7 @@ func (a *app) buildMenu() {
 	mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "VoxtMini", Submenu: append(appItems,
 			mygo.Separator(),
-			&mygo.MenuItem{Label: i18n.T("Settings…"), Accelerator: "CmdOrCtrl+,", Click: act(func() { a.navigate("/settings") })},
+			&mygo.MenuItem{Label: i18n.T("Settings"), Accelerator: "CmdOrCtrl+,", Click: act(func() { a.navigate("/settings") })},
 			mygo.Separator(),
 			&mygo.MenuItem{Role: mygo.RoleServices, Label: i18n.T("Services")},
 			mygo.Separator(),

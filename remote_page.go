@@ -190,7 +190,7 @@ func (a *app) providerCard(c *ui.Context, kind providers.Kind, pr providers.Pres
 	hidden := a.prefs.Models.IsHidden(hideKey)
 	b := ui.ButtonBase(c.Key("rm-card-"+acc)).Width(w).Padding(px(t, sp3), px(t, sp4)).Radius(px(t, radiusCard)).Border(1, k.Line).
 		Label(name).Tooltip(i18n.T("Set up %s", name)).AlignItems(ui.Stretch).Shrink(0).
-		ContextMenu(func(m *ui.Menu) { a.hideMenu(m, hideKey, name) }) // models_hide.go
+		ContextMenu(func(m *ui.Menu) { a.providerMenu(m, kind, pr.ID, p, configured, missing, hideKey, name) })
 	if hidden {
 		b.Opacity(0.6)
 	}
@@ -199,49 +199,47 @@ func (a *app) providerCard(c *ui.Context, kind providers.Kind, pr providers.Pres
 	}
 	b.Children(func() {
 		ui.Column(c).Gap(px(t, 6)).Grow(1).MinWidth(0).Children(func() {
-			// A long name takes two lines; the dot and the chip stay on the first.
-			ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Start).MinHeight(px(t, 22)).Children(func() {
-				ui.Row(c).Height(px(t, 22)).AlignItems(ui.Center).Shrink(0).Children(func() { statusDot(c, dot) })
-				ui.Text(c, name).FontWeight(600).Grow(1).MinWidth(0).MaxLines(2).Ellipsis("…").Margin(px(t, 2), 0, 0, 0)
-				ui.Row(c).Height(px(t, 22)).AlignItems(ui.Center).Gap(px(t, sp1)).Shrink(0).Children(func() {
-					if hidden {
-						tagChip(c, i18n.T("Hidden"))
-					}
-					tagChip(c, uitext.ModeLabel(pr))
+			// The name on one line (all of it in the tooltip), then ⋯.
+			ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).MinHeight(px(t, 22)).Children(func() {
+				statusDot(c, dot)
+				truncText(c, name).FontWeight(600).Grow(1).Shrink(1)
+				if hidden {
+					tagChip(c, i18n.T("Hidden"))
+				}
+				moreMenu(c.Key("rm-more-"+acc), i18n.T("More actions for %s", name), func(m *ui.Menu) {
+					a.providerMenu(m, kind, pr.ID, p, configured, missing, hideKey, name)
 				})
 			})
 			model := providers.Model(kind, p)
 			if model == "" {
 				model = i18n.T("Model not chosen")
 			}
-			truncText(c, model).FontSize(px(t, fsCaption)).TextColor(k.Text2)
-			if !configured {
-				return // the rest shows once it is set up
-			}
-			ui.Row(c).Gap(px(t, sp1)).AlignItems(ui.Center).Height(px(t, 30)).Children(func() {
+			// One caption line: the mode, the model, then (set up) its key
+			// (an icon; its mask in the tooltip, a problem in words) and its
+			// test's result or what is missing.
+			ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).MinHeight(px(t, 20)).Children(func() {
+				tagChip(c, uitext.ModeLabel(pr))
+				truncText(c, model).FontSize(px(t, fsCaption)).TextColor(k.Text2).Shrink(1)
+				ui.Box(c).Grow(1)
+				if !configured {
+					return // the rest shows once it is set up
+				}
 				mask, read := a.keyMask(acc)
-				keyText, keyCol := mask, k.Text2
 				switch {
 				case mask != "":
+					iconMark(c.Key("rm-key-"+acc), icons.KeyMinimalisticSquare, k.Text2, mask)
 				case !read:
-					keyText = "…"
 				case a.rmKeyErr[acc] != "":
-					keyText, keyCol = i18n.T("Could not read the key"), k.Warning
+					statusMark(c, icons.KeyMinimalisticSquare, k.Warning, i18n.T("Could not read the key")).Shrink(1)
 				case missing == providers.MissingKey:
-					keyText, keyCol = i18n.T("No key"), k.Warning
+					statusMark(c, icons.KeyMinimalisticSquare, k.Warning, i18n.T("No key")).Shrink(0)
 				default:
-					keyText, keyCol = i18n.T("No key needed"), k.Text3
+					iconMark(c.Key("rm-key-"+acc), icons.KeyMinimalisticSquare, k.Text3, i18n.T("No key needed"))
 				}
-				ui.Icon(c, icons.KeyMinimalisticSquare.Linear).Size(px(t, 14), px(t, 14)).TextColor(keyCol).Shrink(0)
-				ui.Text(c, keyText).FontSize(px(t, fsCaption)).TextColor(keyCol).SingleLine().Ellipsis("…").MinWidth(0).Grow(1)
 				switch missing {
 				case "":
 					if tr, ok := a.rmTests[acc]; ok {
 						testStatus(c, tr, false)
-					}
-					tr := a.rmTests[acc]
-					if ghostButton(c.Key("rm-test-"+acc), i18n.T("Test")).Label(i18n.T("Test %s", name)).Disabled(tr.running).Clicked() {
-						a.testProvider(kind, p)
 					}
 				case providers.MissingKey:
 				default:
@@ -253,6 +251,24 @@ func (a *app) providerCard(c *ui.Context, kind providers.Kind, pr providers.Pres
 	if b.Clicked() {
 		a.openProviderDialog(kind, pr.ID)
 	}
+}
+
+// providerMenu is a service card's ⋯ and context menu: its dialog,
+// a connection test once it is set up, hiding it.
+func (a *app) providerMenu(m *ui.Menu, kind providers.Kind, id string, p settings.Provider, configured bool, missing, hideKey, name string) {
+	label := i18n.T("Set up")
+	if configured {
+		label = i18n.T("Settings")
+	}
+	if m.Item(label).Chosen() {
+		a.openProviderDialog(kind, id)
+	}
+	if configured && missing == "" {
+		if m.Item(i18n.T("Test")).Disabled(a.rmTests[providers.Account(kind, id)].running).Chosen() {
+			a.testProvider(kind, p)
+		}
+	}
+	a.hideMenu(m, hideKey, name) // models_hide.go
 }
 
 // remoteProxy is the family's network.proxy rule now (any goroutine:

@@ -19,13 +19,18 @@ import (
 	fammodels "github.com/hehehai/actnowkit/models"
 )
 
-// modelCard is one model: what it is good at, its languages, its size
-// and state, and what can be done with it; dimmed while hidden.
+// modelCard is one model, about three short lines: its name with its
+// chips and marks (shared with other apps, loaded: an icon with a
+// tooltip), what it is good at (one line, all of it in the tooltip), and
+// its series and size. The one button is what its state needs
+// (Download, Cancel, Use it); the rest is in ⋯ and the context menu.
+// Dimmed while hidden.
 func (a *app) modelCard(c *ui.Context, m models.Model) {
 	t := c.Theme()
 	k := tok(t)
 	st := a.modelStatus[m.ID]
 	hidden := a.prefs.Models.IsHidden(m.ID)
+	name := uitext.ModelName(m.ID)
 	ic := icons.Soundwave
 	if m.Kind == models.LLM {
 		ic = icons.ChatRoundLine
@@ -34,41 +39,36 @@ func (a *app) modelCard(c *ui.Context, m models.Model) {
 	if hidden {
 		el.Opacity(0.6)
 	}
-	el.ContextMenu(func(mn *ui.Menu) { a.hideMenu(mn, m.ID, uitext.ModelName(m.ID)) }) // models_hide.go
+	el.ContextMenu(func(mn *ui.Menu) { a.modelMenu(mn, m, st) })
 	el.Children(func() {
 		ui.Row(c).Gap(px(t, sp3)).AlignItems(ui.Start).Children(func() {
 			ui.Icon(c, ic.Linear).Size(px(t, 20), px(t, 20)).TextColor(k.Text2).Shrink(0).Margin(px(t, 1), 0, 0, 0)
-			ui.Column(c).Grow(1).MinWidth(0).Gap(px(t, sp1)).Children(func() {
+			ui.Column(c).Grow(1).MinWidth(0).Gap(px(t, 2)).Children(func() {
+				// The name, its marks, then its chips (they wrap under it in a
+				// narrow window rather than cut the name).
 				ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Wrap().Children(func() {
-					ui.Text(c, uitext.ModelName(m.ID)).FontWeight(600)
-					modelChips(c, m, st, hidden)
-				})
-				if uitext.ModelName(m.ID) != m.Title { // the plain name of a recommended model: its own below
-					caption(c.Key("title"), m.Title)
-				}
-				ui.Text(c, uitext.ModelAbout(m.ID))
-				size, family := modelSizeText(m, st), modelFamilyText(m, st)
-				if st.Downloading && st.WaitingFor != "" { // "Downloading in AudioSmith… 43%" says it all
-					size, family = family, ""
-				}
-				if family != "" {
-					caption(c.Key("family"), family)
-				}
-				ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Wrap().Children(func() {
-					caption(c, size)
+					ui.Text(c, name).FontWeight(600)
+					if fam := modelFamilyText(m, st); fam != "" && !modelFamilyBusy(st) {
+						mark := icons.UsersGroupRounded
+						if !st.Downloading && !st.OnDisk && st.DeletedBy != "" {
+							mark = icons.TrashBinMinimalistic
+						}
+						iconMark(c.Key("family"), mark, k.Text2, fam)
+					}
 					if mem, ok := a.modelMem[m.ID]; ok && st.Installed { // models_memory.go
-						ui.Row(c.Key("loaded")).Gap(px(t, 6)).AlignItems(ui.Center).Children(func() {
+						text := modelMemText(mem)
+						ui.Box(c.Key("loaded")).Size(px(t, 16), px(t, 16)).Center().Label(text).Tooltip(text).Shrink(0).Children(func() {
 							statusDot(c, k.Accent)
-							caption(c, modelMemText(mem))
 						})
 					}
+					modelChips(c, m, st, hidden)
 				})
+				truncText(c, uitext.ModelAbout(m.ID))
+				truncText(c.Key("series"), modelSeriesText(m, st)).FontSize(px(t, fsCaption)).TextColor(k.Text2)
 			})
 			ui.Row(c.Key("actions")).Gap(px(t, sp2)).Shrink(0).AlignItems(ui.Center).Children(func() {
 				a.modelActions(c, m, st)
-				moreMenu(c.Key("more"), i18n.T("More actions for %s", uitext.ModelName(m.ID)), func(mn *ui.Menu) {
-					a.hideMenu(mn, m.ID, uitext.ModelName(m.ID))
-				})
+				moreMenu(c.Key("more"), i18n.T("More actions for %s", name), func(mn *ui.Menu) { a.modelMenu(mn, m, st) })
 			})
 		})
 		if st.Downloading {
@@ -76,7 +76,7 @@ func (a *app) modelCard(c *ui.Context, m models.Model) {
 			if st.Total > 0 {
 				frac = float64(st.Done) / float64(st.Total)
 			}
-			ui.Progress(c, frac).Label(i18n.T("Downloading %s", uitext.ModelName(m.ID)))
+			ui.Progress(c, frac).Label(i18n.T("Downloading %s", name))
 		}
 		if st.Err != nil && !st.Downloading {
 			msg, more := uitext.DownloadErrorText(st.Err)
@@ -87,6 +87,51 @@ func (a *app) modelCard(c *ui.Context, m models.Model) {
 			}, nil)
 		}
 	})
+}
+
+// modelSeriesText is the card's caption: the model's series when its
+// name is a plain one ("Qwen3.5 4B OptiQ · 4-bit"), then its size or
+// its download's state.
+func modelSeriesText(m models.Model, st models.Status) string {
+	size := modelSizeText(m, st)
+	if modelFamilyBusy(st) { // "Downloading in AudioSmith… 43%" says it all
+		size = modelFamilyText(m, st)
+	}
+	if uitext.ModelName(m.ID) == m.Title {
+		return size
+	}
+	return m.Title + " · " + size
+}
+
+// modelFamilyBusy: another app downloads the model, which the caption
+// says instead of the size.
+func modelFamilyBusy(st models.Status) bool {
+	return st.Downloading && st.WaitingFor != "" || !st.Downloading && !st.OnDisk && st.Elsewhere != ""
+}
+
+// modelMenu is a card's ⋯ and context menu: its Settings, deleting
+// what it downloaded or the model, hiding it.
+func (a *app) modelMenu(mn *ui.Menu, m models.Model, st models.Status) {
+	if st.Installed && modelKnobs(m.ID) != nil {
+		if mn.Item(i18n.T("Settings")).Chosen() {
+			a.openModelSettings(m.ID) // models_settings_view.go
+		}
+	}
+	switch {
+	case st.Installed:
+		label := i18n.T("Delete")
+		if m.Borrowed { // the files are the other app's: VoxtMini lets go of it
+			label = i18n.T("Remove")
+		}
+		if mn.Item(label).Disabled(a.modelDeciding == m.ID).Chosen() {
+			a.askDeleteModel(m.ID) // models_delete.go
+		}
+	case !st.Downloading && !m.Borrowed && !st.OnDisk && st.Done > 0 && st.Elsewhere == "":
+		if mn.Item(i18n.T("Delete the partial download")).Chosen() {
+			a.deleteModel(m.ID, fammodels.ThisApp)
+		}
+	}
+	a.hideMenu(mn, m.ID, uitext.ModelName(m.ID)) // models_hide.go
 }
 
 // modelChips are the chips after a model's name: Recommended,
@@ -103,7 +148,7 @@ func modelChips(c *ui.Context, m models.Model, st models.Status, hidden bool) {
 		tagChip(c, i18n.T("Hidden"))
 	}
 	if st.Installed {
-		statusMark(c, icons.CheckCircle, k.Success, i18n.T("Installed"))
+		statusMark(c, icons.CheckCircle, k.Success, i18n.T("Installed")).Shrink(0)
 	}
 }
 
@@ -114,7 +159,7 @@ func modelSizeText(m models.Model, st models.Status) string {
 	case st.Downloading:
 		return i18n.T("Downloading: %s of %s (%s)", uitext.HumanBytes(st.Done), uitext.HumanBytes(st.Total), fmt.Sprintf("%d%%", percent(st.Done, st.Total)))
 	case st.Installed || st.OnDisk:
-		return i18n.T("%s on disk", size)
+		return size
 	case st.Done > 0 && st.Elsewhere == "":
 		return i18n.T("Stopped: %s of %s downloaded", uitext.HumanBytes(st.Done), size)
 	}
@@ -169,7 +214,9 @@ func modelMemText(b int64) string {
 	return i18n.T("Loaded · %s in memory", uitext.MemoryBytes(b))
 }
 
-// modelActions are a card's buttons for the model's state.
+// modelActions is a card's button for the model's state: Cancel while
+// it downloads, Use it for another app's model on this Mac, Download (or
+// Resume, Download again) before it is installed; none once installed.
 func (a *app) modelActions(c *ui.Context, m models.Model, st models.Status) {
 	name := uitext.ModelName(m.ID)
 	switch {
@@ -178,22 +225,12 @@ func (a *app) modelActions(c *ui.Context, m models.Model, st models.Status) {
 			a.cancelModel(m.ID)
 		}
 	case st.Installed:
-		label, tip := i18n.T("Delete"), i18n.T("Delete %s…", name)
-		if m.Borrowed { // the files are the other app's: VoxtMini lets go of it
-			label, tip = i18n.T("Remove"), i18n.T("Remove %s…", name)
-		}
-		if ghostButton(c.Key("delete"), label).Label(tip).Disabled(a.modelDeciding == m.ID).Clicked() {
-			a.askDeleteModel(m.ID) // models_delete.go
-		}
 	case m.Borrowed || st.OnDisk: // another app's on this Mac: VoxtMini's once used
 		if st.OnDisk && ui.Button(c.Key("use"), i18n.T("Use it")).Label(i18n.T("Use %s", name)).Clicked() {
 			a.useModel(m.ID)
 		}
 	default:
 		elsewhere := st.Elsewhere != ""
-		if st.Done > 0 && !elsewhere && ghostButton(c.Key("discard"), i18n.T("Delete")).Label(i18n.T("Delete what was downloaded of %s", name)).Clicked() {
-			a.deleteModel(m.ID, fammodels.ThisApp)
-		}
 		label := i18n.T("Download")
 		switch {
 		case st.DeletedBy != "":

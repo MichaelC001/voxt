@@ -76,7 +76,7 @@ var (
 	appRelaunch   = func() { mygo.App.Relaunch() }
 	chooseMoveDir = func(a *app, then func(string)) {
 		go func() {
-			dirs, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: a.win, Title: i18n.T("Move the data folder to…"),
+			dirs, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: a.win, Title: i18n.T("Move the data folder"),
 				Directory: true, CreateDirectories: true, ButtonLabel: i18n.T("Move here")})
 			if err != nil || len(dirs) == 0 {
 				return
@@ -297,14 +297,14 @@ func (a *app) storageSettings(c *ui.Context) {
 	sectionTitle(c, i18n.T("Data folder"))
 	settingRow(c, "st-data", uitext.ShortPath(a.dataDir()), i18n.T("Your history and its recordings, your dictionary and the database."), func() {
 		open("st-open-data", a.dataDir())
-		if ui.Button(c.Key("st-move"), i18n.T("Move…")).Disabled(a.moving).Clicked() {
+		if ui.Button(c.Key("st-move"), i18n.T("Move")).Disabled(a.moving).Clicked() {
 			chooseMoveDir(a, a.startMove)
 		}
 	})
 	if dir := a.prefs.History.AudioDir; dir != "" {
 		// Recordings kept elsewhere (history_settings.go).
 		settingRowNote(c, "st-audio", i18n.T("Recordings folder"), uitext.ShortPath(dir), func() {
-			if ui.Button(c.Key("st-audio-settings"), i18n.T("History settings…")).Clicked() {
+			if ui.Button(c.Key("st-audio-settings"), i18n.T("History settings")).Clicked() {
 				a.showHistorySettings()
 			}
 		})
@@ -353,12 +353,12 @@ func (a *app) storageSettings(c *ui.Context) {
 		}
 	})
 	settingRow(c, "st-reset-settings", i18n.T("Reset all settings"), i18n.T("Every setting goes back to its default. Your history and dictionary stay."), func() {
-		if ui.Button(c.Key("st-reset-settings"), i18n.T("Reset…")).Clicked() {
+		if ui.Button(c.Key("st-reset-settings"), i18n.T("Reset")).Clicked() {
 			a.resetAsk = "settings"
 		}
 	})
 	settingRow(c, "st-erase", i18n.T("Erase everything"), i18n.T("Deletes your history, recordings, dictionary, app enhancement rules, the local models no other ActNow app uses, settings and logs, then restarts VoxtMini as new."), func() {
-		if ui.Button(c.Key("st-erase"), i18n.T("Erase…")).Disabled(a.erasing).Clicked() {
+		if ui.Button(c.Key("st-erase"), i18n.T("Erase")).Disabled(a.erasing).Clicked() {
 			a.askErase()
 		}
 	})

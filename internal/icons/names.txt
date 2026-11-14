@@ -61,6 +61,7 @@ soundwave                # speech models
 chat-round-line          # language models
 download-minimalistic    # download a model
 eye-closed               # hide a model, every model hidden
+users-group-rounded      # a model shared with other ActNow apps (models_cards.go)
 
 # Remote services (remote_page.go).
 key-minimalistic-square  # a service's saved key

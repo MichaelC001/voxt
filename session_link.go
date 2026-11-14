@@ -189,6 +189,7 @@ func resolver(lm local.Services) session.Resolver {
 			return svc, nil // no language model: the text goes on as recognised
 		}
 		svc.LLM, svc.LLMInfo = modelClient{c: c}, sessionModel(ml)
+		svc.LLMInfo.Thinks = modelThinks(s.Models, ml) // models_settings.go
 		return svc, nil
 	}
 }

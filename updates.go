@@ -4,7 +4,7 @@ package main
 // checks actnow.dev once a day, shows a new version's notes in its
 // own window, in the language VoxtMini shows, and installs it (a delta
 // when there is one) on the user's word, then offers to restart. Its
-// "Check for Updates…" is ours, in the app menu, the menu bar icon's menu,
+// "Check for Updates" is ours, in the app menu, the menu bar icon's menu,
 // the palette and Settings → About, which also shows its two preferences.
 // Release builds only: `updates` is put in mygo.json by the release
 // workflow (docs/release.md), so other builds cannot update themselves.
@@ -159,7 +159,7 @@ func (a *app) updateMenuItems(act func(func()) func(*mygo.MenuItem, *mygo.Window
 	if a.upd == nil {
 		return nil
 	}
-	return []*mygo.MenuItem{{Label: i18n.T("Check for Updates…"), Click: act(a.checkForUpdates)}}
+	return []*mygo.MenuItem{{Label: i18n.T("Check for Updates"), Click: act(a.checkForUpdates)}}
 }
 
 // setAutoCheck and setAutoInstall change the updater's preferences
@@ -265,7 +265,7 @@ func (a *app) updateSettingsSection(c *ui.Context) {
 		desc = i18n.T("Last checked %s.", uitext.TimeAgo(p.LastCheck))
 	}
 	settingRowNoteTip(c, "about-update", i18n.T("Check for updates"), tip, desc, func() {
-		if ui.Button(c.Key("about-update"), i18n.T("Check for Updates…")).Clicked() {
+		if ui.Button(c.Key("about-update"), i18n.T("Check for Updates")).Clicked() {
 			a.checkForUpdates()
 		}
 	})

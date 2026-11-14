@@ -118,7 +118,8 @@ func clone(s Settings) Settings {
 	s.Appearance.ClosedSections = slices.Clone(s.Appearance.ClosedSections)
 	s.Audio.Devices = slices.Clone(s.Audio.Devices)
 	s.Models.Hidden = slices.Clone(s.Models.Hidden)
-	s.Models.LLMParams = cloneLLMParams(s.Models.LLMParams)
+	s.Models.Params = cloneParams(s.Models.Params)
+	s.Models.LegacyLLMParams = cloneParams(s.Models.LegacyLLMParams)
 	s.Audio.DeviceNames = maps.Clone(s.Audio.DeviceNames)
 	if p := s.Audio.MuteOutput; p != nil {
 		on := *p
@@ -195,7 +196,7 @@ func normalize(s Settings) Settings {
 	for _, f := range []*Feature{&f.Transcribe.Feature, &f.Translate.Feature, &f.Rewrite.Feature} {
 		f.ASR, f.LLM = strings.TrimSpace(f.ASR), strings.TrimSpace(f.LLM)
 	}
-	s.Models.LLMParams = normalizeLLMParams(s.Models.LLMParams)
+	s.Models = normalizeParams(s.Models)
 	return s
 }
 

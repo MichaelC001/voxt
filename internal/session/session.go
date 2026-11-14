@@ -128,6 +128,9 @@ type Problem struct {
 // Model names a model a session used.
 type Model struct {
 	ID, Name, Model string
+	// Thinks: a language model whose Thinking is on (its Settings): its
+	// requests get longer deadlines (ThinkFactor).
+	Thinks bool
 }
 
 // Timings are a session's stage times. Sent is how much of the

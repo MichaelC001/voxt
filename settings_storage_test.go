@@ -46,7 +46,7 @@ func TestStorageModels(t *testing.T) {
 	tt.SetSize(windowWidth, 1400)
 	// Erase… is below the settings dialog's fold since the Time Machine
 	// row (spec §7.12): its button's action.
-	if !has(tt, "Erase…") {
+	if !has(tt, "Erase") {
 		t.Fatal("no Erase…")
 	}
 	a.askErase()

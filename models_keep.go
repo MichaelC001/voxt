@@ -90,6 +90,5 @@ func (a *app) modelsAdvanced(c *ui.Context) {
 				a.updateSettings(func(s *settings.Settings) { s.Models.KeepLoaded = v })
 			}
 		})
-		a.llmParamsSection(c) // models_llm_params.go
 	})
 }

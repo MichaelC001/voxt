@@ -116,7 +116,7 @@ func TestRemotePage(t *testing.T) {
 		t.Fatalf("setup %+v", p)
 	}
 	frames(tt)
-	if !has(tt, "Remote services you set up") || !has(tt, "sk-…3456") || !has(tt, "Test DeepSeek") {
+	if !has(tt, "Remote services you set up") || !has(tt, "sk-…3456") || !has(tt, "More actions for DeepSeek") {
 		t.Errorf("card %q", firstTexts(tt))
 	}
 

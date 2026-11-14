@@ -83,7 +83,7 @@ func TestHistorySettingsDialog(t *testing.T) {
 	if !a.settingsForm.keepAudio {
 		t.Error("Privacy shows it off")
 	}
-	click(t, tt, "Open…")
+	click(t, tt, "Open")
 	if !a.histSet.open || a.currentPage() != "history" || a.settingsOpen {
 		t.Errorf("Privacy's link: open %v, page %s, settings %v", a.histSet.open, a.currentPage(), a.settingsOpen)
 	}
@@ -209,7 +209,7 @@ func TestHistoryRecordingsFolder(t *testing.T) {
 	chooseFolder = func(_ *app, _, _ string, then func(string)) { then(chosen) }
 	t.Cleanup(func() { chooseFolder = old })
 	openHistSettings(t, a, tt)
-	click(t, tt, "Choose…")
+	click(t, tt, "Choose")
 	if a.settings.Get().History.AudioDir != ext || h.AudioDir() != ext {
 		t.Fatalf("saved %q, in use %q", a.settings.Get().History.AudioDir, h.AudioDir())
 	}
@@ -264,7 +264,7 @@ func TestHistoryExportAndDelete(t *testing.T) {
 	chooseFolder = func(_ *app, _, _ string, then func(string)) { then(out) }
 	t.Cleanup(func() { chooseFolder = old })
 	openHistSettings(t, a, tt)
-	click(t, tt, "Export…")
+	click(t, tt, "Export")
 	got, _ := os.ReadDir(filepath.Join(out, "transcription"))
 	if len(got) != 2 {
 		t.Fatalf("exported %v", got)
@@ -278,11 +278,11 @@ func TestHistoryExportAndDelete(t *testing.T) {
 	click(t, tt, "All recordings")
 	click(t, tt, "Translate only")
 	out = t.TempDir()
-	click(t, tt, "Export…")
+	click(t, tt, "Export")
 	if got, _ := os.ReadDir(out); len(got) != 0 {
 		t.Errorf("the tab's: %v", got)
 	}
-	click(t, tt, "Delete all…")
+	click(t, tt, "Delete all")
 	if !has(tt, "Delete every recording?") {
 		t.Fatalf("no question: %q", firstTexts(tt))
 	}

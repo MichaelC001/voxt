@@ -71,7 +71,7 @@ func TestAppleModelsPage(t *testing.T) {
 	a.navigate("/home")
 	a.navigate(modelsPath) // the page reads apple.status as it shows
 	for _, s := range []string{"Built into macOS", "Apple Speech", "Ready", "English: Ready · Chinese (Simplified): Ready · Japanese: Not downloaded",
-		"No download from VoxtMini: macOS provides it.", "Allow speech recognition"} {
+		"Allow speech recognition"} {
 		if !has(tt, s) {
 			t.Errorf("no %q in %q", s, tt.Texts())
 		}

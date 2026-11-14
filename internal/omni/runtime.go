@@ -104,8 +104,9 @@ func Locate(exe string, env bool) (string, error) {
 // time, and Silero's beside it. Goroutine-safe.
 type Runtime struct {
 	cfg    Config
-	events *resident.Queue // Config.OnModel's
-	idle   atomic.Int64    // the idle timeout (Config.IdleTimeout, SetIdleTimeout)
+	events *resident.Queue                    // Config.OnModel's
+	idle   atomic.Int64                       // the idle timeout (Config.IdleTimeout, SetIdleTimeout)
+	opts   atomic.Pointer[map[string]Options] // SetOptions
 
 	mu      sync.Mutex
 	servers map[string]*server // by model id and directory

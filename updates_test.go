@@ -98,8 +98,8 @@ func TestUpdatesSettings(t *testing.T) {
 	if !has(tt, "Check for updates") || !has(tt, "Last checked 2 hours ago") {
 		t.Fatalf("about: %q", firstTexts(tt))
 	}
-	see(t, tt, "Check for Updates…")
-	click(t, tt, "Check for Updates…")
+	see(t, tt, "Check for Updates")
+	click(t, tt, "Check for Updates")
 	if f.checked() != 1 {
 		t.Errorf("checks %d", f.checked())
 	}
@@ -127,7 +127,7 @@ func TestUpdatesSettings(t *testing.T) {
 	if !hasPrefix(tt, "This copy cannot update itself") || has(tt, "Check automatically") {
 		t.Errorf("disabled: %q", firstTexts(tt))
 	}
-	click(t, tt, "Check for Updates…") // the window says why
+	click(t, tt, "Check for Updates") // the window says why
 	if f.checked() != 2 {
 		t.Errorf("checks %d", f.checked())
 	}
@@ -211,14 +211,14 @@ func TestUpdateMenus(t *testing.T) {
 		var out []string
 		for _, it := range a.trayItems() {
 			out = append(out, it.Label)
-			if it.Label == "Check for Updates…" {
+			if it.Label == "Check for Updates" {
 				it.Click(it, nil)
 			}
 		}
 		return out
 	}
 	tray := labels()
-	if i := slices.Index(tray, "Check for Updates…"); i < 0 || tray[i-1] != "Settings…" || f.checked() != 1 {
+	if i := slices.Index(tray, "Check for Updates"); i < 0 || tray[i-1] != "Settings" || f.checked() != 1 {
 		t.Errorf("tray %q, checks %d", tray, f.checked())
 	}
 	cmd := slices.IndexFunc(a.commands(), func(c command) bool { return c.id == "check-updates" })
@@ -233,7 +233,7 @@ func TestUpdateMenus(t *testing.T) {
 		t.Error("app menu item")
 	}
 	a.upd = nil
-	if slices.Contains(labels(), "Check for Updates…") || len(a.updateMenuItems(act)) != 0 {
+	if slices.Contains(labels(), "Check for Updates") || len(a.updateMenuItems(act)) != 0 {
 		t.Error("an item without the updater")
 	}
 	a.checkForUpdates() // nothing to do, no panic

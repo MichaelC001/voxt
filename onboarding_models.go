@@ -200,7 +200,7 @@ func (a *app) obReuseCard(c *ui.Context, found []models.Found) {
 					if primaryButton(c.Key("ob-reuse-use"), i18n.T("Use them")).Clicked() {
 						a.obUse(ids...)
 					}
-					if ghostButton(c.Key("ob-reuse-choose"), i18n.T("Choose models…")).Clicked() {
+					if ghostButton(c.Key("ob-reuse-choose"), i18n.T("Choose models")).Clicked() {
 						a.closeOnboarding()
 						a.navigate(modelsPath)
 					}

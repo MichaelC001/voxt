@@ -100,7 +100,7 @@ func TestOnboardingReuse(t *testing.T) {
 	a.models.Refresh()
 	a.obGo(obModels)
 	for _, s := range []string{"2 models are already on this Mac", "Installed by AudioSmith · 2.5 GB · no download needed",
-		"Accurate speech recognition · Voice detection", "Use them", "Choose models…", "Installed · from AudioSmith",
+		"Accurate speech recognition · Voice detection", "Use them", "Choose models", "Installed · from AudioSmith",
 		"3.3 GB still to download", "Download (3.3 GB)"} {
 		if !has(tt, s) {
 			t.Errorf("no %q in %q", s, tt.Texts())
@@ -129,7 +129,7 @@ func TestOnboardingReuse(t *testing.T) {
 
 	// Choose models… opens the Local models page.
 	reuseAgain(t, a)
-	click(t, tt, "Choose models…")
+	click(t, tt, "Choose models")
 	if a.ob.open || a.shownPath() != modelsPath {
 		t.Errorf("choose models: %v %s", a.ob.open, a.shownPath())
 	}
@@ -332,7 +332,7 @@ func TestShortcutRecorderUsedBy(t *testing.T) {
 		t.Fatal("warned before")
 	}
 	row := &a.fui(hotkey.Rewrite).rows[0]
-	row.sel = "Custom…"
+	row.sel = "Custom"
 	a.chooseKeys(hotkey.Rewrite, 0, row, nil)
 	frames(tt)
 	click(t, tt, "Custom keys of shortcut 1")

@@ -72,9 +72,9 @@ type modelsState struct {
 	modelAdvanced bool
 	modelKeepSel  string
 	modelKeepFor  string
-	// llmForm is the language models' parameters as typed
-	// (models_llm_params.go).
-	llmForm llmParamsForm
+	// modelSet is the open Settings dialog of a model
+	// (models_settings_view.go).
+	modelSet modelSettingsForm
 
 	// presetSel is the shortcut presets' select (settings_shortcuts.go).
 	presetSel string
@@ -97,6 +97,7 @@ func (a *app) openModels() {
 		}
 		// Apple's on-device models after the downloaded ones (apple_link.go).
 		a.apples = apple.New(apple.Config{Local: a.withDevLLM(newLocalServices(a)), Helper: helperCaller{a.host}, Name: uitext.ModelName}) // llm_link.go: VOXTMINI_DEV_LLM
+		a.apples.SetParams(appleParams(a.prefs.Models))                                                                                    // models_settings.go
 		a.local = remote.New(remote.Config{
 			Local:    a.apples,
 			Settings: st,

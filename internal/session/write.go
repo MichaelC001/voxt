@@ -189,7 +189,7 @@ func (r *run) ask(in compose.Input) (compose.Answer, string, error) {
 		}
 		req.Translate = &llm.TranslateHint{Text: text, Target: in.TargetLanguage}
 	}
-	resp, err := r.llmChat(cfg.llmDeadlines(req, utf8.RuneCountInString(in.Text+in.Instruction), cfg.WriteTimeout))
+	resp, err := r.llmChat(cfg.llmDeadlines(req, utf8.RuneCountInString(in.Text+in.Instruction), cfg.WriteTimeout, r.svc.LLMInfo.Thinks))
 	if err != nil {
 		return compose.Answer{}, out.Profile(), err
 	}

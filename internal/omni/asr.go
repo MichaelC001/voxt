@@ -123,7 +123,7 @@ func (a *ASR) Transcribe(ctx context.Context, req asr.FileRequest) (asr.Result, 
 	}
 	defer l.release()
 	start := time.Now()
-	text, language, err := a.final(ctx, l, pcm, a.spec.languageHint(req.Lang, req.Others), a.spec.ASR.contextBias(req.Hints, req.Prompt))
+	text, language, err := a.final(ctx, l, pcm, a.hint(req.Lang, req.Others), a.spec.ASR.contextBias(req.Hints, req.Prompt))
 	if err != nil {
 		return asr.Result{}, err
 	}
@@ -167,7 +167,7 @@ func (a *ASR) final(ctx context.Context, l *lease, pcm []byte, language string, 
 			break
 		}
 		req := finalRequest{kind: a.spec.Kind, pcm: c.pcm, language: language, context: b.context, maxTokens: budget,
-			layout: t.AudioLayout, temperature: t.Temperature}
+			layout: t.AudioLayout, temperature: a.temperature()}
 		r, err := transcribe(ctx, l, req, a.rt.cfg.StallTimeout)
 		if err != nil {
 			return "", "", err

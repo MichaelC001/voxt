@@ -62,7 +62,7 @@ func TestDictionaryCategories(t *testing.T) {
 	if has(tt, "Default") {
 		t.Error("a header without categories")
 	}
-	chooseMenu(t, tt, "More actions", "New category…")
+	chooseMenu(t, tt, "More actions", "New category")
 	click(t, tt, "Save")
 	if !has(tt, "Type a name.") {
 		t.Errorf("empty name saved: %q", firstTexts(tt))
@@ -75,7 +75,7 @@ func TestDictionaryCategories(t *testing.T) {
 	}
 	// The same name (or Default) again is refused.
 	for _, name := range []string{"work", "default"} {
-		chooseMenu(t, tt, "More actions", "New category…")
+		chooseMenu(t, tt, "More actions", "New category")
 		click(t, tt, "Category name")
 		tt.Type(name)
 		click(t, tt, "Save")
@@ -105,7 +105,7 @@ func TestDictionaryCategories(t *testing.T) {
 		t.Error("not opened")
 	}
 	// Rename.
-	chooseMenu(t, tt, "Actions of Work", "Rename…")
+	chooseMenu(t, tt, "Actions of Work", "Rename")
 	click(t, tt, "Category name")
 	tt.Key(ui.Cmd, ui.KeyA)
 	tt.Type("Cloud")
@@ -114,7 +114,7 @@ func TestDictionaryCategories(t *testing.T) {
 		t.Fatalf("renamed %+v", a.dv.cats)
 	}
 	// Delete: its term goes to Default, the headers go.
-	chooseMenu(t, tt, "Actions of Cloud", "Delete…")
+	chooseMenu(t, tt, "Actions of Cloud", "Delete")
 	if !has(tt, "Its terms move to Default.") {
 		t.Errorf("confirmation %q", firstTexts(tt))
 	}

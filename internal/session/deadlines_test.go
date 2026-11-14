@@ -30,10 +30,16 @@ func TestLLMDeadlines(t *testing.T) {
 		{100, cfg.WriteTimeout, 15500 * time.Millisecond, 5 * s, 60 * s},
 		{3000, cfg.WriteTimeout, 30 * s, 5 * s, 330 * s},
 	} {
-		req := cfg.llmDeadlines(llm.Request{}, c.chars, c.floor)
+		req := cfg.llmDeadlines(llm.Request{}, c.chars, c.floor, false)
 		if req.FirstTokenTimeout != c.firstToken || req.StallTimeout != c.stall || req.Timeout != c.total {
 			t.Errorf("%d characters: first token %v, stall %v, total %v; want %v, %v, %v", c.chars,
 				req.FirstTokenTimeout, req.StallTimeout, req.Timeout, c.firstToken, c.stall, c.total)
+		}
+		// Thinking: ThinkFactor times the first token and the whole, the
+		// same stall.
+		th := cfg.llmDeadlines(llm.Request{}, c.chars, c.floor, true)
+		if th.FirstTokenTimeout != ThinkFactor*c.firstToken || th.StallTimeout != c.stall || th.Timeout != ThinkFactor*c.total {
+			t.Errorf("%d characters, thinking: first token %v, stall %v, total %v", c.chars, th.FirstTokenTimeout, th.StallTimeout, th.Timeout)
 		}
 	}
 }
@@ -209,4 +215,33 @@ func inBubble(t *testing.T, fake bool, f func(*testing.T)) {
 	} else {
 		f(t)
 	}
+}
+
+// TestThinkingDeadlines: a model that thinks (Model.Thinks) gets
+// ThinkFactor times the deadlines: a clean-up whose first token comes
+// after the usual first-token deadline is cleaned up, not left as
+// recognised.
+func TestThinkingDeadlines(t *testing.T) {
+	ms := time.Millisecond
+	inBubble(t, true, func(t *testing.T) {
+		paced := &pacedLLM{scripts: []script{{text: "我们下周三开会。", first: 1800 * ms, pause: 10 * ms}}}
+		h := newHarness(t, &fakeFile{text: "我们下周三开会"}, &llm.Client{Backend: paced}, func(cfg *Config, _ *settings.Settings) {
+			resolve := cfg.Resolve
+			cfg.Resolve = func(ctx context.Context, kind Kind, s settings.Settings) (Services, error) {
+				svc, err := resolve(ctx, kind, s)
+				svc.LLMInfo.Thinks = true
+				return svc, err
+			}
+		})
+		h.speak(h.start(), 5)
+		end := h.rec.wait(t)
+		if end.Result != "我们下周三开会。" || end.Problem != nil {
+			t.Errorf("result %q, problem %+v", end.Result, end.Problem)
+		}
+		paced.mu.Lock()
+		defer paced.mu.Unlock()
+		if len(paced.reqs) == 0 || paced.reqs[0].FirstTokenTimeout < ThinkFactor*time.Second || paced.reqs[0].StallTimeout != 500*ms {
+			t.Errorf("deadlines %+v", paced.reqs)
+		}
+	})
 }

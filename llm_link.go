@@ -45,7 +45,7 @@ func (a *app) llmRuntime() *llmrt.Runtime {
 	default:
 		logDir, _ := mygo.App.Path(mygo.PathLogs)
 		a.llmrt = llmrt.New(a.llmConfig(llmLocate(), logDir))
-		a.llmrt.SetTuning(llmTunings(a.keepSetting())) // models_llm_params.go
+		a.llmrt.SetTuning(llmTunings(a.keepSetting())) // models_settings.go
 	}
 	return a.llmrt
 }

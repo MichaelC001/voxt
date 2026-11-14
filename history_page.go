@@ -163,6 +163,7 @@ func (a *app) historyPage(c *ui.Context) {
 			}
 			caption(c, label).SingleLine()
 		}
+		a.historySettingsButton(c) // history_settings.go: a setting of the page, not a filter
 	})
 	ui.Row(c).Padding(px(t, sp1), px(t, sp6), px(t, sp3)).Gap(px(t, sp2)).AlignItems(ui.Center).Shrink(0).Children(func() {
 		tabs := []string{i18n.T("Transcribe"), i18n.T("Translate"), i18n.T("Rewrite")}
@@ -173,7 +174,6 @@ func (a *app) historyPage(c *ui.Context) {
 		if searchField(c, "hist-search", &h.query, i18n.T("Search"), px(t, 360)).Label(i18n.T("Search the history")).Changed() {
 			a.loadHistory()
 		}
-		a.historySettingsButton(c) // history_settings.go
 	})
 	a.historyFolderNotice(c)
 	if !a.prefs.Privacy.KeepHistory {

@@ -48,7 +48,7 @@ type providerDialog struct {
 }
 
 // otherModel is the model select's last choice: a model id typed in.
-func otherModel() string { return i18n.T("Other model…") }
+func otherModel() string { return i18n.T("Other model") }
 
 // ---- The dialog ----
 

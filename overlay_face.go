@@ -286,11 +286,16 @@ func kindIcon(k store.Kind) icons.Icon {
 // overlayNotice is a notice: the pill with an icon and one line in place
 // of the waveform; with an action, a click on it runs the action.
 func (a *app) overlayNotice(c *ui.Context) {
-	t := c.Theme()
-	n := a.notice
-	if n == nil {
-		return
+	if a.notice != nil {
+		noticeFace(c, a.notice, a.prefs.Overlay, a.ov.h, a)
 	}
+}
+
+// noticeFace draws the notice n with the look o, h DIPs high; a click on
+// its action runs it in the app live (nil: the settings' preview, where
+// nothing runs).
+func noticeFace(c *ui.Context, n *sessionNotice, o settings.Overlay, h int, live *app) {
+	t := c.Theme()
 	label := noticeActionLabel(n.action)
 	content := func() {
 		// Centred, as the pill's row: a notice narrower than layout.NoticeW
@@ -309,16 +314,15 @@ func (a *app) overlayNotice(c *ui.Context) {
 			}
 		})
 	}
-	o := a.prefs.Overlay
 	if label == "" {
-		faceStyle(ui.Column(c.Key("ov-face")), o, ovNotice, a.ov.h).DragWindow().Label(n.text).Children(content)
+		faceStyle(ui.Column(c.Key("ov-face")), o, ovNotice, h).DragWindow().Label(n.text).Children(content)
 		return
 	}
-	b := faceStyle(ui.ButtonBase(c.Key("ov-notice")), o, ovNotice, a.ov.h).Label(n.text + " · " + label)
+	b := faceStyle(ui.ButtonBase(c.Key("ov-notice")), o, ovNotice, h).Label(n.text + " · " + label)
 	if b.Hovered() {
 		b.Background(ui.RGBA(34, 34, 40, min(layout.FaceAlpha(o)+0.06, 1)))
 	}
-	if b.Children(content).Clicked() {
-		a.noticeAction(n.action)
+	if b.Children(content).Clicked() && live != nil {
+		live.noticeAction(n.action)
 	}
 }

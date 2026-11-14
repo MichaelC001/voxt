@@ -284,6 +284,14 @@ func TestChat(t *testing.T) {
 	if p := sim.Chats[1]; *p.Temperature != 0 || p.MaxTokens != 100 {
 		t.Errorf("params %+v", p)
 	}
+	// The user's settings win over the request's (Services.SetParams).
+	user := Params{Temperature: llm.F64(0.9), MaxTokens: 300}
+	tuned := &Chat{h: sim, params: func() Params { return user }}
+	tuned.Chat(context.Background(), llm.Request{Messages: []llm.Message{{Role: llm.User, Content: "x"}}, Temperature: llm.F64(0), MaxTokens: 100})
+	if p := sim.Chats[2]; *p.Temperature != 0.9 || p.MaxTokens != 300 {
+		t.Errorf("user's params %+v", p)
+	}
+	sim.Chats = sim.Chats[:2]
 	// Too long for the window: refused before anything is sent.
 	long := strings.Repeat("字", Window)
 	if _, err := c.Chat(context.Background(), llm.Request{Messages: []llm.Message{{Role: llm.User, Content: long}}}); codeOf(err) != llm.CodeContextLength || len(sim.Chats) != 2 {

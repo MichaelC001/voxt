@@ -19,19 +19,37 @@ import (
 
 // overlayCard is the answer card's content, in the face.
 func (a *app) overlayCard(c *ui.Context) {
-	v := a.cardNow()
+	cardFace{v: a.cardNow(), h: a.ov.h, top: a.prefs.Overlay.Position == "top", motion: a.overlayMotion(), phase: a.overlayPhase(), live: a}.view(c)
+}
+
+// cardFace is the answer card as it draws: v, h DIPs high, the overlay
+// at the top or not, moving at phase seconds. live is the app whose card
+// it is; nil for the settings' preview (settings_overlay_preview.go),
+// whose card does nothing.
+type cardFace struct {
+	v      cardView
+	h      int
+	top    bool
+	motion bool
+	phase  float64
+	live   *app
+}
+
+// view is the card's content, in the face.
+func (f cardFace) view(c *ui.Context) {
+	v := f.v
 	msgH := 0
 	if v.msg != "" {
 		msgH = layout.CardMsgGap + layout.CardMsgH
 	}
-	bodyH := float32(max(a.ov.h-layout.CardChrome-msgH, 0))
+	bodyH := float32(max(f.h-layout.CardChrome-msgH, 0))
 	// The border takes layout.Border of the padding (MyGo's border box).
 	ui.Column(c).Fill().Padding(layout.CardPadTop-layout.Border, layout.CardPadX-layout.Border, layout.CardPadY-layout.Border).Children(func() {
 		ui.Row(c).Height(layout.CardHeadH).Shrink(0).Gap(layout.CardHeadGap).AlignItems(ui.Center).Children(func() {
-			a.cardHeader(c, v)
+			f.header(c)
 		})
 		ui.Box(c).Height(1).Shrink(0).Margin(layout.CardRuleTop, 0, 0, 0).Background(ovCardRule)
-		a.cardBody(c, v, bodyH)
+		f.body(c, bodyH)
 		if v.msg != "" {
 			ui.Row(c).Height(layout.CardMsgH).Shrink(0).Margin(layout.CardMsgGap, 0, 0, 0).Gap(6).AlignItems(ui.Center).Label(v.msg).Children(func() {
 				ic, col := icons.InfoCircle, ovText2
@@ -45,8 +63,9 @@ func (a *app) overlayCard(c *ui.Context) {
 	})
 }
 
-// cardHeader is the card's header: what it is, then what it offers.
-func (a *app) cardHeader(c *ui.Context, v cardView) {
+// header is the card's header: what it is, then what it offers.
+func (f cardFace) header(c *ui.Context) {
+	v, a := f.v, f.live
 	// Voxt's: one answer icon for every single result, the microphone over
 	// a conversation (its waveform beside it).
 	ic := icons.VoxtAnswer
@@ -57,23 +76,23 @@ func (a *app) cardHeader(c *ui.Context, v cardView) {
 	if v.conversation {
 		// Voxt's: a small waveform in the title's place, moving while a
 		// follow-up records.
-		cardWave(c, v, a.overlayMotion(), a.overlayPhase())
+		cardWave(c, v, f.motion, f.phase)
 		ui.Spacer(c)
 	} else {
 		ui.Text(c, v.title).FontSize(layout.CardTitleSize).FontWeight(600).TextColor(ui.RGB(255, 255, 255)).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
 		if v.busy {
 			// Voxt's spinner: an arc turning once in 0.9 s, 88 %.
 			ui.Icon(c, icons.VoxtSpinner.Linear).Size(12, 12).TextColor(ui.RGBA(255, 255, 255, 0.88)).Shrink(0).
-				Rotate(float32(math.Mod(a.overlayPhase()*400, 360))).Label(i18n.T("Translating…"))
+				Rotate(float32(math.Mod(f.phase*400, 360))).Label(i18n.T("Translating…"))
 		}
 		ui.Box(c).Grow(1).MinWidth(0) // Voxt's Spacer(minLength: 12): the gap
 	}
 	if v.kind == store.KindTranslate && v.failed == nil {
-		a.cardLanguage(c, v)
+		f.language(c)
 	}
 	switch {
 	case v.canStop:
-		if cardCapsule(c.Key("ov-card-stop"), i18n.T("Done"), i18n.T("Stop recording the follow-up")) {
+		if cardCapsule(c.Key("ov-card-stop"), i18n.T("Done"), i18n.T("Stop recording the follow-up")) && a != nil {
 			a.closeLangMenu()
 			a.stopSession()
 		}
@@ -82,12 +101,12 @@ func (a *app) cardHeader(c *ui.Context, v cardView) {
 		if v.follow != "" {
 			tip = i18n.T("Follow up by voice (Space or %s)", v.follow)
 		}
-		if cardCapsule(c.Key("ov-card-continue"), i18n.T("Continue"), tip) {
+		if cardCapsule(c.Key("ov-card-continue"), i18n.T("Continue"), tip) && a != nil {
 			a.closeLangMenu()
 			a.followUpAnswer("")
 		}
 	case v.canRetry:
-		if cardCapsule(c.Key("ov-card-retry"), i18n.T("Try again"), "") {
+		if cardCapsule(c.Key("ov-card-retry"), i18n.T("Try again"), "") && a != nil {
 			a.closeLangMenu()
 			a.retryAnswer("")
 		}
@@ -97,7 +116,7 @@ func (a *app) cardHeader(c *ui.Context, v cardView) {
 		if v.why != "" {
 			tip = v.why
 		}
-		if cardIconButton(c.Key("ov-card-insert"), i18n.T("Insert"), tip, icons.Pen, v.canInsert) {
+		if cardIconButton(c.Key("ov-card-insert"), i18n.T("Insert"), tip, icons.Pen, v.canInsert) && a != nil {
 			a.closeLangMenu()
 			a.insertAnswer()
 		}
@@ -105,12 +124,12 @@ func (a *app) cardHeader(c *ui.Context, v cardView) {
 		if v.copied {
 			copyIcon, copyLabel = icons.CopyCheck, i18n.T("Copied")
 		}
-		if cardIconButton(c.Key("ov-card-copy"), copyLabel, copyLabel, copyIcon, v.canCopy) {
+		if cardIconButton(c.Key("ov-card-copy"), copyLabel, copyLabel, copyIcon, v.canCopy) && a != nil {
 			a.closeLangMenu()
 			a.copyAnswer(c.Services().WriteClipboard)
 		}
 	}
-	if cardIconButton(c.Key("ov-card-close"), i18n.T("Close"), "", icons.Close, true) {
+	if cardIconButton(c.Key("ov-card-close"), i18n.T("Close"), "", icons.Close, true) && a != nil {
 		a.closeAnswer()
 	}
 }
@@ -170,12 +189,13 @@ func cardCapsule(c *ui.Context, label, tip string) bool {
 	}).Clicked()
 }
 
-// cardLanguage is Translate's target in the card (Voxt's capsule): its
+// language is Translate's target in the card (Voxt's capsule): its
 // name and a chevron; a click opens our own menu of the languages
 // (overlay_lang.go), where another translates the card's text again,
 // into the card.
-func (a *app) cardLanguage(c *ui.Context, v cardView) {
-	open := a.answer.langOpen && v.canLang
+func (f cardFace) language(c *ui.Context) {
+	v, a := f.v, f.live
+	open := a != nil && a.answer.langOpen && v.canLang
 	b := ui.ButtonBase(c.Key("ov-card-lang")).Height(layout.CardBtn).Padding(0, 10-layout.Border).Radius(radiusPill).Shrink(0).
 		Label(i18n.T("Translate into")).Disabled(!v.canLang).Checked(open)
 	line, bg := ui.RGBA(255, 255, 255, 0.12), ui.RGBA(255, 255, 255, 0.08)
@@ -191,11 +211,11 @@ func (a *app) cardLanguage(c *ui.Context, v cardView) {
 		alpha = 0.6
 	}
 	chevron := icons.AltArrowDown
-	if open && a.prefs.Overlay.Position != "top" {
+	if open && !f.top {
 		chevron = icons.AltArrowUp // it opens upward
 	}
 	defer func() {
-		if b.Clicked() {
+		if b.Clicked() && a != nil {
 			a.toggleLangMenu()
 		}
 	}()
@@ -230,9 +250,22 @@ func cardWave(c *ui.Context, v cardView, motion bool, phase float64) {
 	})
 }
 
-// cardBody is the card's text, bodyH high: it scrolls past that. A
-// conversation follows its newest turn while it shows the end.
-func (a *app) cardBody(c *ui.Context, v cardView, bodyH float32) {
+// body is the card's text, bodyH high: it scrolls past that. A
+// conversation follows its newest turn while it shows the end. The
+// preview's does not keep its scroll.
+func (f cardFace) body(c *ui.Context, bodyH float32) {
+	v, a := f.v, f.live
+	blocks := func() {
+		ui.Column(c).Padding(0, layout.CardInset, 0, 0).Children(func() {
+			for i, b := range cardBlocks(v) {
+				f.block(c.Key(i), b)
+			}
+		})
+	}
+	if a == nil {
+		ui.Scroll(c.Key("ov-card-body")).Height(bodyH).Shrink(0).Margin(layout.CardRuleGap, 0, 0, 0).Children(blocks)
+		return
+	}
 	st := &a.ov.cardScroll
 	key := a.answer.id + "/" + a.sess.ID
 	if v.conversation {
@@ -247,20 +280,14 @@ func (a *app) cardBody(c *ui.Context, v cardView, bodyH float32) {
 	} else if v.conversation && st.Y >= st.MaxY-2 {
 		st.Y = math.MaxFloat32
 	}
-	ui.Scroll(c.Key("ov-card-body")).Height(bodyH).Shrink(0).Margin(layout.CardRuleGap, 0, 0, 0).TrackScroll(st).Children(func() {
-		ui.Column(c).Padding(0, layout.CardInset, 0, 0).Children(func() {
-			for i, b := range cardBlocks(v) {
-				a.cardBlockView(c.Key(i), b)
-			}
-		})
-	})
+	ui.Scroll(c.Key("ov-card-body")).Height(bodyH).Shrink(0).Margin(layout.CardRuleGap, 0, 0, 0).TrackScroll(st).Children(blocks)
 }
 
-// cardBlockView draws one piece of the card's text.
-func (a *app) cardBlockView(c *ui.Context, b cardBlock) {
+// block draws one piece of the card's text.
+func (f cardFace) block(c *ui.Context, b cardBlock) {
 	switch {
 	case b.bubble:
-		a.cardBubbleView(c, b)
+		f.bubble(c, b)
 	case b.problem:
 		ui.Row(c).Gap(layout.ProblemGap).AlignItems(ui.Start).Margin(b.gap, 0, 0, 0).Children(func() {
 			ui.Icon(c, icons.DangerCircle.Bold).Size(layout.ProblemIcon, layout.ProblemIcon).TextColor(tok(c.Theme()).Danger).Shrink(0)
@@ -277,10 +304,11 @@ func (a *app) cardBlockView(c *ui.Context, b cardBlock) {
 	}
 }
 
-// cardBubbleView is a conversation's turn (Voxt's
+// bubble is a conversation's turn (Voxt's
 // RewriteConversationBubble): 340 wide, the user's on the right; an
 // answer shows Copy under the pointer.
-func (a *app) cardBubbleView(c *ui.Context, b cardBlock) {
+func (f cardFace) bubble(c *ui.Context, b cardBlock) {
+	a := f.live
 	justify := ui.Start
 	bg, line := ui.RGBA(255, 255, 255, 0.06), ui.RGBA(255, 255, 255, 0.08)
 	titleA, textA := float32(0.64), float32(0.92)
@@ -299,7 +327,7 @@ func (a *app) cardBubbleView(c *ui.Context, b cardBlock) {
 		if b.user {
 			col.AlignItems(ui.End)
 		}
-		hover := !b.user && !b.live && col.Hovered()
+		hover := a != nil && !b.user && !b.live && col.Hovered()
 		col.Children(func() {
 			if b.title.text != "" {
 				ui.Text(c, b.title.text).FontSize(layout.BubbleTitleSize).FontWeight(600).TextColor(ui.RGBA(255, 255, 255, titleA)).SingleLine().Ellipsis("…").MaxWidth(layout.BubbleW - 2*layout.BubblePadX)

@@ -43,7 +43,7 @@ func readyModels(a *app) {
 func TestTranscribePageRenders(t *testing.T) {
 	a, tt := trTester(t)
 	for _, s := range []string{
-		"Transcribe", "Shortcuts", "Right ⌥", "Tap", "Double tap", "Long press", "Add a shortcut",
+		"Transcribe", "Right ⌥", "Tap", "Double tap", "Long press", "Add a shortcut",
 		"Paste the last result", "⌃⌥V",
 		"Models", "No speech model installed.", "Open Models",
 		"Clean-up", "Clean up with a language model", "Basic clean-up", "Structure",
@@ -53,6 +53,11 @@ func TestTranscribePageRenders(t *testing.T) {
 		if !has(tt, s) {
 			t.Errorf("no %q in %q", s, tt.Texts())
 		}
+	}
+	// The shortcuts and Translate's or Rewrite's settings have no title:
+	// it would repeat the page's (TestFeatureHeaderAdd).
+	if hasExact(tt, "Shortcuts") {
+		t.Error("the Shortcuts title is back")
 	}
 	// No event tap in tests: the Accessibility notice, and Right ⌥ is marked.
 	if !has(tt, "Open Permissions") {
@@ -86,7 +91,7 @@ func TestTranscribeHotkeysEdit(t *testing.T) {
 
 	// Custom keys: invalid ones show why and are not saved; valid ones are
 	// saved in canonical spelling.
-	a.fui(hotkey.Transcribe).rows[1].sel = "Custom…"
+	a.fui(hotkey.Transcribe).rows[1].sel = "Custom"
 	a.chooseKeys(hotkey.Transcribe, 1, &a.fui(hotkey.Transcribe).rows[1], nil)
 	frames(tt)
 	if !a.fui(hotkey.Transcribe).rows[1].custom || a.fui(hotkey.Transcribe).rows[1].text != "MouseMiddle" {
@@ -422,8 +427,8 @@ func TestTranscribeFullPage(t *testing.T) {
 	}
 }
 
-// TestSectionTitleAdd: "Add a shortcut" and App enhancement's "Add apps…"
-// sit on their section title's line, on its centre line, with their
+// TestSectionTitleAdd: App enhancement's "Add apps" sits on its
+// section title's line, on its centre line, with their
 // label ending on the card's right edge (its last control + the card's
 // padding and border), at the default and the smallest window, in English
 // and Chinese.
@@ -458,15 +463,47 @@ func TestSectionTitleAdd(t *testing.T) {
 					t.Errorf("%v %s: %q at %+v, title %+v", size, lang, add, br, tr)
 				}
 			}
-			for _, p := range []string{"/transcribe", "/translate", "/rewrite"} {
-				a.navigate(p)
-				check("Shortcuts", "Add a shortcut", i18n.T("Remove shortcut %d", 1))
-			}
 			a.setRules(sampleRules())
 			a.navigate("/app-enhancement")
 			a.aePage.sel = "g-chat"
 			tt.SetSize(size[0], 1600) // the Apps section, below the prompt
-			check("Apps", "Add apps…", i18n.T("Remove %s", "Slack"))
+			check("Apps", "Add apps", i18n.T("Remove %s", "Slack"))
+		}
+	}
+}
+
+// TestFeatureHeaderAdd: the feature pages' "Add a shortcut" is in the
+// header, on its centre line and at its right, inside the window, at the
+// default and the smallest window, in English and Chinese, and adds a
+// shortcut there.
+func TestFeatureHeaderAdd(t *testing.T) {
+	for _, size := range [][2]int{{windowWidth, windowHeight}, {windowMinWidth, windowMinHeight}} {
+		for _, lang := range []string{"en", "zh-Hans"} {
+			a, _, tt := newTestApp(t)
+			tt.SetSize(size[0], size[1])
+			if lang != "en" {
+				a.updateSettings(func(s *settings.Settings) { s.General.Language = lang })
+			}
+			for _, f := range hotkey.Features {
+				a.navigate("/" + f)
+				frames(tt)
+				br, ok := tt.Find(i18n.T("Add a shortcut"))
+				if !ok {
+					t.Fatalf("%v %s %s: no Add a shortcut", size, lang, f)
+				}
+				if d := br.Y + br.H/2 - float32(titleBarHeight)/2; d < -1 || d > 1 {
+					t.Errorf("%v %s %s: Add a shortcut %.1f off the header's centre line", size, lang, f, d)
+				}
+				if br.X+br.W > float32(size[0]) || br.X < float32(size[0])/2 {
+					t.Errorf("%v %s %s: Add a shortcut at %+v", size, lang, f, br)
+				}
+				n := len(hotkey.HotkeysOf(a.prefs.Features, f))
+				tt.ClickAt(br.X+br.W/2, br.Y+br.H/2)
+				frames(tt)
+				if got := len(hotkey.HotkeysOf(a.prefs.Features, f)); got != n+1 {
+					t.Errorf("%v %s %s: %d shortcuts after Add, had %d", size, lang, f, got, n)
+				}
+			}
 		}
 	}
 }

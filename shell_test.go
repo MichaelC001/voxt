@@ -317,7 +317,7 @@ func TestPrivacyClearsHistory(t *testing.T) {
 		h.Put(context.Background(), store.Entry{ID: id, Kind: store.KindTranscribe, CreatedAt: time.Now().Add(time.Duration(i) * time.Second), Result: "x"})
 	}
 	a.navigate("/settings/privacy")
-	click(t, tt, "Clear…")
+	click(t, tt, "Clear")
 	if !a.clearHistoryAsk {
 		t.Fatal("no confirmation")
 	}

@@ -28,7 +28,7 @@ func (a *app) trayMicItem(act func(func()) func(*mygo.MenuItem, *mygo.Window)) *
 	if len(sub) == 0 {
 		sub = append(sub, &mygo.MenuItem{Label: i18n.T("No microphone found"), Disabled: true})
 	}
-	sub = append(sub, mygo.Separator(), &mygo.MenuItem{Label: i18n.T("Microphone settings…"), Click: act(func() {
+	sub = append(sub, mygo.Separator(), &mygo.MenuItem{Label: i18n.T("Microphone settings"), Click: act(func() {
 		a.showMainWindow()
 		a.navigate("/settings/audio")
 	})})

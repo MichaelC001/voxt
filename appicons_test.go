@@ -82,7 +82,7 @@ func TestAppIcons(t *testing.T) {
 	// never more than a batch a request.
 	manyApps(fs, 200)
 	*asked = nil
-	click(t, tt, "Add apps…")
+	click(t, tt, "Add apps")
 	frames(tt)
 	count := func() (n int) {
 		for _, ids := range *asked {

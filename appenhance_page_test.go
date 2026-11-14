@@ -158,7 +158,7 @@ func TestAppEnhancementEdit(t *testing.T) {
 	}
 	// Delete the group.
 	click(t, tt, "More actions")
-	if err := tt.ChooseMenuItem("Delete the group…"); err != nil {
+	if err := tt.ChooseMenuItem("Delete the group"); err != nil {
 		t.Fatal(err)
 	}
 	click(t, tt, "Delete")
@@ -238,7 +238,7 @@ func TestAppEnhancementApps(t *testing.T) {
 	a.setRules(sampleRules())
 	a.aePage.sel = "g-code"
 	frames(tt)
-	click(t, tt, "Add apps…")
+	click(t, tt, "Add apps")
 	for _, s := range []string{"Add apps to Code review", "Slack", "Notes", "Running"} {
 		if !has(tt, s) {
 			t.Errorf("no %q in %q", s, firstTexts(tt))

@@ -4,8 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/hehehai/VoxtMini/internal/knobs"
 	"github.com/hehehai/VoxtMini/internal/llm"
 	"github.com/hehehai/VoxtMini/internal/llmrt/llmrttest"
 	"github.com/hehehai/VoxtMini/internal/llmrt/wire"
@@ -30,9 +32,69 @@ func TestTuningApply(t *testing.T) {
 	if g.Sampling.RepetitionPenalty != 1.1 || g.Sampling.RepetitionContextSize != DefaultRepetitionContext {
 		t.Errorf("penalty %+v", g.Sampling)
 	}
-	exact, rewrite, max := mustLookup(t, Balanced).Defaults()
-	if exact.Temperature != 0 || rewrite.Temperature != 0.7 || max != 1536 {
-		t.Errorf("defaults %+v %+v %d", exact, rewrite, max)
+	l := wire.ChatParams{Sampling: lfmRewrite}
+	Tuning{TopK: 40, MinP: f64(0)}.apply(&l)
+	if l.Sampling.TopK != 40 || l.Sampling.MinP != 0 {
+		t.Errorf("top-k, min-p %+v", l.Sampling)
+	}
+	// Thinking: only a template that can think, with room for the thought.
+	q := wire.ChatParams{Template: qwenNoThink, MaxTokens: 400}
+	Tuning{Think: true}.apply(&q)
+	if q.Template[thinkVar] != true || qwenNoThink[thinkVar] != false || q.MaxTokens != 400+ThinkTokens {
+		t.Errorf("think %+v (profile's %v)", q, qwenNoThink)
+	}
+	q = wire.ChatParams{Template: qwenNoThink, MaxTokens: 400}
+	Tuning{Think: true, MaxTokens: 600}.apply(&q)
+	if q.MaxTokens != 600 {
+		t.Errorf("think, budget set: %d", q.MaxTokens)
+	}
+	n := wire.ChatParams{MaxTokens: 400}
+	Tuning{Think: true}.apply(&n)
+	if n.Template != nil || n.MaxTokens != 400 {
+		t.Errorf("no thinking template: %+v", n)
+	}
+}
+
+// TestProfileKnobs: every profile has settings; each family shows what
+// its runtime applies (thinking for Qwen3.5 and Gemma 4, top-k where its
+// sampling has one, min-p for LFM2), with its tuned values.
+func TestProfileKnobs(t *testing.T) {
+	names := func(fs []knobs.Field) string {
+		var out []string
+		for _, f := range fs {
+			out = append(out, string(f.Knob))
+		}
+		return strings.Join(out, ",")
+	}
+	for _, c := range []struct{ id, want string }{
+		{Balanced, "thinking,temperature,topP,topK,repetitionPenalty,maxTokens"},
+		{Fast, "thinking,temperature,topP,topK,repetitionPenalty,maxTokens"},
+		{Qwen36_27B, "thinking,temperature,topP,topK,repetitionPenalty,maxTokens"},
+		{Gemma4, "thinking,temperature,topP,topK,repetitionPenalty,maxTokens"},
+		{Qwen3, "temperature,topP,topK,repetitionPenalty,maxTokens"},
+		{Translate, "temperature,topP,topK,repetitionPenalty,maxTokens"},
+		{Ministral3, "temperature,topP,repetitionPenalty,maxTokens"},
+		{LFM2, "temperature,minP,topP,repetitionPenalty,maxTokens"},
+		{LFM2_8B, "temperature,minP,topP,repetitionPenalty,maxTokens"},
+	} {
+		if got := names(mustLookup(t, c.id).Knobs()); got != c.want {
+			t.Errorf("%s: %s, want %s", c.id, got, c.want)
+		}
+	}
+	for _, p := range profiles {
+		if len(p.Knobs()) == 0 {
+			t.Errorf("%s has no settings", p.ID)
+		}
+	}
+	ks := mustLookup(t, Balanced).Knobs()
+	if f := ks[1]; f.Knob != knobs.Temperature || len(f.Auto) != 3 || f.Auto[0] != 0 || f.Auto[1] != 0 || f.Auto[2] != 0.7 {
+		t.Errorf("temperature %+v", f)
+	}
+	if f := ks[5]; f.Auto[0] != 1536 {
+		t.Errorf("budget %+v", f)
+	}
+	if f := mustLookup(t, Translate).Knobs()[0]; len(f.Auto) != 1 || f.Auto[0] != 0.7 {
+		t.Errorf("Hy-MT2's temperature %+v", f)
 	}
 }
 

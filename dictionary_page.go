@@ -147,16 +147,16 @@ func (a *app) dictionaryPage(c *ui.Context) {
 			a.updateSettings(func(s *settings.Settings) { s.Dictionary.Enabled = v })
 		}
 		moreMenu(c.Key("dict-more"), "", func(m *ui.Menu) {
-			if m.Item(i18n.T("New category…")).Chosen() {
+			if m.Item(i18n.T("New category")).Chosen() {
 				a.openCategory(store.Category{})
 			}
-			if m.Item(i18n.T("Import…")).Chosen() {
+			if m.Item(i18n.T("Import")).Chosen() {
 				a.importTerms()
 			}
-			if m.Item(i18n.T("Export as CSV…")).Chosen() {
+			if m.Item(i18n.T("Export as CSV")).Chosen() {
 				a.exportTerms(dict.CSV)
 			}
-			if m.Item(i18n.T("Export as text…")).Chosen() {
+			if m.Item(i18n.T("Export as text")).Chosen() {
 				a.exportTerms(dict.Text)
 			}
 		})
@@ -256,7 +256,7 @@ func (a *app) dictEmpty(c *ui.Context) {
 			if ghostIconButton(c.Key("dict-empty-add"), icons.Add, i18n.T("Add term")).Clicked() {
 				a.openTerm(store.Term{Enabled: true})
 			}
-			if ghostIconButton(c.Key("dict-empty-import"), icons.Import, i18n.T("Import…")).Label(i18n.T("Import terms")).Clicked() {
+			if ghostIconButton(c.Key("dict-empty-import"), icons.Import, i18n.T("Import")).Label(i18n.T("Import terms")).Clicked() {
 				a.importTerms()
 			}
 		})

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hehehai/VoxtMini/internal/apple"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -71,7 +72,7 @@ func TestModelsPage(t *testing.T) {
 
 	// Installed models: the page, the features' choices.
 	seedModels(t, a, models.ASRFast, models.VADSilero, models.LLMTranslate)
-	if !has(tt, "Installed") || !has(tt, "712.8 MB on disk") {
+	if !has(tt, "Installed") || !has(tt, "Qwen3-ASR 0.6B · 4-bit · 712.8 MB") {
 		t.Errorf("installed: %q", tt.Texts())
 	}
 	if m, ok := a.featureModel(local.ASR, hotkey.Transcribe); !ok || m.ID != models.ASRFast || m.Name != "Fast speech recognition" {
@@ -95,7 +96,7 @@ func TestModelsPage(t *testing.T) {
 	// Deleting asks first.
 	a.navigate(modelsPath)
 	frames(tt)
-	click(t, tt, "Delete Fast speech recognition…")
+	chooseMenu(t, tt, "More actions for Fast speech recognition", "Delete")
 	if !has(tt, "Delete Fast speech recognition?") || !has(tt, "This frees 712.8 MB. You can download it again later.") {
 		t.Fatalf("no confirmation: %q", tt.Texts())
 	}
@@ -191,7 +192,7 @@ func TestModelDownloadStates(t *testing.T) {
 	}
 
 	// Deleting what a stopped download kept.
-	click(t, tt, "Delete what was downloaded of Fast language model")
+	chooseMenu(t, tt, "More actions for Fast language model", "Delete the partial download")
 	drain()
 	if st := a.modelStatus[models.LLMFast]; st.Done != 0 || has(tt, "Resume") {
 		t.Errorf("kept: %+v", st)
@@ -339,6 +340,22 @@ func modelShots(t *testing.T, a *app, tt *ui.Tester, save func(string)) {
 	scrollToText(tt, i18n.T("Advanced"))
 	save("models-advanced-open")
 	a.modelAdvanced = false
+	// Models' Settings dialogs, one per family (models_settings_view.go).
+	for _, c := range []struct{ id, name string }{
+		{models.LLMBalanced, "qwen"}, {models.LLMLFM2, "lfm2"}, {models.LLMTranslate, "hymt"},
+		{models.ASRAccurate, "qwen-asr"}, {models.ASRWhisperTurbo, "whisper"}, {apple.IntelligenceID, "apple"},
+	} {
+		a.openModelSettings(c.id)
+		if c.id == models.LLMBalanced {
+			t3 := 0.3
+			a.updateSettings(func(s *settings.Settings) {
+				s.Models.Params = s.Models.WithParams(c.id, settings.ModelParams{Temperature: &t3, Think: true})
+			})
+		}
+		save("models-settings-" + c.name)
+		a.modelSet.open = false
+	}
+	a.updateSettings(func(s *settings.Settings) { s.Models.Params = nil })
 	// The page as it was: the setup guide's shots show it behind them.
 	a.navigate("/home")
 	a.navigate(modelsPath + "/language")

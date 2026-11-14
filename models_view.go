@@ -118,7 +118,7 @@ func (a *app) listModels() modelsList {
 func (a *app) modelsPage(c *ui.Context) {
 	t := c.Theme()
 	pageHeaderTip(c, i18n.T("Models"), i18n.T("Local models run on this Mac. A remote service gets your audio or text only when you choose it for a feature; its key stays in the Keychain."), func() {
-		if ghostButton(c.Key("models-network"), i18n.T("Network…")).Tooltip(i18n.T("How model downloads and remote services reach the internet")).Clicked() {
+		if ghostButton(c.Key("models-network"), i18n.T("Network")).Tooltip(i18n.T("How model downloads and remote services reach the internet")).Clicked() {
 			a.openNetwork()
 		}
 	})
@@ -156,9 +156,10 @@ func (a *app) modelsPage(c *ui.Context) {
 			}
 		})
 	})
-	a.modelDeleteDialogs(c) // models_delete.go
-	a.networkDialog(c)      // models_network.go
-	a.providerDialogView(c) // remote_dialog.go
+	a.modelDeleteDialogs(c)  // models_delete.go
+	a.networkDialog(c)       // models_network.go
+	a.providerDialogView(c)  // remote_dialog.go
+	a.modelSettingsDialog(c) // models_settings_view.go
 }
 
 // modelsTip is the ⓘ of the Recommended section: what the tab's models do.

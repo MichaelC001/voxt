@@ -144,6 +144,7 @@ func TestMenuBarOrDock(t *testing.T) {
 // true.
 func clickDialogSwitch(t *testing.T, tt *ui.Tester, title string, on func() bool) {
 	t.Helper()
+	frames(tt)                                       // laid out: the scroll finds its scroller
 	tt.Scroll(windowWidth/2, windowHeight/2, 0, 400) // the row to the dialog's middle
 	frames(tt)
 	r, ok := tt.Find(title)

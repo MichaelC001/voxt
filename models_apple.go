@@ -64,11 +64,11 @@ func (a *app) appleCard(c *ui.Context, id string) {
 	if hidden {
 		el.Opacity(0.6)
 	}
-	el.ContextMenu(func(mn *ui.Menu) { a.hideMenu(mn, id, name) })
+	el.ContextMenu(func(mn *ui.Menu) { a.appleMenu(mn, id) })
 	el.Children(func() {
 		ui.Row(c).Gap(px(t, sp3)).AlignItems(ui.Start).Children(func() {
 			ui.Icon(c, ic.Linear).Size(px(t, 20), px(t, 20)).TextColor(k.Text2).Shrink(0).Margin(px(t, 1), 0, 0, 0)
-			ui.Column(c).Grow(1).MinWidth(0).Gap(px(t, sp1)).Children(func() {
+			ui.Column(c).Grow(1).MinWidth(0).Gap(px(t, 2)).Children(func() {
 				ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Wrap().Children(func() {
 					ui.Text(c, name).FontWeight(600)
 					if hidden {
@@ -80,12 +80,11 @@ func (a *app) appleCard(c *ui.Context, id string) {
 						statusMark(c, icons.DangerTriangle, k.Warning, i18n.T("Not available"))
 					}
 				})
-				ui.Text(c, uitext.ModelAbout(id))
+				truncText(c, uitext.ModelAbout(id))
 				ui.Row(c).Gap(px(t, 4)).AlignItems(ui.Center).Children(func() {
 					ui.Icon(c, icons.Global.Linear).Size(px(t, 14), px(t, 14)).TextColor(k.Text2).Shrink(0)
-					caption(c, a.appleLanguagesLine(id)).MinWidth(0)
+					caption(c, a.appleLanguagesLine(id)).MinWidth(0) // each language's state: all of it
 				})
-				caption(c.Key("no-download"), i18n.T("No download from VoxtMini: macOS provides it."))
 				if why != "" {
 					caption(c.Key("why"), why)
 				}
@@ -94,13 +93,22 @@ func (a *app) appleCard(c *ui.Context, id string) {
 				if id == apple.SpeechID {
 					a.appleSpeechActions(c)
 				}
-				moreMenu(c.Key("more"), i18n.T("More actions for %s", name), func(mn *ui.Menu) { a.hideMenu(mn, id, name) })
+				moreMenu(c.Key("more"), i18n.T("More actions for %s", name), func(mn *ui.Menu) { a.appleMenu(mn, id) })
 			})
 		})
 		if id == apple.SpeechID {
 			a.appleSpeechNotices(c)
 		}
 	})
+}
+
+// appleMenu is an Apple card's ⋯ and context menu: Apple
+// Intelligence's Settings, Hide.
+func (a *app) appleMenu(mn *ui.Menu, id string) {
+	if modelKnobs(id) != nil && mn.Item(i18n.T("Settings")).Chosen() {
+		a.openModelSettings(id) // models_settings_view.go
+	}
+	a.hideMenu(mn, id, uitext.ModelName(id))
 }
 
 // appleLanguagesLine is the card's languages: Apple Speech's with their

@@ -1,6 +1,6 @@
 package main
 
-// A feature page's Shortcuts section (feature_page.go): its rows of
+// A feature page's shortcuts, its first card (feature_page.go): its rows of
 // shortcuts with their triggers, choosing or typing a chord, and Transcribe's
 // paste-the-last-result row. Keys another ActNow app uses too say so
 // under the row, as they are chosen or typed; saving stays allowed.
@@ -20,7 +20,7 @@ import (
 // keyRow is a shortcut's controls.
 type keyRow struct {
 	sel    string // the select's label
-	custom bool   // "Custom…" chosen: the keys are typed
+	custom bool   // "Custom" chosen: the keys are typed
 	text   string // the typed keys
 	trig   int    // 0 tap, 1 double tap, 2 long press
 	edited bool   // the typed keys are not saved yet
@@ -105,7 +105,7 @@ func presetOf(keys string) string {
 }
 
 // keyOptions are a select's options for a binding whose keys are cur:
-// the presets, cur when it is none of them, then "Custom…" (and "Off"
+// the presets, cur when it is none of them, then "Custom" (and "Off"
 // first with off). byLabel maps each label to its keys.
 func keyOptions(cur string, off bool) (opts []string, byLabel map[string]string) {
 	byLabel = map[string]string{}
@@ -125,7 +125,7 @@ func keyOptions(cur string, off bool) (opts []string, byLabel map[string]string)
 			byLabel[l] = cur
 		}
 	}
-	opts = append(opts, i18n.T("Custom…"))
+	opts = append(opts, i18n.T("Custom"))
 	return opts, byLabel
 }
 
@@ -170,22 +170,20 @@ func newHotkey(f settings.Features) settings.Hotkey {
 	return settings.Hotkey{Keys: keyPresets[0], Trigger: settings.TriggerDouble}
 }
 
+// featureAddKey is "Add a shortcut", in the feature page's header: the
+// shortcuts are the page's first card, without a title of their own.
+func (a *app) featureAddKey(c *ui.Context, feature string) {
+	if quietButton(c.Key(uitext.FeaturePrefix(feature)+"-key-add"), icons.Add, i18n.T("Add a shortcut")).Clicked() {
+		h := newHotkey(a.prefs.Features)
+		a.setHotkeys(feature, true, func(hs []settings.Hotkey) []settings.Hotkey { return append(hs, h) })
+	}
+}
+
 func (a *app) featureShortcuts(c *ui.Context, feature string) {
 	t := c.Theme()
 	p := uitext.FeaturePrefix(feature)
 	u := a.fui(feature)
 	a.featureSync(feature)
-	keysTip := i18n.T("Tap: press to start, press again to stop. Double tap: press twice quickly. Long press: record while you hold the keys. Escape cancels.")
-	if a.prefs.Features.EscapeOff { // Settings → Shortcuts → Escape cancels (settings_recording.go)
-		keysTip = i18n.T("Tap: press to start, press again to stop. Double tap: press twice quickly. Long press: record while you hold the keys.")
-	}
-	if feature == hotkey.Rewrite {
-		keysTip += " " + i18n.T("While the answer card shows an answer, the shortcut records a follow-up that changes it (\"shorter\", \"in English\").")
-	}
-	if sectionTitleAdd(c, p+"-key-add", i18n.T("Shortcuts"), keysTip, i18n.T("Add a shortcut")) {
-		h := newHotkey(a.prefs.Features)
-		a.setHotkeys(feature, true, func(hs []settings.Hotkey) []settings.Hotkey { return append(hs, h) })
-	}
 	if !a.hotkeys.Installed {
 		notice(c, p+"-no-tap", noticeWarn,
 			i18n.T("Without Accessibility, only plain key combos work."),
@@ -236,7 +234,7 @@ func (a *app) keyRowView(c *ui.Context, feature string, i int, h settings.Hotkey
 					r.sel = chordLabel(h.Keys)
 				}
 				if r.custom {
-					r.sel = i18n.T("Custom…")
+					r.sel = i18n.T("Custom")
 				}
 				sel := ui.Select(c.Key("sel"), &r.sel, opts).Label(i18n.T("Keys of shortcut %d", n)).Width(px(t, 180)).Shrink(1).MinWidth(px(t, 120))
 				if sel.Changed() {
@@ -303,7 +301,7 @@ func recordedKeys(r keyRow, saved string) string {
 
 // chooseKeys applies a choice of a feature's i-th shortcut select.
 func (a *app) chooseKeys(feature string, i int, r *keyRow, byLabel map[string]string) {
-	if r.sel == i18n.T("Custom…") {
+	if r.sel == i18n.T("Custom") {
 		r.custom = true
 		if hs := hotkey.HotkeysOf(a.prefs.Features, feature); i < len(hs) {
 			r.text = hs[i].Keys
@@ -379,10 +377,10 @@ func (a *app) trPasteRow(c *ui.Context) {
 				r.sel = chordLabel(cur)
 			}
 			if r.custom {
-				r.sel = i18n.T("Custom…")
+				r.sel = i18n.T("Custom")
 			}
 			if ui.Select(c.Key("tr-paste-sel"), &r.sel, opts).Label(i18n.T("Keys to paste the last result")).Width(px(t, 180)).Changed() {
-				if r.sel == i18n.T("Custom…") {
+				if r.sel == i18n.T("Custom") {
 					r.custom, r.text = true, cur
 					return
 				}

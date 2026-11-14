@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -27,8 +28,8 @@ func pageTester(t *testing.T, path string) (*app, *ui.Tester) {
 func TestTranslatePage(t *testing.T) {
 	a, tt := pageTester(t, "/translate")
 	for _, s := range []string{
-		"Translate", "Shortcuts", "Right ⌥ ⇧", "Models", "No speech model: only selected text can be translated.",
-		"No language model installed.", "Translation", "Translate into", "Automatic: Simplified Chinese",
+		"Translate", "Right ⌥ ⇧", "Models", "No speech model: only selected text can be translated.",
+		"No language model installed.", "Translate into", "Automatic: Simplified Chinese",
 		"Basic clean-up", "Show the result in a card", "Prompt", "Try it",
 	} {
 		if !has(tt, s) {
@@ -84,12 +85,17 @@ func TestRewritePage(t *testing.T) {
 	a, tt := pageTester(t, "/rewrite")
 	for _, s := range []string{
 		"Rewrite", "⌃ Right ⌥", "No speech model installed.", "No language model installed.",
-		"Rewriting", "Clean up the instruction",
-		"While the answer card shows an answer, the shortcut records a follow-up that changes it (\"shorter\", \"in English\").",
+		"Clean up the instruction",
 	} {
 		if !has(tt, s) {
 			t.Errorf("no %q in %q", s, firstTexts(tt))
 		}
+	}
+	// The page's ⓘ tells the follow-up (the shortcuts have no tip of their own).
+	if tip := a.featureTip(hotkey.Rewrite); !strings.Contains(tip, "While the answer card shows an answer, the shortcut records a follow-up") {
+		t.Errorf("tip %q", tip)
+	} else if _, ok := tt.Find(tip); !ok {
+		t.Error("no page tip")
 	}
 	clickSwitch(t, tt, "Clean up the instruction")
 	if a.lib.settings.Get().Features.Rewrite.Cleanup {

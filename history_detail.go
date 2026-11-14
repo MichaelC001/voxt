@@ -57,7 +57,7 @@ func (a *app) historyDetail(c *ui.Context, e store.Entry) {
 			if e.Audio != "" && iconButton(c.Key("hist-reveal"), icons.FolderOpen, i18n.T("Show the recording in Finder")).Clicked() {
 				revealInFinder(filepath.Join(a.lib.store.History().AudioDir(), e.Audio))
 			}
-			if iconButton(c.Key("hist-delete"), icons.TrashBinMinimalistic, i18n.T("Delete the entry…")).Clicked() {
+			if iconButton(c.Key("hist-delete"), icons.TrashBinMinimalistic, i18n.T("Delete the entry")).Clicked() {
 				a.askDeleteEntry(e.ID)
 			}
 			if iconButton(c.Key("panel-close"), icons.Close, i18n.T("Close")).Clicked() {

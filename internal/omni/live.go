@@ -75,7 +75,7 @@ func openLive(ctx context.Context, a *ASR, l *lease, req asr.StreamRequest) (*li
 	}
 	conn.SetReadLimit(1 << 20)
 	session := map[string]any{"input_audio_format": "pcm16", "turn_detection": nil}
-	if hint := a.spec.languageHint(req.Lang, req.Others); hint != "" {
+	if hint := a.hint(req.Lang, req.Others); hint != "" {
 		session["language"] = hint
 	}
 	if err := writeJSON(dctx, conn, map[string]any{"type": "session.update", "session": session}); err != nil {
@@ -98,7 +98,7 @@ func openLive(ctx context.Context, a *ASR, l *lease, req asr.StreamRequest) (*li
 	}
 	sctx, cancel := context.WithCancel(ctx)
 	s := &live{a: a, l: l, req: req, ctx: sctx, cancel: cancel, conn: conn,
-		language: a.spec.languageHint(req.Lang, req.Others), bias: a.spec.ASR.contextBias(req.Hints, req.Prompt),
+		language: a.hint(req.Lang, req.Others), bias: a.spec.ASR.contextBias(req.Hints, req.Prompt),
 		out: make(chan []byte, 1024), preview: true, events: make(chan asr.Event, eventBuffer)}
 	go s.write()
 	go s.read()

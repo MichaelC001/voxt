@@ -47,12 +47,12 @@ func (a *app) privacySettings(c *ui.Context) {
 		}
 	})
 	settingRow(c, "priv-hist-settings", i18n.T("History settings"), i18n.T("Where the recordings are kept, exporting them, and the automatic clean-up of old entries."), func() {
-		if ui.Button(c.Key("priv-hist-settings"), i18n.T("Open…")).Clicked() {
+		if ui.Button(c.Key("priv-hist-settings"), i18n.T("Open")).Clicked() {
 			a.showHistorySettings()
 		}
 	})
 	settingRow(c, "priv-clear", i18n.T("Clear the history"), i18n.T("Deletes every entry and its recording. Your dictionary and settings stay."), func() {
-		if ui.Button(c.Key("priv-clear"), i18n.T("Clear…")).Clicked() {
+		if ui.Button(c.Key("priv-clear"), i18n.T("Clear")).Clicked() {
 			a.clearHistoryAsk = true
 		}
 	})

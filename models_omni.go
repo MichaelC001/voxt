@@ -57,6 +57,7 @@ func (a *app) omniRuntime() (*omni.Runtime, error) {
 	speech, _ := keepIdle(a.keepSetting()) // models_keep.go
 	a.omniRT = omni.NewRuntime(omni.Config{Binary: bin, Log: a.omniLog, IdleTimeout: speech,
 		OnModel: a.modelEvents(workerOmni), BeforeLoad: a.beforeLoad()}) // family_runtime.go
+	a.omniRT.SetOptions(omniOptions(a.keepSetting())) // models_settings.go
 	return a.omniRT, nil
 }
 

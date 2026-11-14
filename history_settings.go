@@ -146,8 +146,8 @@ func (a *app) histRecordingsSection(c *ui.Context) {
 	}
 	move := i18n.T("Choosing another folder moves the recordings there: each one is copied and checked before the original is deleted.")
 	settingRowNoteTip(c, "hist-set-dir", i18n.T("Storage location"), move, uitext.ShortPath(shown), func() {
-		if ui.Button(c.Key("hist-set-choose"), i18n.T("Choose…")).Disabled(busy).Clicked() {
-			chooseFolder(a, i18n.T("Move the recordings to…"), i18n.T("Move here"), a.moveRecordings)
+		if ui.Button(c.Key("hist-set-choose"), i18n.T("Choose")).Disabled(busy).Clicked() {
+			chooseFolder(a, i18n.T("Move the recordings"), i18n.T("Move here"), a.moveRecordings)
 		}
 		if iconButton(c.Key("hist-set-reveal"), icons.FolderOpen, i18n.T("Show in Finder")).Clicked() {
 			revealInFinder(h.AudioDir())
@@ -168,7 +168,7 @@ func (a *app) histRecordingsSection(c *ui.Context) {
 		usage = i18n.N(hs.usageN, "%d recording · %s", "%d recordings · %s", hs.usageN, uitext.HumanBytes(hs.usageBytes))
 	}
 	settingRowNote(c, "hist-set-usage", i18n.T("Saved recordings"), usage, func() {
-		if ui.Button(c.Key("hist-set-delete"), i18n.T("Delete all…")).Disabled(busy || hs.usageN <= 0).Clicked() {
+		if ui.Button(c.Key("hist-set-delete"), i18n.T("Delete all")).Disabled(busy || hs.usageN <= 0).Clicked() {
 			hs.delAudioAsk = true
 		}
 	})
@@ -178,9 +178,9 @@ func (a *app) histRecordingsSection(c *ui.Context) {
 			hs.exportSel = opts[0]
 		}
 		ui.Select(c.Key("hist-set-scope"), &hs.exportSel, opts).Label(i18n.T("Which recordings")).Width(px(t, 200)).Shrink(1).MinWidth(px(t, 120))
-		if ui.Button(c.Key("hist-set-export"), i18n.T("Export…")).Disabled(busy || hs.usageN == 0).Clicked() {
+		if ui.Button(c.Key("hist-set-export"), i18n.T("Export")).Disabled(busy || hs.usageN == 0).Clicked() {
 			only := hs.exportSel == opts[1]
-			chooseFolder(a, i18n.T("Export the recordings to…"), i18n.T("Export here"), func(dir string) { a.exportRecordings(dir, only) })
+			chooseFolder(a, i18n.T("Export the recordings"), i18n.T("Export here"), func(dir string) { a.exportRecordings(dir, only) })
 		}
 	})
 	if busy {

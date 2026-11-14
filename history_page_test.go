@@ -347,7 +347,7 @@ func TestHistoryDelete(t *testing.T) {
 	seedHistory(t, a)
 	a.navigate("/history")
 	click(t, tt, "明天上午十点的站会改到线上，链接我稍后发到群里。")
-	click(t, tt, "Delete the entry…")
+	click(t, tt, "Delete the entry")
 	if !a.hist.delAsk || !has(tt, "Delete this entry?") {
 		t.Fatalf("no confirmation: %q", firstTexts(tt))
 	}
@@ -355,7 +355,7 @@ func TestHistoryDelete(t *testing.T) {
 	if _, err := a.lib.store.History().Get(context.Background(), histCard); err != nil {
 		t.Fatalf("Cancel deleted it: %v", err)
 	}
-	click(t, tt, "Delete the entry…")
+	click(t, tt, "Delete the entry")
 	if err := tt.Click("Delete"); err != nil {
 		t.Fatal(err)
 	}

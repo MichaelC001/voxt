@@ -36,7 +36,7 @@ func TestTrayMicrophones(t *testing.T) {
 	a, _, _ := newTestApp(t)
 	// The helper became ready: the inputs are listed without Settings.
 	labels, checked := checkedLabels(micMenu(t, a))
-	if !slices.Equal(labels, []string{"MacBook Air Microphone", "AirPods Pro", "", "Microphone settings…"}) || checked != "MacBook Air Microphone" {
+	if !slices.Equal(labels, []string{"MacBook Air Microphone", "AirPods Pro", "", "Microphone settings"}) || checked != "MacBook Air Microphone" {
 		t.Fatalf("menu %q, checked %q", labels, checked)
 	}
 	// Choosing one puts it first in the list.
@@ -57,7 +57,7 @@ func TestTrayMicrophones(t *testing.T) {
 	// AirPods unplugged: capture.devices.changed.
 	m, _ := proto.NewNotification(proto.MethodDevicesChanged, proto.DevicesResult{Devices: helpertest.Devices()[:1]})
 	a.helperNotified(m)
-	if labels, _ := checkedLabels(micMenu(t, a)); !slices.Equal(labels, []string{"MacBook Air Microphone", "", "Microphone settings…"}) {
+	if labels, _ := checkedLabels(micMenu(t, a)); !slices.Equal(labels, []string{"MacBook Air Microphone", "", "Microphone settings"}) {
 		t.Errorf("unplugged: %q", labels)
 	}
 	// None at all.

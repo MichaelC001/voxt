@@ -52,7 +52,7 @@ func (a *app) aeDetail(c *ui.Context, g appctx.Group) {
 				a.updateGroup(g.ID, func(g *appctx.Group) { g.Enabled = v })
 			})
 			moreMenu(c.Key("ae-more"), "", func(m *ui.Menu) {
-				if m.Item(i18n.T("Delete the group…")).Chosen() {
+				if m.Item(i18n.T("Delete the group")).Chosen() {
 					p.delAsk = true
 				}
 			})
@@ -124,7 +124,7 @@ func (a *app) aeApps(c *ui.Context, g appctx.Group) {
 	t := c.Theme()
 	k := tok(t)
 	p := &a.aePage
-	if sectionTitleAdd(c, "ae-add-app", i18n.T("Apps"), i18n.T("Dictating in one of these apps uses the group. A browser here covers the websites no website rule of any group matches."), i18n.T("Add apps…")) {
+	if sectionTitleAdd(c, "ae-add-app", i18n.T("Apps"), i18n.T("Dictating in one of these apps uses the group. A browser here covers the websites no website rule of any group matches."), i18n.T("Add apps")) {
 		p.appsOpen, p.appsQuery, p.bundleIn = true, "", ""
 		a.loadApps()
 	}
@@ -245,14 +245,14 @@ func (a *app) aeAutoKey(c *ui.Context, g appctx.Group) {
 			opts = append(opts, l)
 			byLabel[l] = cur
 		}
-		opts = append(opts, i18n.T("Custom…"))
+		opts = append(opts, i18n.T("Custom"))
 		if p.keyCustom {
-			p.keySel = i18n.T("Custom…")
+			p.keySel = i18n.T("Custom")
 		} else if !slices.Contains(opts, p.keySel) {
 			p.keySel = uitext.AutoKeyLabel(g.AutoKey)
 		}
 		if ui.Select(c.Key("ae-key-sel"), &p.keySel, opts).Label(i18n.T("Key after inserting")).Width(px(t, 180)).Changed() {
-			if p.keySel == i18n.T("Custom…") {
+			if p.keySel == i18n.T("Custom") {
 				p.keyCustom, p.keyText, p.keyErr = true, g.AutoKey, ""
 				return
 			}

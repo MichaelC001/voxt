@@ -155,7 +155,7 @@ func (a *app) trayItems() []*mygo.MenuItem {
 		mygo.Separator(),
 		a.trayMicItem(act), // tray_mic.go
 		&mygo.MenuItem{Label: i18n.T("Open VoxtMini"), Click: act(a.showMainWindow)},
-		&mygo.MenuItem{Label: i18n.T("Settings…"), Click: act(func() { a.showMainWindow(); a.navigate("/settings") })},
+		&mygo.MenuItem{Label: i18n.T("Settings"), Click: act(func() { a.showMainWindow(); a.navigate("/settings") })},
 	)
 	items = append(items, a.updateMenuItems(act)...) // updates.go
 	return append(items,
