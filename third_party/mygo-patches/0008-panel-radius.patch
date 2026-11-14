@@ -1,0 +1,104 @@
+diff --git a/ui/combobox.go b/ui/combobox.go
+index 6dc8b7b..e07bc63 100644
+--- a/ui/combobox.go
++++ b/ui/combobox.go
+@@ -268,7 +268,7 @@ func styleOptions(c *context, p *comboboxParts, options []string) *node {
+ 		panel.MaxHeight(t.Space(70))
+ 		panel.flags |= flagScrollY | flagHover
+ 		for _, opt := range options {
+-			item := p.Item(opt).Padding(t.Space(1.5), t.Space(2.5)).Radius(t.Radius)
++			item := p.Item(opt).Padding(t.Space(1.5), t.Space(2.5)).Radius(t.optionRadius())
+ 			if item.Highlighted() {
+ 				item.Background(t.Accent).TextColor(t.AccentText)
+ 			}
+diff --git a/ui/panel_radius_test.go b/ui/panel_radius_test.go
+new file mode 100644
+index 0000000..9c55ad3
+--- /dev/null
++++ b/ui/panel_radius_test.go
+@@ -0,0 +1,25 @@
++package ui
++
++import "testing"
++
++func TestPanelRadius(t *testing.T) {
++	th := LightTheme()
++	if got := th.panelRadius(); got != th.Radius+2 {
++		t.Errorf("default panel radius %v, want Radius+2", got)
++	}
++	if got := th.optionRadius(); got != th.Radius {
++		t.Errorf("default option radius %v, want Radius", got)
++	}
++	th.PanelRadius = 12
++	if got := th.panelRadius(); got != 12 {
++		t.Errorf("panel radius %v, want 12", got)
++	}
++	// Concentric: the panel's padding is Space(1).
++	if got, want := th.optionRadius(), 12-th.Space(1); got != want {
++		t.Errorf("option radius %v, want %v", got, want)
++	}
++	th.PanelRadius = 2
++	if got := th.optionRadius(); got != 0 {
++		t.Errorf("option radius %v, want 0", got)
++	}
++}
+diff --git a/ui/theme.go b/ui/theme.go
+index 28d7d8c..e14d63e 100644
+--- a/ui/theme.go
++++ b/ui/theme.go
+@@ -46,6 +46,12 @@ type Theme struct {
+ 	ScrollbarWidth float32
+ 	// Radius rounds the corners of controls.
+ 	Radius float32
++	// PanelRadius rounds the panels that pop up over the window (Select's
++	// and a ComboBox's lists, Popover, the date and color pickers); 0 is
++	// Radius+2. When set, the options of Select's and a ComboBox's lists
++	// are rounded PanelRadius less the panel's padding, so that their
++	// corners and the panel's are concentric.
++	PanelRadius float32
+ 	// Spacing is the unit of the room widgets leave inside and between
+ 	// their parts: their paddings and gaps, and the sizes of check boxes,
+ 	// switches, sliders and the rows of tables and trees, are multiples
+diff --git a/ui/widgets.go b/ui/widgets.go
+index 8e9c64f..eab126f 100644
+--- a/ui/widgets.go
++++ b/ui/widgets.go
+@@ -622,10 +622,28 @@ func corePopover(c *context, anchor *node, open *bool, fn func()) *node {
+ // stylePanel gives the panel of a popup the theme's look.
+ func stylePanel(c *context, panel *node) {
+ 	t := c.theme
+-	panel.Margin(t.Space(1), 0, 0, 0).Padding(t.Space(1)).Radius(t.Radius+2).Background(t.Background).Border(1, t.Border)
++	panel.Margin(t.Space(1), 0, 0, 0).Padding(t.Space(1)).Radius(t.panelRadius()).Background(t.Background).Border(1, t.Border)
+ 	panel.Shadow(0, 6, 20, 0, RGBA(0, 0, 0, 0.18))
+ }
+ 
++// panelRadius is the radius of a popup's panel: PanelRadius, or Radius+2.
++func (t *Theme) panelRadius() float32 {
++	if t.PanelRadius > 0 {
++		return t.PanelRadius
++	}
++	return t.Radius + 2
++}
++
++// optionRadius is the radius of an option in a popup's list (stylePanel's
++// padding inside the panel): Radius, or, with PanelRadius set, concentric
++// with the panel's corners.
++func (t *Theme) optionRadius() float32 {
++	if t.PanelRadius > 0 {
++		return max(t.PanelRadius-t.Space(1), 0)
++	}
++	return t.Radius
++}
++
+ // Select creates a drop-down choosing one of options into *selected.
+ func coreSelect(c *context, selected *string, options []string) *node {
+ 	t := c.theme
+@@ -649,7 +667,7 @@ func coreSelect(c *context, selected *string, options []string) *node {
+ 		list.Children(func() {
+ 			coreColumn(c).Children(func() {
+ 				for _, opt := range options {
+-					item := sel.Item(opt).Padding(t.Space(1.5), t.Space(2.5)).Radius(t.Radius)
++					item := sel.Item(opt).Padding(t.Space(1.5), t.Space(2.5)).Radius(t.optionRadius())
+ 					switch {
+ 					case item.Highlighted():
+ 						item.Background(t.Accent).TextColor(t.AccentText)

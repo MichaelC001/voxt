@@ -1,0 +1,45 @@
+{"to":"helper","msg":{"id":"c1","method":"apple.status","params":{"locales":["en-US","zh-CN","ja-JP"]}}}
+{"to":"app","msg":{"id":"c1","result":{"speech":{"engine":"analyzer","locales":[{"locale":"en-US","status":"installed"},{"locale":"zh-CN","status":"available"},{"locale":"ja-JP","status":"unsupported"}]},"intelligence":{"status":"available","languages":["en","ja","zh"]}}}}
+{"to":"helper","msg":{"id":"c2","method":"apple.status","params":{"locales":["en-US"]}}}
+{"to":"app","msg":{"id":"c2","result":{"speech":{"engine":"recognizer","locales":[{"locale":"en-US","status":"installed"}]},"intelligence":{"status":"unavailable","reason":"unsupportedOS"}}}}
+{"to":"helper","msg":{"id":"c3","method":"apple.status","params":{"locales":["zh-CN"]}}}
+{"to":"app","msg":{"id":"c3","result":{"speech":{"reason":"unsupportedOS","locales":[{"locale":"zh-CN","status":"unsupported"}]},"intelligence":{"status":"unavailable","reason":"notEnabled"}}}}
+{"to":"helper","msg":{"id":"01JB0C5000000000000000000I","method":"apple.install","params":{"locales":["zh-CN"]}}}
+{"to":"app","msg":{"method":"apple.progress","params":{"job":"01JB0C5000000000000000000I","fraction":0.25}}}
+{"to":"app","msg":{"method":"apple.progress","params":{"job":"01JB0C5000000000000000000I","fraction":1}}}
+{"to":"app","msg":{"id":"01JB0C5000000000000000000I","result":{"locales":[{"locale":"zh-CN","status":"installed"}]}}}
+{"to":"helper","msg":{"id":"01JB0C5000000000000000000S","method":"apple.speech","params":{"locale":"en-US","hints":["VoxtMini","Qwen"]}}}
+{"to":"app","msg":{"method":"apple.speech.started","params":{"job":"01JB0C5000000000000000000S","locale":"en-US","engine":"analyzer"}}}
+{"to":"helper","msg":{"id":"c4","method":"apple.speech.audio","params":{"job":"01JB0C5000000000000000000S","data":"AAABAAIA"}}}
+{"to":"app","msg":{"id":"c4","result":{}}}
+{"to":"app","msg":{"method":"apple.partial","params":{"job":"01JB0C5000000000000000000S","text":"Hello"}}}
+{"to":"helper","msg":{"id":"c5","method":"apple.speech.audio","params":{"job":"01JB0C5000000000000000000S","data":"AwAEAAUA"}}}
+{"to":"app","msg":{"id":"c5","result":{}}}
+{"to":"app","msg":{"method":"apple.partial","params":{"job":"01JB0C5000000000000000000S","text":"Hello VoxtMini"}}}
+{"to":"helper","msg":{"id":"c6","method":"apple.speech.finish","params":{"job":"01JB0C5000000000000000000S"}}}
+{"to":"app","msg":{"id":"c6","result":{}}}
+{"to":"app","msg":{"id":"01JB0C5000000000000000000S","result":{"text":"Hello, VoxtMini.","locale":"en-US","engine":"analyzer","audioMs":1840}}}
+{"to":"helper","msg":{"id":"01JB0C5000000000000000000U","method":"apple.speech","params":{"locale":"ja-JP"}}}
+{"to":"app","msg":{"id":"01JB0C5000000000000000000U","error":{"code":"unsupported","message":"Speech recognition does not support ja-JP on this Mac","data":{"capability":"locale"}}}}
+{"to":"helper","msg":{"id":"01JB0C5000000000000000000V","method":"apple.speech","params":{"locale":"en-US"}}}
+{"to":"app","msg":{"id":"01JB0C5000000000000000000V","error":{"code":"permission_denied","message":"Speech recognition is not allowed","data":{"permission":"speechRecognition"}}}}
+{"to":"helper","msg":{"id":"c7","method":"apple.speech.audio","params":{"job":"01JB0C5000000000000000000V","data":"AAA="}}}
+{"to":"app","msg":{"id":"c7","error":{"code":"bad_request","message":"No apple.speech job 01JB0C5000000000000000000V"}}}
+{"to":"helper","msg":{"id":"01JB0C5000000000000000000W","method":"apple.speech","params":{"locale":"zh-CN"}}}
+{"to":"app","msg":{"method":"apple.speech.started","params":{"job":"01JB0C5000000000000000000W","locale":"zh-CN","engine":"recognizer"}}}
+{"to":"helper","msg":{"id":"c8","method":"job.cancel","params":{"job":"01JB0C5000000000000000000W"}}}
+{"to":"app","msg":{"id":"01JB0C5000000000000000000W","error":{"code":"cancelled","message":"The recognition was cancelled"}}}
+{"to":"app","msg":{"id":"c8","result":{"cancelled":true}}}
+{"to":"helper","msg":{"id":"01JB0C6000000000000000000C","method":"apple.chat","params":{"messages":[{"role":"system","content":"Clean up the dictation. Answer with the text only."},{"role":"user","content":"um so the review moves to friday"}],"maxTokens":256,"temperature":0}}}
+{"to":"app","msg":{"method":"apple.delta","params":{"job":"01JB0C6000000000000000000C","text":"The review"}}}
+{"to":"app","msg":{"method":"apple.delta","params":{"job":"01JB0C6000000000000000000C","text":" moves to Friday."}}}
+{"to":"app","msg":{"id":"01JB0C6000000000000000000C","result":{"text":"The review moves to Friday.","finish":"stop"}}}
+{"to":"helper","msg":{"id":"01JB0C6000000000000000000D","method":"apple.chat","params":{"messages":[{"role":"user","content":"Translate into Japanese: good morning"}]}}}
+{"to":"app","msg":{"id":"01JB0C6000000000000000000D","error":{"code":"unsupported","message":"Apple Intelligence is not turned on","data":{"capability":"intelligence"}}}}
+{"to":"helper","msg":{"id":"01JB0C6000000000000000000E","method":"apple.chat","params":{"messages":[{"role":"user","content":"…"}],"maxTokens":64}}}
+{"to":"app","msg":{"id":"01JB0C6000000000000000000E","error":{"code":"context_length","message":"The prompt does not fit Apple Intelligence's context window"}}}
+{"to":"helper","msg":{"id":"01JB0C6000000000000000000F","method":"apple.chat","params":{"messages":[{"role":"user","content":"…"}]}}}
+{"to":"app","msg":{"id":"01JB0C6000000000000000000F","error":{"code":"refused","message":"Apple Intelligence's guardrails refused the request"}}}
+{"to":"helper","msg":{"id":"01JB0C6000000000000000000G","method":"apple.chat","params":{"messages":[{"role":"user","content":"Write a long story"}],"maxTokens":4}}}
+{"to":"app","msg":{"method":"apple.delta","params":{"job":"01JB0C6000000000000000000G","text":"Once upon a"}}}
+{"to":"app","msg":{"id":"01JB0C6000000000000000000G","result":{"text":"Once upon a","finish":"length"}}}

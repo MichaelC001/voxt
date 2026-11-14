@@ -1,55 +1,49 @@
-# Repository Guidelines
+# Working on VoxtMini
 
-## Project Shape
+VoxtMini is a macOS voice input app on local models, with remote models the user may choose instead (docs/remote-models.md): Go + MyGo (native UI, no cgo) and a small Swift helper. Speech recognition and voice activity detection come from sglang-omni's native MLX servers (`sglang_omni_mlx/native`), the language models from a Swift process of their own (mlx-swift-lm and a few GGUF models). It started as a copy of Auralink, the same author's app on remote models (NOTICE). Read [docs/architecture.md](docs/architecture.md) first, then [docs/plan.md](docs/plan.md) for the milestones; [docs/behavior.md](docs/behavior.md) compares its behaviour with Voxt's.
 
-Voxt is a macOS menu bar voice input and translation app written in Swift with an Xcode project at `Voxt.xcodeproj`.
+This repository held Voxt (Swift) until the tag `voxt-final`; everything since is VoxtMini, and these rules apply to all of it.
 
-- Main app sources live under `Voxt/`.
-- Tests live under `VoxtTests/`, with shared helpers in `VoxtTests/TestSupport/`.
-- User-facing docs live under `docs/`.
-- Local build products, derived data, and scratch references live under `build/` and `tmp/`; avoid editing or reviewing generated files there.
-- The root `.codex/` directory is local workflow state and is gitignored.
+## Rules
 
-## Build And Test
+- **Local models first; remote models only by the user's choice** (user, 2026-11-11; docs/remote-models.md). Local models are the default and "Automatic" always means a local one: audio and text leave the Mac only for a feature whose model the user picked as a remote service on its page (`settings.RemoteID`; `local.Choose` never picks a `Remote` model for automatic). Remote services (Voxt's providers, Auralink's code: `internal/providers`, `internal/asr/*`, `internal/llm`'s transports) are set up on the Models page; their keys live in the macOS Keychain only (`internal/secrets`, behind `remote.Keys`), never in the settings, the database or the logs; requests follow the family's network setting (the downloads' proxy). Apple's on-device models (Apple Speech, Apple Intelligence: docs/apple-models.md, run by the helper) are local models: on-device only, never Apple's servers. Otherwise the network is for update checks and model downloads. No account or server of VoxtMini's. The local models live in the ActNow family's model library (`$HUB`, the Hugging Face cache, shared with the family's other apps: `internal/models` on `actnowkit`), and downloads follow the family's shared network settings (proxy, Hub endpoints; "automatic" = the Mac's system proxy). VoxtMini is a member of the ActNow family (`internal/actnow`, the spec in the actnow repository `docs/family/actnow-family-spec.md`): never delete another app's models or claims. Models are behind `internal/local` (`local.Services`), which `internal/remote` wraps with the ready remote services: the session and the pages never talk to a runtime or a remote service directly.
+- **Every user-visible string goes through `i18n.T`** (or `N`, `X`) with a literal English message, and whoever adds one adds its zh-Hans translation to `internal/i18n/locales/zh-Hans.json`. `TestKeyParity` fails on a missing translation, an unused one, or format verbs that differ. Product words in Chinese: 转录 (Transcribe), 翻译 (Translate), 转写 (Rewrite), 应用增强 (App enhancement), 词典 (Dictionary), 本地模型 (Local models), 远程模型 (Remote models), 辅助进程 (the helper).
+- **The build pass does no I/O.** Views read `app` fields, snapshots and memory-only getters (`local.Services.Installed` too). Store, runtime and helper calls run on goroutines (`a.async`, `helperCall`) and come back through `a.post`. `app` is main-thread only.
+- **Voxt and Auralink are sources.** Both are the same author's, Apache-2.0 for VoxtMini: port their code where it fits (Voxt's Omni runtime lifecycle, model request policies and prompts; Auralink's everything else), written our way (one session owner, a layered prompt composer, pure logic apart from platform code), and record a behaviour that differs from Voxt's in `docs/behavior.md` (Voxt / VoxtMini / why).
+- **The UI is AudioSmith's.** Build pages from `ui_kit.go` and the tokens in `ui_tokens.go` (one ink primary button per view, the accent for state only, Solar icons, `settingRow` with ⓘ help). New icons: add the name to `internal/icons/names.txt`, then `go generate ./internal/icons`.
+- **Pure logic in `internal/`, platform code behind narrow interfaces** (the helper, `permission`, the local runtimes), with fakes for tests: everything must be testable on Linux. A runtime's or a remote service's client is tested against a fake server on loopback; tests never reach a real service (the `VOXTMINI_E2E=1` tests, with keys in `~/.config/voxtmini-dev/keys.env`, are by hand) nor the real Keychain (`newKeyring` is a memory one in the app's tests).
+- **The helper protocol** changes in every place at once: `internal/helper/proto`, the Swift types (`helper/Sources/VoxtMiniHelperKit/Wire*.swift`), `helper/Fixtures`, the fake helper (`internal/helper/helpertest`) and `docs/helper-protocol.md`. Go and Swift tests decode the same fixtures. So does the language models' llm protocol: `internal/llmrt/wire`, `llm/Sources/VoxtMiniLLMKit/Wire*.swift`, `llm/Fixtures`, `internal/llmrt/llmrttest` and `docs/llm-protocol.md`.
+- **The helper does, Go decides**: policy (when ⌘C may run, delays, keys after a paste, which device) goes in the params; the helper keeps no settings. The same holds for the model runtimes: Go supervises them and chooses the parameters.
+- **Files stay small**: at most 600 lines of code (aim for 400), 800 of tests; split by topic into `<area>_<part>.go`. `internal/archtest` checks the sizes (a ratchet over `allowlist.txt`) and the import layering (`imports.txt` lists every internal → internal import: add a line for a new one). Refactors that move code prove it with `declhash` and `scripts/snapshots.sh check` (docs/architecture.md, "Code structure rules").
+- **Licence**: VoxtMini is Apache-2.0, as the repository. Third-party code, data, models' runtimes or artwork need a licence compatible with it and an entry in `NOTICE`, with its licence text in `LICENSES/` (a new Go module: its licence file in `LICENSES/go/`). No per-file licence headers.
+- **The Mac (`mac-air`) is shared and short of disk** (about 32 GB free): build in `code/VoxtMini` (`scripts/mac.sh`), delete large build trees and models you downloaded for a test, and never touch `~/code/Auralink*`. The six catalogue models are in the real `$HUB` (`~/.cache/huggingface/hub`, claimed as `dev.hehehai.voxtnew`; the user's AudioSmith and Dicta use it too) and the runtimes in `~/voxtmini-runtime/{omni,llm}/` for every thread (its README says how to refresh it): use them instead of downloading or building again, never delete or move anything in the HF cache, and test deletions with a scratch `ACTNOW_FAMILY_DIR` + `HF_HUB_CACHE`. Do not sync (`scripts/mac.sh`) into a checkout while it builds, nor before pulling back files the Mac made (`--pull`): the sync deletes what the Linux side lacks.
+- Code comments and commit messages in English. Keep the MyGo lifetime rules (`.agents/skills/mygo-maintenance`).
 
-Use the shared `Voxt` scheme.
+## Commands
 
-```bash
-xcodebuild -list -project Voxt.xcodeproj
-xcodebuild build -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
-xcodebuild test -project Voxt.xcodeproj -scheme Voxt -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
+Run from `VoxtMini/`; Go 1.27.1 (`GOTOOLCHAIN=auto` fetches it).
+
+```sh
+CGO_ENABLED=0 go test ./...                                  # all tests (Linux and Mac)
+go tool mygo vet .                                           # vet + MyGo's UI checks
+CGO_ENABLED=1 go test -race ./...                            # needs cgo
+VOXTMINI_SNAPSHOTS=/tmp/shots go test -run TestSnapshots .    # pages as PNG
+go test -run TestKeyParity ./internal/i18n                   # strings and zh-Hans
+scripts/mac.sh '<command>'                                   # run on the Mac (MAC_HOST, MAC_DIR=code/VoxtMini)
+scripts/mac.sh 'scripts/build-helper.sh && scripts/build-llm.sh && go tool mygo build'   # the Swift helper and voxtmini-llm, then the app (mygo.json gives llm/voxtmini-llm its entitlements: no app without it)
+scripts/mac.sh 'scripts/build-omni.sh && go tool mygo build'     # the Omni runtime (speech models) into the app; --out DIR for VOXTMINI_OMNI_RUNTIME
+scripts/mac.sh 'scripts/build-llm.sh && go tool mygo build'      # voxtmini-llm (language models) into the app; --out DIR for VOXTMINI_LLM; on mac-air cp -Rc ~/voxtmini-runtime/llm resources/darwin-arm64/llm is quicker
+scripts/mac.sh 'scripts/release.sh --runtimes $HOME/voxtmini-runtime'   # the release build: helper, omni, LLM, mygo build, release-verify.sh (docs/release.md); VOXTMINI_SIGN_IDENTITY signs it (team 779M533DL5, as the other ActNow apps: scripts/release-identity.sh), over ssh through scripts/mac-gui.sh
+MAC_DIR=code/VoxtMini-xyz scripts/mac.sh 'VOXTMINI_COEXIST_OK=1 scripts/mac-hotkey-coexist.sh'   # a built app's helper beside a running Auralink: synthetic keys, right ⌥ fires only VoxtMini
+MAC_DIR=code/VoxtMini-sign scripts/mac.sh scripts/mac-sign-e2e.sh  # the release's signing with a throwaway identity: every nested binary hardened and timestamped
+scripts/mac.sh 'scripts/build-llm.sh --test'                     # its Swift tests (the same fixtures as Go)
+scripts/mac.sh 'cd helper && swift test'                     # the helper's tests (same fixtures as Go)
+MAC_DIR=code/VoxtMini-mt scripts/mac.sh scripts/mac-e2e.sh    # headless Mac tests: real helper, fake models, no window or key
+MAC_DIR=code/VoxtMini-logsel scripts/mac.sh scripts/mac-logs-shots.sh  # the logs' selection worked with the real pointer and captured (only while nobody uses the Mac; VOXTMINI_SHOTS_DRY=1: the window only)
+MAC_DIR=code/VoxtMini-xyz scripts/mac.sh scripts/mac-regress.sh  # the real models ($HUB, ~/voxtmini-runtime): Swift tests, omni, LLM, quick eval, app smoke
+scripts/mac.sh 'VOXTMINI_EVAL=1 VOXTMINI_OMNI_RUNTIME=$HOME/voxtmini-runtime/omni VOXTMINI_LLM=$HOME/voxtmini-runtime/llm/voxtmini-llm go test -run TestEval -v .'  # the eval (docs/eval.md)
+scripts/vendor-mygo.sh --check                               # third_party/mygo is MyGo + our patches
+scripts/snapshots.sh check                                   # every snapshot, pixel for pixel, against the merge base
+go run ./internal/tools/declhash . ./internal/...            # a hash per declaration: equal before and after a pure move
+go vet -tags updatecheck .                                   # the update-check build
 ```
-
-For focused test runs, prefer `-only-testing:VoxtTests/TestClassName` or `-only-testing:VoxtTests/TestClassName/testMethodName`.
-
-CI runs tests with explicit SwiftPM cache paths and `CODE_SIGNING_ALLOWED=NO`; mirror `.github/workflows/tests.yml` when reproducing CI package resolution issues.
-
-## Signing
-
-Shared signing defaults are in `Config/Signing.shared.xcconfig`.
-For local signing, copy `Config/Signing.local.xcconfig.example` to `Config/Signing.local.xcconfig`; the local file is gitignored. Do not commit personal signing settings.
-
-## Coding Conventions
-
-- Follow existing Swift style in nearby files.
-- Keep UI work consistent with the existing SwiftUI/AppKit split under `Voxt/Windows`, `Voxt/Settings`, and `Voxt/App`.
-- Split large files by responsibility, not arbitrary line counts. Preserve actor isolation and keep file-local helpers private when extracting code.
-- Treat unreferenced-symbol scans as candidates only: check protocol/selector callbacks, resource references, migrations, and tests before deletion.
-- Prefer existing managers, stores, and support types before adding new abstractions.
-- Keep tests deterministic by using `UserDefaults` suites and temporary directories from `VoxtTests/TestSupport` where applicable.
-- Do not modify audio fixtures in `VoxtTests/Fixtures/Audio/` unless the task explicitly requires fixture changes.
-
-## Dependencies
-
-Swift package dependencies are resolved through the Xcode project. Direct package references include MLXAudio, mlx-swift-lm, llama.swift, GRDB, swift-log, Sparkle, PermissionFlow, and FaviconFinder; mlx-swift is part of the model dependency graph. The MLX Audio dependency policy is documented in `docs/MLXAudioDependency.md`.
-
-## Architecture And Documentation
-
-- Documentation index: `docs/index.md`.
-- Current source map: `docs/Architecture.md`.
-- Refactoring baseline and deletion evidence: `docs/RefactoringAssessment.zh-CN.md`; staged implementation and pending validation: `docs/RefactoringProgress.zh-CN.md`.
-- Keep current behavior guides distinct from historical plans; do not present pending verification as completed.
-
-## Release Workflow
-
-Release automation is in `.github/workflows/release.yml`. Stable release tasks may also use the local `voxt-release` skill under `.codex/skills/voxt-release/`.

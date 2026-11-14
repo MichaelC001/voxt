@@ -1,0 +1,39 @@
+# Releases and updates
+
+VoxtMini is distributed through [GitHub Releases](https://github.com/hehehai/VoxtMini/releases) and the ActNow family site. GitHub releases carry a notarized macOS Apple silicon DMG. Installed copies receive signed updates from `https://actnow.dev/updates/voxtnew`; beta copies use the corresponding beta feed. The app keeps VoxtNew's bundle identifier, ActNow registration, feed and update key so existing installations can update to VoxtMini without losing their settings or model claims. The visible product name and source repository are VoxtMini.
+
+The native speech runtime is included at `sglang_omni_mlx/native` and pinned in [`UPSTREAM_PIN`](../sglang_omni_mlx/native/UPSTREAM_PIN). `scripts/build-omni.sh` builds only this checked-in version, so a release does not depend on a neighboring SGLang-Omni checkout.
+
+## GitHub Actions setup
+
+The release workflow builds on an Apple silicon macOS runner. Add these repository secrets in **Settings → Secrets and variables → Actions**. Organization secrets with access to this repository also work.
+
+| Secret | Purpose |
+|---|---|
+| `MACOS_CERTIFICATE` | Base64-encoded Developer ID Application `.p12` certificate |
+| `MACOS_CERTIFICATE_PASSWORD` | Password for the `.p12` |
+| `APPLE_TEAM_ID` | Developer team ID, currently `779M533DL5` |
+| `APPLE_ID` | Apple developer account used by `notarytool` |
+| `APPLE_APP_PASSWORD` | App-specific password for that account |
+| `MYGO_UPDATER_PRIVATE_KEY` | Existing VoxtNew update private key matching `release/mygo.release.json` |
+| `ACTNOW_INGEST_TOKEN` | Existing ActNow release-ingest token for the `voxtnew` app |
+
+The update signing key and ActNow token are scoped to the existing VoxtNew app identity. Do not generate a replacement update key: installed copies trust the public key already embedded in them. The workflow stores the signing certificate and update key in temporary runner files and removes the signing keychain at the end.
+
+For local releases, `scripts/release.sh --notarize <profile> --publish` uses the same app identity, update key, ActNow feed and signing team. `VOXTMINI_SIGN_IDENTITY` selects the Developer ID identity, `VOXTMINI_UPDATE_KEY` may point at the existing private key file, and `ACTNOW_INGEST_TOKEN` supplies the site token. A build without the signing identity is a local development build and cannot update installed copies.
+
+## Publishing a version
+
+1. Set the same version in `mygo.json`, `helper/Support/Info.plist` and `llm/Support/Info.plist`. The first standalone release continues the existing sequence at `0.1.0-beta.2`.
+2. Move the release notes from `Unreleased` into a versioned section in `CHANGELOG.md`. Keep the English notes first and the Chinese notes under `### 中文`.
+3. Commit and push the version, then create and push the matching tag, for example `v0.1.0-beta.2`.
+4. The tag workflow builds the app, signs it with Developer ID, notarizes and staples the app and DMG, verifies the bundle, publishes the update to ActNow, then creates a **draft GitHub release** with the DMG attached.
+5. Review and publish the GitHub draft. Beta versions should remain marked as pre-releases. ActNow updates become available after the workflow publishes them.
+
+A manual run from **Actions → Release → Run workflow** makes an artifact for checking the build. With `sign` off, it does not require release secrets and does not publish. With `sign` on, it signs and notarizes but still does not publish.
+
+## Distribution paths
+
+- **GitHub install:** users download the DMG from GitHub Releases and install VoxtMini.
+- **ActNow install:** the existing VoxtNew product page and download link remain available during this repository transition.
+- **In-app update:** every installed copy keeps reading the existing ActNow feed. GitHub release publication does not change the update source.
