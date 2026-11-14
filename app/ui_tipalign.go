@@ -14,6 +14,7 @@ package main
 // row aligned at the start, each with the top margin tipMargins returns.
 
 import (
+	"runtime"
 	"sync"
 	"unicode"
 
@@ -23,11 +24,18 @@ import (
 // The middle of a label's glyphs above its baseline, as a share of the
 // font's size: Latin capitals (cap height 0.70 in SF, 0.73 in DejaVu, the
 // tests' font) and CJK ideographs, whose em box stands about 0.12 below
-// the baseline.
-const (
-	latinMiddle = 0.36
-	cjkMiddle   = 0.37
-)
+// the baseline. PingFang SC (the Mac's Chinese font) draws its ideographs
+// lower in the em box than Noto Sans CJK (the tests' Linux font): measured
+// on mac-air, 0.37 put the ⓘ 0.5 DIP high beside 14-DIP labels and 1 DIP
+// high beside page titles; 0.33 centres it (TestInfoTipCentred).
+const latinMiddle = 0.36
+
+var cjkMiddle = func() float32 {
+	if runtime.GOOS == "darwin" {
+		return 0.33
+	}
+	return 0.37
+}()
 
 // infoTipBox is the ⓘ's side, in DIPs at 100 %.
 const infoTipBox = 18
