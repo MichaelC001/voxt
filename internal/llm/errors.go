@@ -17,7 +17,6 @@ import (
 // named in each comment.
 const (
 	CodeNoKey         = "llm.no_key"           // provider: no API key stored (a remote service)
-	CodeSignIn        = "llm.sign_in"          // provider: the account's sign-in is missing, failed or expired (Codex: a 401 too): sign in again
 	CodeAuth          = "llm.auth"             // provider, status: refused, the key rejected (401/403)
 	CodeRateLimited   = "llm.rate_limited"     // provider, retry_after (seconds, may be empty)
 	CodeServer        = "llm.server"           // provider, status: 5xx

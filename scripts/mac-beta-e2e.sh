@@ -4,9 +4,9 @@
 # workflow publishes them (scripts/actnow-publish.sh --dry-run, the site's
 # own script) and published as actnow.dev's back end does (update-server
 # -publish, into a directory that stands for the R2 bucket: a release
-# under voxtnew/, a beta under voxtnew/beta/, and the beta channel's
+# under voxtmini/, a beta under voxtmini/beta/, and the beta channel's
 # manifest always the newer of both), on a local actnow.dev: its update feed
-# /updates/voxtnew[/beta]/ served over HTTPS on the loopback interface
+# /updates/voxtmini[/beta]/ served over HTTPS on the loopback interface
 # (scripts/update-server -site, which serves the update files only):
 #
 #   0.1.0-beta.1, 0.1.0-beta.2   betas before any release
@@ -51,7 +51,7 @@ ID=dev.hehehai.voxtnew.betatest
 B1=0.1.0-beta.1 B2=0.1.0-beta.2 R1=0.1.0 B3=0.2.0-beta.1 R2=0.1.1
 WORK="$ROOT/build/beta-e2e"
 BUCKET="$WORK/bucket"
-FEED="$BUCKET/voxtnew"
+FEED="$BUCKET/voxtmini"
 FAILS=0 RUNS=0
 
 step() {
@@ -109,7 +109,7 @@ chmod 600 "$WORK/keys/mygo-update.key"
 server_pid=$!
 for _ in $(seq 50); do [[ -s "$WORK/url.txt" ]] && break; sleep 0.1; done
 SITE="$(cat "$WORK/url.txt")"
-URL="$SITE/updates/voxtnew"
+URL="$SITE/updates/voxtmini"
 # The release's updates (url, s3, prereleases) with the test key and feed.
 jq --arg id "$ID" --arg key "$(cat "$WORK/keys/mygo-update.pub")" --arg url "$URL" \
   '.identifier = $id | .updates.publicKey = $key | .updates.url = $url' release/mygo.release.json >"$WORK/overlay.json"
@@ -152,13 +152,13 @@ deltas() { jq -r '[.deltas[]?.from] | join(" ")' "$WORK/out-$1/darwin-arm64/upda
 # the site publishes it (no disk image: -skip-dmg).
 publish() {
   local out="$WORK/out-$1/darwin-arm64"
-  bash scripts/actnow-publish.sh --app voxtnew --dir "$out" --changelog CHANGELOG.md --min-macos 15.0 \
+  bash scripts/actnow-publish.sh --app voxtmini --dir "$out" --changelog CHANGELOG.md --min-macos 15.0 \
     --url "$SITE" --dry-run >"$WORK/publish-$1.json" 2>"$WORK/publish-$1.log" ||
     { cat "$WORK/publish-$1.log" >&2; exit 1; }
   # shellcheck disable=SC2016 # jq's variables
   check "actnow-publish.sh --dry-run takes $1 ($(jq -r '.channel' "$WORK/publish-$1.json"), $(jq -r '[.artifacts[].filename] | join(" ")' "$WORK/publish-$1.json"))" \
     jq -e --arg v "$1" '.version == $v and (.notes | length > 0) and (.notesZh | length > 0)' "$WORK/publish-$1.json"
-  "$WORK/update-server" -publish "$out" -dir "$BUCKET" -app voxtnew | sed 's/^/  publish: /'
+  "$WORK/update-server" -publish "$out" -dir "$BUCKET" -app voxtmini | sed 's/^/  publish: /'
 }
 
 # channels: the versions of the releases' and the beta channel's manifests.
@@ -278,7 +278,7 @@ cp "$WORK/beta-manifest.json" "$FEED/beta/update-darwin-arm64.json"
 
 step "the feed"
 echo "  $(wc -l <"$WORK/server.log" | tr -d ' ') requests, $RUNS update checks"
-check "nothing but /updates/voxtnew/ was asked" bash -c "! grep -E ' (GET|HEAD) /' '$WORK/server.log' | grep -v ' /updates/voxtnew/'"
+check "nothing but /updates/voxtmini/ was asked" bash -c "! grep -E ' (GET|HEAD) /' '$WORK/server.log' | grep -v ' /updates/voxtmini/'"
 check "no disk image was uploaded (-no-dmg) nor asked" bash -c "! find '$BUCKET' -name '*.dmg' | grep -q . && ! grep -q '\.dmg' '$WORK/server.log'"
 if pgrep -f "$WORK/inst/VoxtMini.app/Contents/Resources/helper/voxtmini-helper" >/dev/null; then
   echo "  FAIL a helper is running" && FAILS=$((FAILS + 1))

@@ -1,6 +1,6 @@
 # Releases and updates
 
-VoxtMini is distributed through [GitHub Releases](https://github.com/hehehai/VoxtMini/releases) and the ActNow family site. GitHub releases carry a notarized macOS Apple silicon DMG. Installed copies receive signed updates from `https://actnow.dev/updates/voxtnew`; beta copies use the corresponding beta feed. The app keeps VoxtNew's bundle identifier, ActNow registration, feed and update key so existing installations can update to VoxtMini without losing their settings or model claims. The visible product name and source repository are VoxtMini.
+VoxtMini is distributed through [GitHub Releases](https://github.com/hehehai/VoxtMini/releases) and the ActNow family site. GitHub releases carry a notarized macOS Apple silicon DMG. Its page is [actnow.dev/voxtmini](https://actnow.dev/voxtmini), with the download at [actnow.dev/download/voxtmini](https://actnow.dev/download/voxtmini). Installed copies receive signed updates from `https://actnow.dev/updates/voxtmini`; beta copies use the corresponding beta feed (`/updates/voxtmini/beta`). Copies built before that point at `https://actnow.dev/updates/voxtnew`, which the site redirects to `/updates/voxtmini` (MyGo's updater follows redirects). The app keeps VoxtNew's bundle identifier, ActNow registration and update key so existing installations can update to VoxtMini without losing their settings or model claims. The visible product name, site slug (`voxtmini`) and source repository are VoxtMini.
 
 The native speech runtime is included at `sglang_omni_mlx/native` and pinned in [`UPSTREAM_PIN`](../sglang_omni_mlx/native/UPSTREAM_PIN). `scripts/build-omni.sh` builds only this checked-in version, so a release does not depend on a neighboring SGLang-Omni checkout.
 
@@ -16,9 +16,9 @@ The release workflow builds on an Apple silicon macOS runner. Add these reposito
 | `APPLE_ID` | Apple developer account used by `notarytool` |
 | `APPLE_APP_PASSWORD` | App-specific password for that account |
 | `MYGO_UPDATER_PRIVATE_KEY` | Existing VoxtNew update private key matching `release/mygo.release.json` |
-| `ACTNOW_INGEST_TOKEN` | Existing ActNow release-ingest token for the `voxtnew` app |
+| `ACTNOW_INGEST_TOKEN` | ActNow release-ingest token for the `voxtmini` app (the site's `RELEASE_INGEST_TOKEN_VOXTMINI`) |
 
-The update signing key and ActNow token are scoped to the existing VoxtNew app identity. Do not generate a replacement update key: installed copies trust the public key already embedded in them. The workflow stores the signing certificate and update key in temporary runner files and removes the signing keychain at the end.
+The update signing key is the existing VoxtNew app identity's; the ActNow token is the `voxtmini` app's (the site rejects `--app voxtnew`). Do not generate a replacement update key: installed copies trust the public key already embedded in them. The workflow stores the signing certificate and update key in temporary runner files and removes the signing keychain at the end.
 
 For local releases, `scripts/release.sh --notarize <profile> --publish` uses the same app identity, update key, ActNow feed and signing team. `VOXTMINI_SIGN_IDENTITY` selects the Developer ID identity, `VOXTMINI_UPDATE_KEY` may point at the existing private key file, and `ACTNOW_INGEST_TOKEN` supplies the site token. A build without the signing identity is a local development build and cannot update installed copies.
 

@@ -19,7 +19,6 @@ type Keyring interface {
 // block. Goroutine-safe.
 type Keys struct {
 	ring Keyring
-	mask func(string) string
 
 	mu    sync.Mutex
 	masks map[string]string // by account; "" none; missing: not read
@@ -27,15 +26,7 @@ type Keys struct {
 
 // NewKeys is the keys of ring (nil: none can be read or saved).
 func NewKeys(ring Keyring) *Keys {
-	return &Keys{ring: ring, mask: Mask, masks: map[string]string{}}
-}
-
-// NewKeysMask is NewKeys with how a saved value is shown (a sign-in's
-// account rather than a key's ends).
-func NewKeysMask(ring Keyring, mask func(string) string) *Keys {
-	k := NewKeys(ring)
-	k.mask = mask
-	return k
+	return &Keys{ring: ring, masks: map[string]string{}}
 }
 
 // Has says whether account holds a key, as last read. Memory only.
@@ -103,7 +94,7 @@ func (k *Keys) Set(account, label, value string) error {
 func (k *Keys) remember(account, value string) {
 	m := ""
 	if value != "" {
-		m = k.mask(value)
+		m = Mask(value)
 	}
 	k.mu.Lock()
 	k.masks[account] = m

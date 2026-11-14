@@ -33,7 +33,7 @@ func TestModelsFilter(t *testing.T) {
 	if !has(tt, "LFM2 1.2B · 4-bit") || has(tt, "Whisper small") || has(tt, "DeepSeek") {
 		t.Errorf("language, local: %q", firstTexts(tt))
 	}
-	click(t, tt, "All 39") // ChatGPT (Codex) since #29
+	click(t, tt, "All 38")
 	if !has(tt, "DeepSeek") {
 		t.Errorf("language, all: %q", firstTexts(tt))
 	}

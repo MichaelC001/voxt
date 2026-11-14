@@ -32,7 +32,7 @@
 # with it, with the hardened runtime and a secure timestamp (mygo build:
 # signNestedCode), and the build takes the update feed of
 # release/mygo.release.json (scripts/release-config.sh): actnow.dev's
-# /updates/voxtnew, or /updates/voxtnew/beta for a version with a "-".
+# /updates/voxtmini, or /updates/voxtmini/beta for a version with a "-".
 # The update files are signed with VoxtMini's update key:
 # MYGO_UPDATER_PRIVATE_KEY (the key itself) or the file VOXTMINI_UPDATE_KEY
 # (default ~/.config/voxtnew-release/update-keys/mygo-update.key), which
@@ -221,7 +221,7 @@ scripts/release-verify.sh build/darwin-arm64 "$mode"
 
 if compgen -G "build/darwin-arm64/update-*.json" >/dev/null; then
   echo "== actnow.dev ($channel)"
-  publish=(--app voxtnew --channel "$channel" --dir build/darwin-arm64 --changelog CHANGELOG.md --min-macos 15.0 --version "$version")
+  publish=(--app voxtmini --channel "$channel" --dir build/darwin-arm64 --changelog CHANGELOG.md --min-macos 15.0 --version "$version")
   if ((PUBLISH)); then
     bash scripts/actnow-publish.sh "${publish[@]}"
   else

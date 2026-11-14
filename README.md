@@ -27,7 +27,7 @@ Voice input for macOS, on **local models** first: press a shortcut in any app, s
 - **Language models**: Qwen3.5 4B (balanced, recommended) and 2B (fast), Hy-MT2 for translation, more MLX models marked experimental (Gemma 4, Ministral 3, LFM2…), in `voxtmini-llm`, a Swift process of VoxtMini's own (MLX, llama.cpp for GGUF); **Apple Intelligence** on macOS 26.
 - Models download from Hugging Face (or a mirror) when you ask, each file checked against a pinned SHA-256, into the model library shared with the other ActNow apps. A model stops after a few minutes unused (Models → Advanced changes it).
 
-**Remote** (set up on the Models page, chosen per feature): OpenAI, Doubao, Alibaba Cloud, Gemini Live, StepFun, Z.ai, Xiaomi MiMo for speech; Anthropic, OpenAI (also the Responses API, with web search for Rewrite), Codex with your ChatGPT sign-in, Gemini, DeepSeek, OpenRouter and others, or Ollama / LM Studio / oMLX on your Mac, for language. API keys can be shared with the other ActNow apps.
+**Remote** (set up on the Models page, chosen per feature): OpenAI, Doubao, Alibaba Cloud, Gemini Live, StepFun, Z.ai, Xiaomi MiMo for speech; Anthropic, OpenAI (also the Responses API, with web search for Rewrite), Gemini, DeepSeek, OpenRouter and others, or Ollama / LM Studio / oMLX on your Mac, for language. API keys can be shared with the other ActNow apps.
 
 ## Requirements
 
@@ -35,9 +35,9 @@ A Mac with Apple silicon and macOS 15 or later (Apple Intelligence and the newer
 
 ## Download
 
-VoxtMini's builds are published on [GitHub Releases](https://github.com/hehehai/VoxtMini/releases) as notarised Apple silicon disk images (tags `v0.x`; the `v1.x` releases there are Voxt's). Installed copies update from [actnow.dev](https://actnow.dev), with a Beta channel in Settings → About.
+Download VoxtMini from its page on actnow.dev, [actnow.dev/voxtmini](https://actnow.dev/voxtmini) ([download](https://actnow.dev/download/voxtmini), with a free ActNow account), or from [GitHub Releases](https://github.com/hehehai/VoxtMini/releases), both notarised Apple silicon disk images (tags `v0.x`; the `v1.x` releases there are Voxt's). Installed copies update from actnow.dev (`/updates/voxtmini`), with a Beta channel in Settings → About.
 
-> **Status: beta** (latest release `0.1.0-beta.2`; what came since is in [CHANGELOG.md](CHANGELOG.md) under Unreleased). Not yet checked on a real Mac: Apple Speech and Apple Intelligence, and Gemini Live, Codex sign-in and the Responses API against the real services; models marked experimental have not been run on a Mac with VoxtMini.
+> **Status: beta** (latest release `0.1.0-beta.2`; what came since is in [CHANGELOG.md](CHANGELOG.md) under Unreleased). Not yet checked on a real Mac: Apple Speech and Apple Intelligence, and Gemini Live and the Responses API against the real services; models marked experimental have not been run on a Mac with VoxtMini.
 
 ## Privacy
 

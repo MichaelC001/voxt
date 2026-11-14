@@ -92,14 +92,11 @@ func TestLLMConfigAPI(t *testing.T) {
 	if !SearchSupported(p) || SearchSupported(settings.Provider{ID: "openai"}) {
 		t.Error("openai: search only over the Responses API")
 	}
-	if !SearchSupported(settings.Provider{ID: "anthropic"}) || !SearchSupported(settings.Provider{ID: "codex"}) || SearchSupported(settings.Provider{ID: "deepseek"}) {
+	if !SearchSupported(settings.Provider{ID: "anthropic"}) || SearchSupported(settings.Provider{ID: "deepseek"}) {
 		t.Error("search support")
 	}
 	if err := CheckEndpoint(LLM, settings.Provider{ID: "deepseek", API: llm.APIResponses}); err == nil {
 		t.Error("DeepSeek has no Responses API")
-	}
-	if pr, _ := LookupPreset(LLM, "codex"); !pr.SignIn || pr.KeyOptional {
-		t.Errorf("codex %+v", pr)
 	}
 	if pr, _ := LookupPreset(LLM, "openai"); !pr.Responses {
 		t.Errorf("openai %+v", pr)

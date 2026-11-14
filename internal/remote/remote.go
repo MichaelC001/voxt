@@ -42,10 +42,6 @@ type Config struct {
 	Proxy func() asr.ProxyFunc
 	// HTTP replaces the clients built on the proxy (tests).
 	HTTP *http.Client
-	// SignIn is the request headers of a service that signs in with an
-	// account (providers.Preset.SignIn: ChatGPT for Codex), by its
-	// Keychain account; nil: such services cannot be opened.
-	SignIn func(account string) llm.HeaderSource
 }
 
 // Services is the local models and the ready remote services.
@@ -154,21 +150,11 @@ func (s *Services) LLM(ctx context.Context, id string) (local.Chat, local.Model,
 	if !ok {
 		return s.cfg.Local.LLM(ctx, "")
 	}
-	acc := providers.Account(providers.LLM, p.ID)
-	var env providers.Env
-	if pr, _ := providers.PresetOf(providers.LLM, p); pr.SignIn {
-		env = s.env("") // the sign-in's headers, not a key
-		if s.cfg.SignIn != nil {
-			env.Auth = s.cfg.SignIn(acc)
-		}
-	} else {
-		key, err := s.cfg.Keys.Get(acc)
-		if err != nil {
-			return nil, local.Model{}, err
-		}
-		env = s.env(key)
+	key, err := s.cfg.Keys.Get(providers.Account(providers.LLM, p.ID))
+	if err != nil {
+		return nil, local.Model{}, err
 	}
-	b, err := providers.NewLLM(p, env)
+	b, err := providers.NewLLM(p, s.env(key))
 	if err != nil {
 		return nil, local.Model{}, err
 	}

@@ -60,10 +60,6 @@ type Preset struct {
 	Prompt, Hints bool
 	// KeyOptional: it works without a key (a custom server).
 	KeyOptional bool
-	// SignIn: it signs in with an account instead of a key (Codex: a
-	// ChatGPT account). Its sign-in is kept as its key (the Keychain
-	// item of Account), so "has a key" is "signed in".
-	SignIn bool
 	// Responses: a language service that also offers the Responses API
 	// (settings.Provider.API).
 	Responses bool
@@ -120,8 +116,8 @@ func Presets(kind Kind) []Preset {
 	for _, p := range llm.Presets() {
 		out = append(out, Preset{Kind: LLM, ID: p.ID, Name: p.Name, Mode: p.Transport, Endpoint: p.BaseURL,
 			Model: p.DefaultModel, Models: p.Models, KeyOptional: p.KeyOptional, Custom: p.BaseURL == "",
-			SignIn: p.Auth == llm.AuthOAuth, Responses: p.Responses,
-			KeyURL: p.Docs, Docs: p.Docs})
+			Responses: p.Responses,
+			KeyURL:    p.Docs, Docs: p.Docs})
 	}
 	return out
 }

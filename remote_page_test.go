@@ -239,9 +239,6 @@ func remoteShots(a *app, save func(string)) {
 	a.rmDlg.advanced = true
 	save("remote-dialog-speech")
 	a.rmDlg = providerDialog{}
-	a.openProviderDialog(providers.LLM, "codex") // codex_signin_view.go
-	save("remote-dialog-codex")
-	a.rmDlg = providerDialog{}
 	a.openProviderDialog(providers.LLM, "openai") // remote_dialog_api.go
 	a.rmDlg.advanced, a.rmDlg.api, a.rmDlg.search = true, llm.APIResponses, true
 	save("remote-dialog-search")

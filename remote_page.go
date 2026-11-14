@@ -23,7 +23,6 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/hehehai/VoxtMini/internal/actnow"
-	"github.com/hehehai/VoxtMini/internal/codex"
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
@@ -60,9 +59,6 @@ type remoteState struct {
 	// rmTests are the last connection tests, by account.
 	rmTests map[string]providerTest
 	rmDlg   providerDialog
-	// codexSrc is the ChatGPT sign-in of the Codex service
-	// (codex_signin.go), made with the keys.
-	codexSrc *codex.Source
 }
 
 // providerTest is a connection test running or done.
@@ -169,9 +165,6 @@ func (a *app) providerState(c *ui.Context, kind providers.Kind, p settings.Provi
 	case providers.MissingOff:
 		return k.G[5], i18n.T("Off")
 	case providers.MissingKey:
-		if pr, _ := providers.PresetOf(kind, p); pr.SignIn {
-			return k.Warning, i18n.T("Not signed in")
-		}
 		return k.Warning, i18n.T("No key")
 	case providers.MissingEndpoint:
 		return k.Warning, i18n.T("No endpoint")
@@ -234,8 +227,6 @@ func (a *app) providerCard(c *ui.Context, kind providers.Kind, pr providers.Pres
 					keyText = "…"
 				case a.rmKeyErr[acc] != "":
 					keyText, keyCol = i18n.T("Could not read the key"), k.Warning
-				case missing == providers.MissingKey && pr.SignIn:
-					keyText, keyCol = i18n.T("Not signed in"), k.Warning
 				case missing == providers.MissingKey:
 					keyText, keyCol = i18n.T("No key"), k.Warning
 				default:
@@ -283,12 +274,12 @@ func (a *app) testProvider(kind providers.Kind, p settings.Provider) {
 		a.rmTests = map[string]providerTest{}
 	}
 	a.rmTests[acc] = providerTest{running: true}
-	keys, proxy, logs, auth := a.rkeys, a.remoteProxy(), a.logs, a.signInAuth(kind, p.ID)
+	keys, proxy, logs := a.rkeys, a.remoteProxy(), a.logs
 	a.async(func() {
 		key, err := keys.Get(acc)
 		res := providers.TestResult{Err: err, At: time.Now()}
 		if err == nil {
-			res = runProviderTest(context.Background(), kind, p, providers.Env{Key: key, Proxy: proxy(), Auth: auth})
+			res = runProviderTest(context.Background(), kind, p, providers.Env{Key: key, Proxy: proxy()})
 		}
 		logTest(logs, kind, p, res, key)
 		a.post(func() { a.rmTests[acc] = providerTest{res: res} })

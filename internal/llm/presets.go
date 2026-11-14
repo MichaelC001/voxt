@@ -29,14 +29,13 @@ const (
 	AuthXAPIKey = "x-api-key" // x-api-key: <key> (Anthropic)
 	AuthAPIKey  = "api-key"   // api-key: <key> (Azure OpenAI)
 	AuthNone    = "none"
-	AuthOAuth   = "oauth" // an account's sign-in: ProviderConfig.Auth's headers (Codex)
 )
 
 // Preset is a provider's fixed facts. Presets are data (presets.json).
 type Preset struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`      // brand name, not translated
-	Transport   string `json:"transport"` // "openai" | "anthropic" | "codex" (Transport*)
+	Transport   string `json:"transport"` // "openai" | "anthropic" (Transport*)
 	BaseURL     string `json:"baseURL"`   // "" for custom: the user supplies it
 	Auth        string `json:"auth"`
 	KeyName     string `json:"keyName,omitempty"` // Secrets name when shared with another preset; default ID
@@ -122,9 +121,6 @@ type ProviderConfig struct {
 	// WebSearch lets rewrites search the web where the service can
 	// (SearchSupported); dictation and translation never search.
 	WebSearch bool `json:"webSearch,omitempty"`
-	// Auth signs requests in for an "oauth" preset (Codex: the app's
-	// ChatGPT sign-in). Never stored.
-	Auth HeaderSource `json:"-"`
 }
 
 // Resolve merges cfg over its preset.

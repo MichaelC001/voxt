@@ -3,8 +3,8 @@ package llm
 // How a service searches the web (Preset.Search); "" none.
 const (
 	// SearchResponses: the Responses API's hosted tool,
-	// tools:[{type:"web_search"}] (OpenAI, xAI, Volcengine Ark, DashScope,
-	// Codex); only over the Responses API.
+	// tools:[{type:"web_search"}] (OpenAI, xAI, Volcengine Ark, DashScope);
+	// only over the Responses API.
 	SearchResponses = "responses"
 	// SearchAnthropic: Anthropic's server tool web_search_20250305.
 	SearchAnthropic = "anthropic"
@@ -26,7 +26,7 @@ const maxSearches = 5
 // APIChat: p's transport; APIResponses: the Responses API), for the UI's
 // web-search switch. p may be a preset or a resolved one.
 func SearchSupported(p Preset, api string) bool {
-	responses := p.Transport == TransportResponses || p.Transport == TransportCodex
+	responses := p.Transport == TransportResponses
 	if api == APIResponses && !responses {
 		if !p.Responses {
 			return false // the API is refused (ProviderConfig.Resolve)

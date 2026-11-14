@@ -16,7 +16,7 @@ package main
 // (checkBundle, appbundle.Updated).
 //
 // Beta updates (Settings → About): betas are in the feed's beta channel
-// (https://actnow.dev/updates/voxtnew/beta, whose manifest is the newer
+// (https://actnow.dev/updates/voxtmini/beta, whose manifest is the newer
 // of the newest beta and release), which MyGo reads only while
 // mygo.Updater.SetPrereleases is on (patch 0006);
 // the switch is Updates.Beta in VoxtMini's settings, on by default while

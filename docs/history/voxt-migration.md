@@ -4,13 +4,13 @@
 
 VoxtMini is a **new app**: Voxt rebuilt from scratch on Go + MyGo with local models only (Qwen3-ASR on the Omni native runtime, MLX / GGUF language models in `voxtmini-llm`). It keeps Voxt's core, Transcribe, Translate, Rewrite, App enhancement and the Dictionary, and leaves out meetings, notes, file transcription and sync.
 
-*Note, 2026-11-14: VoxtMini is published in Voxt's former GitHub repository, hehehai/VoxtMini (Voxt's history kept up to the tag `voxt-final`; Voxt itself continues as SGLang Omni Voxt). actnow.dev renamed its VoxtNew pages to Voxt, so actnow.dev/voxtnew and its download page are gone; downloads are on GitHub Releases until VoxtMini has a page there.*
+*Note, 2026-11-14: VoxtMini is published in Voxt's former GitHub repository, hehehai/VoxtMini (Voxt's history kept up to the tag `voxt-final`; Voxt itself continues as SGLang Omni Voxt). actnow.dev renamed its VoxtNew pages to Voxt, so actnow.dev/voxtnew and its download page are gone; VoxtMini has its own page, [actnow.dev/voxtmini](https://actnow.dev/voxtmini), with its download and update feed (`/updates/voxtmini`; the old `/updates/voxtnew` redirects there), besides GitHub Releases.*
 
 *Note, 2026-11-11: remote models are back (the user's decision): local models stay the default, and a feature uses a remote speech or language service only when the user sets one up on the Remote models page and picks it on the feature's page ([remote-models.md](../remote-models.md)). The announcement draft below was written before; if it is published after this lands, its "remote models are not included" / "no API key is needed" lines need updating (e.g. "local by default; remote models optional").*
 
 ## What this means for Voxt's users
 
-- **No automatic update.** VoxtMini has its own bundle id (`dev.hehehai.voxtnew`), a different signing team (779M533DL5, that of the ActNow apps) and its own update feed (`https://actnow.dev/updates/voxtnew`). Voxt's updater never offers it.
+- **No automatic update.** VoxtMini has its own bundle id (`dev.hehehai.voxtnew`), a different signing team (779M533DL5, that of the ActNow apps) and its own update feed (`https://actnow.dev/updates/voxtmini`). Voxt's updater never offers it.
 - **Voxt keeps working.** Nothing in VoxtMini changes or removes Voxt. Users can keep Voxt, switch, or run both: VoxtMini's default shortcuts are on Right Option, so they don't clash with Voxt's.
 - **They hear about it through Voxt's announcements.** Voxt fetches notices from `https://voxt.actnow.dev/api/app/notifications` (`VoxtNotificationStore`) and shows them in Settings → Notifications. The service and its admin panel are in the `voxt-service` repo (`notifications` table: title, content, cover image, version, published at, draft / published).
 - **Downloads** are on GitHub Releases, https://github.com/hehehai/VoxtMini/releases, not on Voxt's site.

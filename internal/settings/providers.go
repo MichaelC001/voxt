@@ -94,3 +94,32 @@ func cloneProviders(p Providers) Providers {
 	}
 	return Providers{ASR: cp(p.ASR), LLM: cp(p.LLM)}
 }
+
+// removedLLMPresets are language presets VoxtMini no longer offers
+// ("codex", the ChatGPT sign-in, removed 2026-11-14).
+var removedLLMPresets = []string{"codex"}
+
+// dropRemovedProviders forgets the setups of removed presets: a feature
+// that used one goes back to Automatic (a local model), and their hidden
+// marks go. Their Keychain items stay; nothing reads them.
+func dropRemovedProviders(s *Settings) {
+	s.Providers.LLM = slices.DeleteFunc(s.Providers.LLM, func(p Provider) bool {
+		preset := p.Preset
+		if preset == "" {
+			preset = p.ID
+		}
+		if !slices.Contains(removedLLMPresets, preset) {
+			return false
+		}
+		for _, f := range []*Feature{&s.Features.Transcribe.Feature, &s.Features.Translate.Feature, &s.Features.Rewrite.Feature} {
+			if id, ok := IsRemote(f.LLM); ok && id == p.ID {
+				f.LLM = ""
+			}
+		}
+		s.Models.Hidden = slices.DeleteFunc(s.Models.Hidden, func(k string) bool { return k == HiddenRemote("llm", p.ID) })
+		return true
+	})
+	if len(s.Providers.LLM) == 0 {
+		s.Providers.LLM = nil
+	}
+}

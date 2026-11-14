@@ -129,8 +129,6 @@ func ProviderErrorText(err error) (msg, more string) {
 		switch le.Code {
 		case llm.CodeNoKey:
 			return i18n.T("No key is saved for this service."), more
-		case llm.CodeSignIn:
-			return i18n.T("The sign-in expired or was refused: sign in again in the service's settings."), more
 		case llm.CodeAuth:
 			return i18n.T("The service refused the key. Check it and try again."), more
 		case llm.CodeRateLimited, llm.CodeOverloaded:
@@ -186,8 +184,6 @@ func ProviderErrorShort(err error) string {
 		switch le.Code {
 		case llm.CodeNoKey:
 			return i18n.T("No key: paste the key")
-		case llm.CodeSignIn:
-			return i18n.T("Sign in again")
 		case llm.CodeAuth:
 			return i18n.T("Key refused: check the key")
 		case llm.CodeRateLimited, llm.CodeOverloaded:

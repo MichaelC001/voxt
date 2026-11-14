@@ -41,7 +41,6 @@ type providerDialog struct {
 	saving, removeKey        bool
 	test                     providerTest
 	fam                      dialogFamily // the family's keys (family_keys.go)
-	signIn                   signInState  // a sign-in in progress (codex_signin.go)
 	// A language model's API ("" its usual one, llm.APIResponses) and web
 	// search while rewriting.
 	api    string
@@ -156,7 +155,6 @@ func (d *providerDialog) setup() (settings.Provider, string) {
 func (a *app) providerDialogView(c *ui.Context) {
 	d := &a.rmDlg
 	if !d.open {
-		a.cancelSignIn()  // a sign-in waiting for the browser ends with the dialog
 		if d.fam.joined { // closed unsaved after "Use this key"
 			f := d.fam
 			d.fam.joined = false
@@ -182,7 +180,7 @@ func (a *app) providerDialogView(c *ui.Context) {
 				what = i18n.T("When a feature uses it, recognised and selected text is sent to %s.", name)
 			}
 			caption(c, what).Grow(1).Basis(px(t, 240))
-			if pr.KeyURL != "" && !pr.SignIn { // a sign-in has no key to get
+			if pr.KeyURL != "" {
 				ui.Link(c.Key("rm-keyurl"), i18n.T("Get a key"), pr.KeyURL).FontSize(px(t, fsCaption))
 			}
 		})
@@ -203,9 +201,7 @@ func (a *app) providerDialogView(c *ui.Context) {
 			notice(c, "rm-key-err", noticeWarn, i18n.T("Could not read the key from the Keychain. Check that VoxtMini may use the login Keychain, then open this again."), e, nil, nil)
 		}
 		mask, _ := a.keyMask(acc)
-		if pr.SignIn {
-			a.signInField(c, mask) // codex_signin_view.go
-		} else if a.offerShown(mask) {
+		if a.offerShown(mask) {
 			a.sharedKeyOffer(c, name)
 		} else {
 			a.keyField(c, name, mask, pr.KeyOptional)
@@ -364,7 +360,7 @@ func (a *app) testDialog() {
 	d.err, d.test = "", providerTest{running: true}
 	acc := providers.Account(kind, p.ID)
 	typed, remove, keys, proxy, id, logs := strings.TrimSpace(d.key), d.removeKey, a.rkeys, a.remoteProxy(), d.id, a.logs
-	cs, vendor, auth := a.famKeys.Load(), "", a.signInAuth(kind, d.id)
+	cs, vendor := a.famKeys.Load(), ""
 	if d.fam.chosen { // "Use this key", not saved yet: the family's key
 		vendor = d.fam.vendor
 	}
@@ -379,7 +375,7 @@ func (a *app) testDialog() {
 		}
 		res := providers.TestResult{Err: err, At: time.Now()}
 		if err == nil {
-			res = runProviderTest(context.Background(), kind, p, providers.Env{Key: k, Proxy: proxy(), Auth: auth})
+			res = runProviderTest(context.Background(), kind, p, providers.Env{Key: k, Proxy: proxy()})
 		}
 		logTest(logs, kind, p, res, k)
 		a.post(func() {

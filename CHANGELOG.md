@@ -6,7 +6,7 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ### Added
 
-- **Remote models, by your choice**: set up remote speech and language services on the Models page (OpenAI, Doubao, Alibaba Cloud, Gemini Live, StepFun, Z.ai, Xiaomi MiMo; Anthropic, Gemini, DeepSeek, OpenRouter and others; Ollama, LM Studio and oMLX on your Mac) and choose one on a feature's page. Only that feature sends its audio or text, and only to that service; "Automatic" is always a local model. Keys stay in the Keychain and can be shared with the other ActNow apps. Codex signs in with your ChatGPT account; OpenAI-style services can use the Responses API, and Rewrite can search the web.
+- **Remote models, by your choice**: set up remote speech and language services on the Models page (OpenAI, Doubao, Alibaba Cloud, Gemini Live, StepFun, Z.ai, Xiaomi MiMo; Anthropic, Gemini, DeepSeek, OpenRouter and others; Ollama, LM Studio and oMLX on your Mac) and choose one on a feature's page. Only that feature sends its audio or text, and only to that service; "Automatic" is always a local model. Keys stay in the Keychain and can be shared with the other ActNow apps. OpenAI-style services can use the Responses API, and Rewrite can search the web.
 - **Apple Speech and Apple Intelligence** as local models, with nothing to download (on this Mac only; Apple Intelligence needs macOS 26).
 - **One Models page** for speech and language models, local and remote, with filters; models can be hidden. More local models, marked experimental: Whisper large-v3-turbo, large-v3 and small (no live text), Qwen3-ASR 1.7B 6-bit, Gemma 4, Qwen3.5 9B, Ministral 3, LFM2 and others.
 - **Dictionary**: categories, how often each term was used, terms limited to an App enhancement group, and the corrections it made shown in the history.
@@ -25,6 +25,7 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 - Shorter text everywhere: explanations moved behind ⓘ; a smaller Settings window.
 - The Speech Recognition permission is asked for only when a feature uses Apple Speech.
 - VoxtMini now lives in the former Voxt repository on GitHub (hehehai/VoxtMini); Voxt's history ends at the tag `voxt-final`.
+- VoxtMini has its own page on actnow.dev (actnow.dev/voxtmini), linked from Settings → About with its download; updates come from its own feed there.
 
 ### Fixed
 
@@ -37,7 +38,7 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 #### 新增
 
-- **远程模型，由你选择**：在模型页设置远程语音识别和语言模型服务（OpenAI、豆包、阿里云百炼、Gemini Live、阶跃星辰、智谱、小米 MiMo；Anthropic、Gemini、DeepSeek、OpenRouter 等；本机的 Ollama、LM Studio、oMLX），再在功能页里选用。只有这个功能把它的音频或文字发出去，而且只发给这个服务；“自动”总是本地模型。密钥保存在钥匙串里，可以与其他 ActNow app 共用。Codex 用你的 ChatGPT 账号登录；OpenAI 类服务可以用 Responses API，转写可以联网搜索。
+- **远程模型，由你选择**：在模型页设置远程语音识别和语言模型服务（OpenAI、豆包、阿里云百炼、Gemini Live、阶跃星辰、智谱、小米 MiMo；Anthropic、Gemini、DeepSeek、OpenRouter 等；本机的 Ollama、LM Studio、oMLX），再在功能页里选用。只有这个功能把它的音频或文字发出去，而且只发给这个服务；“自动”总是本地模型。密钥保存在钥匙串里，可以与其他 ActNow app 共用。OpenAI 类服务可以用 Responses API，转写可以联网搜索。
 - **Apple 语音识别和 Apple 智能**作为本地模型，无需下载（只在本机运行；Apple 智能需要 macOS 26）。
 - **统一的模型页**：语音识别和语言模型、本地和远程都在一页，可以筛选，也可以隐藏模型。更多本地模型（标为实验性）：Whisper large-v3-turbo、large-v3 和 small（没有实时文字）、Qwen3-ASR 1.7B 6-bit、Gemma 4、Qwen3.5 9B、Ministral 3、LFM2 等。
 - **词典**：分类、每个词条的使用次数、只在某个应用增强分组里生效的词条，历史里标出词典做的更正。
@@ -56,6 +57,7 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 - 各处文字更短：说明放进 ⓘ；设置窗口更小。
 - 只有某个功能用 Apple 语音识别时才请求“语音识别”权限。
 - VoxtMini 现在放在 GitHub 上原来 Voxt 的仓库里（hehehai/VoxtMini）；Voxt 的历史到标签 `voxt-final` 为止。
+- VoxtMini 在 actnow.dev 上有了自己的页面（actnow.dev/voxtmini），设置 → 诊断与关于 里链接它和下载页；更新也来自那里它自己的更新源。
 
 #### 修复
 

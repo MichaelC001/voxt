@@ -89,9 +89,8 @@ func (a *app) openModels() {
 	if a.local == nil {
 		// The local models, then the remote services the user set up
 		// (remote_page.go): a feature uses one only when the user picks it.
-		// family_keys.go: VoxtMini's items, then the family's; a sign-in
-		// shows as its account (codex_signin.go).
-		a.rkeys = remote.NewKeysMask(a.keyRing(), keyMaskOf)
+		// family_keys.go: VoxtMini's items, then the family's.
+		a.rkeys = remote.NewKeys(a.keyRing())
 		var st func() settings.Settings
 		if a.settings != nil {
 			st = a.settings.Get
@@ -103,7 +102,6 @@ func (a *app) openModels() {
 			Settings: st,
 			Keys:     a.rkeys,
 			Proxy:    a.remoteProxy(),
-			SignIn:   signInFor(a.codexSource()),
 		})
 		a.loadRemoteKeys(remoteAccounts(a.prefs))
 	}

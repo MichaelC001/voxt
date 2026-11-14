@@ -6,7 +6,7 @@
 # publishes them (scripts/actnow-publish.sh --dry-run, the site's own
 # script) and published as actnow.dev's back end does (update-server
 # -publish, into a directory that stands for the R2 bucket), on a local
-# actnow.dev: its update feed /updates/voxtnew/ served over HTTPS on the
+# actnow.dev: its update feed /updates/voxtmini/ served over HTTPS on the
 # loopback interface (scripts/update-server -site). The installed 0.1.0 is then updated by
 # the real updater, driven without a window (--update-check, -tags
 # updatecheck: update_check.go):
@@ -100,7 +100,7 @@ chmod 600 "$WORK/keys/mygo-update.key"
 server_pid=$!
 for _ in $(seq 50); do [[ -s "$WORK/url.txt" ]] && break; sleep 0.1; done
 SITE="$(cat "$WORK/url.txt")"
-URL="$SITE/updates/voxtnew"
+URL="$SITE/updates/voxtmini"
 # The release's updates (url, s3, prereleases) with the test key and feed.
 jq --arg id "$ID" --arg key "$(cat "$WORK/keys/mygo-update.pub")" --arg url "$URL" \
   '.identifier = $id | .updates.publicKey = $key | .updates.url = $url' release/mygo.release.json >"$WORK/overlay.json"
@@ -139,13 +139,13 @@ build() {
 # the site publishes it (no disk image: -skip-dmg).
 publish() {
   local out="$WORK/out-$1/darwin-arm64"
-  bash scripts/actnow-publish.sh --app voxtnew --dir "$out" --changelog CHANGELOG.md --min-macos 15.0 \
+  bash scripts/actnow-publish.sh --app voxtmini --dir "$out" --changelog CHANGELOG.md --min-macos 15.0 \
     --url "$SITE" --dry-run >"$WORK/publish-$1.json" 2>"$WORK/publish-$1.log" ||
     { cat "$WORK/publish-$1.log" >&2; exit 1; }
   # shellcheck disable=SC2016 # jq's variables
   check "actnow-publish.sh --dry-run takes $1 ($(jq -r '.channel' "$WORK/publish-$1.json"), $(jq -r '[.artifacts[].filename] | join(" ")' "$WORK/publish-$1.json"))" \
     jq -e --arg v "$1" '.version == $v and (.notes | length > 0) and (.notesZh | length > 0)' "$WORK/publish-$1.json"
-  "$WORK/update-server" -publish "$out" -dir "$WORK/bucket" -app voxtnew | sed 's/^/  publish: /'
+  "$WORK/update-server" -publish "$out" -dir "$WORK/bucket" -app voxtmini | sed 's/^/  publish: /'
 }
 
 # install: 0.1.0-test from its archive, as a user has it.
@@ -175,8 +175,8 @@ check "the app ships LICENSE, NOTICE and LICENSES/ (mygo.json resources)" \
 check "the build passes release-verify.sh (ad hoc)" scripts/release-verify.sh "$WORK/out-$V1/darwin-arm64" ad-hoc --no-dmg --no-runtimes
 publish "$V1"
 check "the release is the beta channel's too" \
-  test "$(jq -r .version "$WORK/bucket/voxtnew/beta/update-darwin-arm64.json")" = "$V1"
-MANIFEST="$WORK/bucket/voxtnew/update-darwin-arm64.json"
+  test "$(jq -r .version "$WORK/bucket/voxtmini/beta/update-darwin-arm64.json")" = "$V1"
+MANIFEST="$WORK/bucket/voxtmini/update-darwin-arm64.json"
 cp "$MANIFEST" "$WORK/manifest-with-delta.json"
 delta_size="$(jq -r --arg v "$V0" '.deltas[] | select(.from == $v) | .size' "$MANIFEST")"
 archive_size="$(jq -r .size "$MANIFEST")"

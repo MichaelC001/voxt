@@ -432,6 +432,7 @@ func Migrate(data []byte) (Settings, error) {
 		}
 	}
 	migrateSoundPreset(&s.Audio)
+	dropRemovedProviders(&s)
 	s.Version = Version
 	return normalize(s), nil
 }

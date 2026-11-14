@@ -27,7 +27,7 @@
 - **语言模型**：Qwen3.5 4B（均衡，推荐）和 2B（快速）、翻译专用的 Hy-MT2，以及标为实验性的更多 MLX 模型（Gemma 4、Ministral 3、LFM2 等），跑在 VoxtMini 自己的 Swift 进程 `voxtmini-llm` 里（MLX，GGUF 用 llama.cpp）；macOS 26 上还有 **Apple 智能**。
 - 模型在你需要时从 Hugging Face（或镜像）下载，每个文件都按固定的 SHA-256 校验，放在与其他 ActNow app 共用的模型库里。模型闲置几分钟后停止（在 模型 → 高级 里可以改）。
 
-**远程**（在模型页设置，按功能选择）：语音识别有 OpenAI、豆包、阿里云百炼、Gemini Live、阶跃星辰、智谱、小米 MiMo；语言模型有 Anthropic、OpenAI（也可用 Responses API，转写时可联网搜索）、用 ChatGPT 账号登录的 Codex、Gemini、DeepSeek、OpenRouter 等，或者本机的 Ollama / LM Studio / oMLX。API 密钥可以与其他 ActNow app 共用。
+**远程**（在模型页设置，按功能选择）：语音识别有 OpenAI、豆包、阿里云百炼、Gemini Live、阶跃星辰、智谱、小米 MiMo；语言模型有 Anthropic、OpenAI（也可用 Responses API，转写时可联网搜索）、Gemini、DeepSeek、OpenRouter 等，或者本机的 Ollama / LM Studio / oMLX。API 密钥可以与其他 ActNow app 共用。
 
 ## 系统要求
 
@@ -35,9 +35,9 @@ Apple 芯片、macOS 15 及以上的 Mac（Apple 智能和新版 Apple 语音识
 
 ## 下载
 
-VoxtMini 的构建发布在 [GitHub Releases](https://github.com/hehehai/VoxtMini/releases)，是经过公证的 Apple 芯片版磁盘映像（标签 `v0.x`；那里的 `v1.x` 是 Voxt 的版本）。装好后从 [actnow.dev](https://actnow.dev) 更新，设置 → 诊断与关于 里有 Beta 通道。
+从 actnow.dev 上的产品页 [actnow.dev/voxtmini](https://actnow.dev/voxtmini) 下载（[下载页](https://actnow.dev/download/voxtmini)，需要免费的 ActNow 账户），或从 [GitHub Releases](https://github.com/hehehai/VoxtMini/releases) 下载，都是经过公证的 Apple 芯片版磁盘映像（标签 `v0.x`；那里的 `v1.x` 是 Voxt 的版本）。装好后从 actnow.dev（`/updates/voxtmini`）更新，设置 → 诊断与关于 里有 Beta 通道。
 
-> **状态：beta**（最新发布 `0.1.0-beta.2`；之后的改动见 [CHANGELOG.md](CHANGELOG.md) 的 Unreleased）。尚未在真机上验证：Apple 语音识别和 Apple 智能，以及 Gemini Live、Codex 登录和 Responses API 对真实服务的调用；标为实验性的模型还没在 Mac 上用 VoxtMini 跑过。
+> **状态：beta**（最新发布 `0.1.0-beta.2`；之后的改动见 [CHANGELOG.md](CHANGELOG.md) 的 Unreleased）。尚未在真机上验证：Apple 语音识别和 Apple 智能，以及 Gemini Live 和 Responses API 对真实服务的调用；标为实验性的模型还没在 Mac 上用 VoxtMini 跑过。
 
 ## 隐私
 

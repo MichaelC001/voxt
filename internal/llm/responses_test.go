@@ -46,7 +46,7 @@ func rsBackend(t *testing.T, f *fake, cfg ProviderConfig) Backend {
 	if cfg.ID == "" {
 		cfg.ID = "openai"
 	}
-	if cfg.API == "" && cfg.ID != "codex" {
+	if cfg.API == "" {
 		cfg.API = APIResponses
 	}
 	cfg.BaseURL = f.srv.URL
@@ -233,7 +233,6 @@ func TestAPIChoice(t *testing.T) {
 		{ProviderConfig{ID: "dashscope-intl", API: APIResponses}, TransportResponses},
 		{ProviderConfig{ID: "c2", Preset: "custom", BaseURL: "http://127.0.0.1:9/v1", API: APIResponses}, TransportResponses},
 		{ProviderConfig{ID: "anthropic"}, TransportAnthropic},
-		{ProviderConfig{ID: "codex"}, TransportCodex},
 		{ProviderConfig{ID: "deepseek", API: APIResponses}, ""},
 		{ProviderConfig{ID: "anthropic", API: APIResponses}, ""},
 		{ProviderConfig{ID: "openai", API: "assistants"}, ""},
@@ -264,7 +263,7 @@ func TestSearchSupported(t *testing.T) {
 		{"openai", "", false}, {"openai", APIResponses, true},
 		{"xai", APIResponses, true}, {"volcengine", APIResponses, true}, {"dashscope", APIResponses, true},
 		{"anthropic", "", true}, {"zhipu", "", true}, {"zhipu", APIResponses, false},
-		{"codex", "", true}, {"gemini", "", false}, {"deepseek", "", false}, {"custom", APIResponses, false},
+		{"gemini", "", false}, {"deepseek", "", false}, {"custom", APIResponses, false},
 	} {
 		if got := SearchSupported(p(c.id), c.api); got != c.want {
 			t.Errorf("%s %q: %v", c.id, c.api, got)
@@ -355,110 +354,6 @@ func TestAnthropicSearchBlocks(t *testing.T) {
 	resp, err = NewAnthropic(p, f2.srv.Client(), keys()).Chat(context.Background(), Request{Messages: msgs("x"), OnDelta: func(s string) { streamed.WriteString(s) }})
 	if err != nil || resp.Text != "Forty-two" || streamed.String() != "Searching.Forty-two" || resp.Usage.CompletionTokens != 9 {
 		t.Fatalf("%v %+v streamed %q", err, resp, streamed.String())
-	}
-}
-
-func TestCodex(t *testing.T) {
-	f := newFake(t, sse(rsStream("o", "k")...))
-	calls := 0
-	auth := HeaderFunc(func(ctx context.Context) (map[string]string, error) {
-		calls++
-		return map[string]string{"Authorization": "Bearer at", "ChatGPT-Account-ID": "acc", "originator": "codex_cli_rs"}, nil
-	})
-	b := rsBackend(t, f, ProviderConfig{ID: "codex", Auth: auth, WebSearch: true})
-	// Not streamed by the caller: Codex streams anyway.
-	resp, err := b.Chat(context.Background(), Request{Messages: []Message{{Role: User, Content: "x"}}, Temperature: F64(0.5), TopP: F64(0.9), MaxTokens: 100, Skill: SkillRewrite})
-	if err != nil || resp.Text != "ok" || calls != 1 {
-		t.Fatalf("%v %+v calls %d", err, resp, calls)
-	}
-	r := f.requests()[0]
-	if r.Path != "/responses" || r.Header.Get("Authorization") != "Bearer at" || r.Header.Get("ChatGPT-Account-ID") != "acc" || r.Header.Get("Accept") != "text/event-stream" {
-		t.Fatalf("headers %v", r.Header)
-	}
-	want := `{"input":[{"content":"x","role":"user"}],"instructions":"` + codexInstructions + `","model":"gpt-5.4","store":false,"stream":true,"tools":[{"type":"web_search"}]}`
-	if got, _ := json.Marshal(r.Body); string(got) != want {
-		t.Fatalf("body\n%s\nwant\n%s", got, want)
-	}
-	// Probe works (streamed).
-	if _, err := Probe(context.Background(), b, ""); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestCodexSignIn(t *testing.T) {
-	f := newFake(t, sse(rsStream("ok")...))
-	cases := []struct {
-		name string
-		auth HeaderSource
-		h    http.HandlerFunc
-	}{
-		{"no sign-in", nil, nil},
-		{"source fails", HeaderFunc(func(context.Context) (map[string]string, error) { return nil, errors.New("refresh token revoked") }), nil},
-		{"401", HeaderFunc(func(context.Context) (map[string]string, error) {
-			return map[string]string{"Authorization": "Bearer old"}, nil
-		}),
-			jsonReply(401, map[string]any{"error": map[string]any{"message": "token expired"}})},
-	}
-	for _, c := range cases {
-		ff := f
-		if c.h != nil {
-			ff = newFake(t, c.h)
-		}
-		b := rsBackend(t, ff, ProviderConfig{ID: "codex", Auth: c.auth})
-		_, err := b.Chat(context.Background(), Request{Messages: msgs("x")})
-		if Code(err) != CodeSignIn {
-			t.Errorf("%s: %v", c.name, err)
-		}
-		if _, err := b.(ModelLister).Models(context.Background()); Code(err) != CodeSignIn {
-			t.Errorf("%s models: %v", c.name, err)
-		}
-	}
-	if len(f.requests()) != 0 {
-		t.Errorf("sent without a sign-in: %d", len(f.requests()))
-	}
-	// A cancelled sign-in is a cancel.
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	b := rsBackend(t, f, ProviderConfig{ID: "codex", Auth: HeaderFunc(func(ctx context.Context) (map[string]string, error) { return nil, ctx.Err() })})
-	if _, err := b.Chat(ctx, Request{Messages: msgs("x")}); Code(err) != CodeCancelled {
-		t.Errorf("cancelled: %v", err)
-	}
-}
-
-func TestCodexModels(t *testing.T) {
-	catalogue := map[string]any{"models": []any{
-		map[string]any{"slug": "gpt-5.4", "display_name": "GPT-5.4"},
-		map[string]any{"slug": "gpt-image", "output_modalities": []any{"image"}},
-		map[string]any{"slug": "gpt-5.4"},
-		map[string]any{"id": "gpt-5.3-codex"},
-	}, "categories": []any{map[string]any{"name": "more", "models": []any{map[string]any{"slug": "gpt-5.5"}}}}}
-	var query string
-	f := newFake(t, func(w http.ResponseWriter, r *http.Request) {
-		query = r.URL.RawQuery
-		jsonReply(200, catalogue)(w, r)
-	}, jsonReply(500, map[string]any{}), jsonReply(200, map[string]any{"models": []any{}}))
-	auth := HeaderFunc(func(context.Context) (map[string]string, error) {
-		return map[string]string{"Authorization": "Bearer at"}, nil
-	})
-	b := rsBackend(t, f, ProviderConfig{ID: "codex", Auth: auth}).(ModelLister)
-	ms, err := b.Models(context.Background())
-	if err != nil || query != "client_version="+CodexClientVersion || f.requests()[0].Path != "/models" {
-		t.Fatalf("%v %q %+v", err, query, f.requests())
-	}
-	var ids []string
-	for _, m := range ms {
-		ids = append(ids, m.ID)
-	}
-	if strings.Join(ids, ",") != "gpt-5.4,gpt-5.3-codex,gpt-5.5" || ms[0].Name != "GPT-5.4" {
-		t.Fatalf("models %+v", ms)
-	}
-	// A failing or empty catalogue: the built-in list.
-	p, _ := LookupPreset("codex")
-	for range 2 {
-		ms, err = b.Models(context.Background())
-		if err != nil || len(ms) != len(p.Models) || ms[0].ID != p.DefaultModel {
-			t.Fatalf("fallback %v %+v", err, ms)
-		}
 	}
 }
 

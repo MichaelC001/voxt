@@ -25,7 +25,6 @@ func TestVendor(t *testing.T) {
 		{"llm.custom", "", ""},
 		{"llm.custom-2", "", ""},
 		{"llm.ollama", "", ""},
-		{"llm.codex", "", ""},
 	} {
 		v, ok := Vendor(c.acc, c.endpoint)
 		if v.ID != c.want || ok != (c.want != "") {

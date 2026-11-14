@@ -18,7 +18,7 @@
 // as actnow.dev's back end does after scripts/actnow-publish.sh uploads it
 // (publish.go), and exits:
 //
-//	go run ./scripts/update-server -publish build/darwin-arm64 -dir bucket -app voxtnew
+//	go run ./scripts/update-server -publish build/darwin-arm64 -dir bucket -app voxtmini
 package main
 
 import (
@@ -48,7 +48,7 @@ func main() {
 	urlOut := flag.String("url", "url.txt", "where to write the URL")
 	site := flag.Bool("site", false, "serve dir as actnow.dev serves its bucket: /updates/<key>, update files only")
 	build := flag.String("publish", "", "publish this build into the bucket in dir, as actnow.dev does, and exit")
-	app := flag.String("app", "voxtnew", "-publish: the app's directory in the bucket")
+	app := flag.String("app", "voxtmini", "-publish: the app's directory in the bucket")
 	flag.Parse()
 	if *build != "" {
 		if err := publish(*build, *dir, *app, os.Stdout); err != nil {

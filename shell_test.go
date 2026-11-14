@@ -369,11 +369,11 @@ func TestAboutAndBundle(t *testing.T) {
 	a, _, tt := newTestApp(t)
 	a.navigate("/settings/about")
 	frames(tt)
-	if !has(tt, "Helper protocol") || !has(tt, "0.1.0") || !has(tt, "actnow.dev") || tt.HasText("Download") {
+	if !has(tt, "Helper protocol") || !has(tt, "0.1.0") || !has(tt, "actnow.dev") || !has(tt, "Download") {
 		t.Errorf("about: %q", firstTexts(tt))
 	}
-	if websiteURL != "https://actnow.dev" {
-		t.Errorf("website %s", websiteURL)
+	if websiteURL != "https://actnow.dev/voxtmini" || downloadURL != "https://actnow.dev/download/voxtmini" {
+		t.Errorf("addresses %s %s", websiteURL, downloadURL)
 	}
 	d := a.diagnosticsText()
 	if !strings.Contains(d, "Helper: 0.1.0 (ready)") || !strings.Contains(d, "Helper protocol: 1") {

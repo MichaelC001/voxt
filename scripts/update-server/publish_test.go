@@ -23,13 +23,13 @@ func TestPublish(t *testing.T) {
 		data, _ := json.Marshal(map[string]string{"version": version})
 		os.WriteFile(filepath.Join(dir, "update-darwin-arm64.json"), data, 0o644)
 		var out bytes.Buffer
-		err := publish(dir, bucket, "voxtnew", &out)
+		err := publish(dir, bucket, "voxtmini", &out)
 		return strings.TrimSpace(out.String()), err
 	}
 	channels := func() string {
 		v := func(p string) string {
 			var m struct{ Version string }
-			b, err := os.ReadFile(filepath.Join(bucket, "voxtnew", p, "update-darwin-arm64.json"))
+			b, err := os.ReadFile(filepath.Join(bucket, "voxtmini", p, "update-darwin-arm64.json"))
 			if err != nil {
 				return "none"
 			}

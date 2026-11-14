@@ -27,9 +27,6 @@ type Env struct {
 	Proxy asr.ProxyFunc
 	// HTTP replaces the clients built on Proxy (tests).
 	HTTP *http.Client
-	// Auth signs requests in for a service with an account's sign-in
-	// instead of a key (Preset.SignIn: ChatGPT for Codex).
-	Auth llm.HeaderSource
 }
 
 // NewASR builds the speech client of a setup, with its advanced
@@ -149,7 +146,6 @@ func NewLLM(p settings.Provider, env Env) (llm.Backend, error) {
 		client = asr.NewHTTPClient(env.Proxy, 0)
 	}
 	cfg := LLMConfig(p)
-	cfg.Auth = env.Auth
 	pr, err := cfg.Resolve()
 	if err != nil {
 		return nil, err

@@ -455,10 +455,6 @@ func TestPresets(t *testing.T) {
 		seen[p.ID] = true
 		switch p.Transport {
 		case TransportOpenAI, TransportAnthropic:
-		case TransportCodex:
-			if p.Auth != AuthOAuth {
-				t.Errorf("%s: auth %q", p.ID, p.Auth)
-			}
 		default:
 			t.Errorf("%s: transport %q", p.ID, p.Transport)
 		}

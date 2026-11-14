@@ -21,8 +21,7 @@ type httpTransport struct {
 	preset  Preset
 	client  *http.Client
 	secrets Secrets
-	auth    HeaderSource // an "oauth" preset's sign-in
-	search  bool         // web search for rewrites (NewBackend)
+	search  bool // web search for rewrites (NewBackend)
 }
 
 func (t *httpTransport) httpClient() *http.Client {
@@ -44,9 +43,6 @@ func (t *httpTransport) headers(ctx context.Context) (http.Header, error) {
 	for k, v := range t.preset.Headers {
 		h.Set(k, v)
 	}
-	if t.preset.Auth == AuthOAuth {
-		return t.signedIn(ctx, h)
-	}
 	key, err := lookupKey(ctx, t.secrets, t.preset)
 	if err != nil {
 		return nil, err
@@ -61,27 +57,6 @@ func (t *httpTransport) headers(ctx context.Context) (http.Header, error) {
 		h.Set("api-key", key)
 	default: // bearer, and "none" when the user stored a key anyway (a custom server with auth on)
 		h.Set("Authorization", "Bearer "+key)
-	}
-	return h, nil
-}
-
-// signedIn adds the account's headers (HeaderSource) to h: no source, or
-// its error, is CodeSignIn (sign in again).
-func (t *httpTransport) signedIn(ctx context.Context, h http.Header) (http.Header, error) {
-	if t.auth == nil {
-		return nil, newErr(CodeSignIn, "provider", t.preset.ID)
-	}
-	hs, err := t.auth.Headers(ctx)
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil, ctxErr(ctx, t.preset.ID, err, 0)
-		}
-		e := newErr(CodeSignIn, "provider", t.preset.ID)
-		e.Err = err
-		return nil, e
-	}
-	for k, v := range hs {
-		h.Set(k, v)
 	}
 	return h, nil
 }

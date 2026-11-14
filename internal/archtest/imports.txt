@@ -15,7 +15,6 @@ appctx hotkey
 appctx settings
 appicons helper/proto
 asr core
-codex core
 compose lang
 datadir store/sqlitestore
 deliver helper/proto

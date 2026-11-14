@@ -28,17 +28,18 @@ import (
 	"github.com/hehehai/VoxtMini/internal/uitext"
 )
 
-// The project's addresses: the website is
+// The project's addresses: the product page and the downloads are on
 // actnow.dev (the ActNow family's site, which also serves the updates);
 // issuesURL is where bugs are reported; the licence, the source and the
 // third-party notices are linked from Settings → About.
 const (
-	websiteURL = "https://actnow.dev" // the product site, shown as its domain
-	repoURL    = "https://github.com/hehehai/VoxtMini"
-	sourceURL  = repoURL + "/tree/main"
-	issuesURL  = repoURL + "/issues/new"
-	licenceURL = repoURL + "/blob/main/LICENSE"
-	noticeURL  = repoURL + "/blob/main/NOTICE"
+	websiteURL  = "https://actnow.dev/voxtmini" // the product page, shown as the site's domain
+	downloadURL = "https://actnow.dev/download/voxtmini"
+	repoURL     = "https://github.com/hehehai/VoxtMini"
+	sourceURL   = repoURL + "/tree/main"
+	issuesURL   = repoURL + "/issues/new"
+	licenceURL  = repoURL + "/blob/main/LICENSE"
+	noticeURL   = repoURL + "/blob/main/NOTICE"
 )
 
 // websiteDomain is the website link's text: a name, the same in every
@@ -309,6 +310,7 @@ func (a *app) aboutSettings(c *ui.Context) {
 	caption(c, i18n.T("VoxtMini is licensed under the Apache License 2.0 and comes with no warranty."))
 	ui.Row(c.Key("about-licence")).Gap(px(t, sp3)).AlignItems(ui.Center).Wrap().Children(func() {
 		ui.Link(c.Key("about-website"), websiteDomain, websiteURL).FontSize(px(t, fsCaption))
+		ui.Link(c.Key("about-download"), i18n.T("Download"), downloadURL).FontSize(px(t, fsCaption))
 		ui.Link(c.Key("about-licence-apache"), i18n.T("Licence"), licenceURL).FontSize(px(t, fsCaption))
 		ui.Link(c.Key("about-licence-source"), i18n.T("Source code"), sourceURL).FontSize(px(t, fsCaption))
 		ui.Link(c.Key("about-licence-notices"), i18n.T("Third-party notices"), noticeURL).FontSize(px(t, fsCaption))
