@@ -106,6 +106,9 @@ type updateState struct {
 	bundleStale func() bool
 	// bundleUpdated is set once it did: the card asks to restart.
 	bundleUpdated bool
+	// updateVersion is a version a daily check found, until Install or an
+	// installed update: the menus offer it (updateMenuItems).
+	updateVersion string
 }
 
 // The update's card: its ID, and the links of its actions (cardAction),
@@ -173,6 +176,8 @@ func (a *app) updateAvailable(version string) {
 	if a.bundleUpdated {
 		return
 	}
+	a.updateVersion = version
+	a.buildTrayMenu() // tray.go: Update to …
 	a.setProblem(problemUpdate, "available "+version, &core.Notification{Severity: core.SeverityInfo,
 		Title: i18n.T("Update available"), Body: i18n.T("Version %s", version), Link: linkInstallUpdate})
 }
@@ -181,16 +186,23 @@ func (a *app) updateAvailable(version string) {
 // opens with the version's notes and installs it on the user's word.
 func (a *app) installUpdate() {
 	a.setProblem(problemUpdate, "", nil)
+	a.updateVersion = ""
+	a.buildTrayMenu()
 	a.checkForUpdates()
 }
 
-// updateMenuItems is Check for Updates… for a menu (none without the
-// updater); act runs a function on the main thread.
+// updateMenuItems is Check for Updates for a menu, after Update to x when
+// a daily check found a version (none without the updater); act runs a
+// function on the main thread.
 func (a *app) updateMenuItems(act func(func()) func(*mygo.MenuItem, *mygo.Window)) []*mygo.MenuItem {
 	if a.upd == nil {
 		return nil
 	}
-	return []*mygo.MenuItem{{Label: i18n.T("Check for Updates"), Click: act(a.checkForUpdates)}}
+	var items []*mygo.MenuItem
+	if a.updateVersion != "" {
+		items = append(items, &mygo.MenuItem{Label: i18n.T("Update to %s", a.updateVersion), Click: act(a.installUpdate)})
+	}
+	return append(items, &mygo.MenuItem{Label: i18n.T("Check for Updates"), Click: act(a.checkForUpdates)})
 }
 
 // setAutoCheck and setAutoInstall change the updater's preferences
@@ -261,6 +273,8 @@ func (a *app) checkBundle() {
 // restart: a card (with Restart VoxtMini), Settings → About and Home.
 func (a *app) appUpdated() {
 	a.bundleUpdated = true
+	a.updateVersion = ""
+	a.buildTrayMenu()
 	a.setProblem(problemUpdate, "installed", &core.Notification{Severity: core.SeverityWarning,
 		Title: i18n.T("Update installed"), Body: i18n.T("Restart VoxtMini to finish updating."), Link: linkRelaunch})
 }

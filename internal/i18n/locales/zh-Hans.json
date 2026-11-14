@@ -1234,6 +1234,7 @@
   "Update available": "有可用更新",
   "Update installed": "已安装更新",
   "Update server": "更新服务器",
+  "Update to %s": "更新到 %s",
   "Updates": "更新",
   "Updates found in the background download and install without asking; VoxtMini then asks to restart. Off by default.": "后台发现的更新会直接下载并安装，不再询问；装好后 VoxtMini 会提示重启。默认关闭。",
   "Upload": "上传",

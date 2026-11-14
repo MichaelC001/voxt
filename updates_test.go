@@ -2,6 +2,7 @@ package main
 
 import (
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -321,9 +322,23 @@ func TestUpdateFound(t *testing.T) {
 	if cardActionLabel(linkInstallUpdate) != "Install" {
 		t.Error("card action label")
 	}
+	// The menu bar icon's menu offers it too, before Check for Updates.
+	trayLabels := func() []string {
+		var out []string
+		for _, it := range a.trayItems() {
+			out = append(out, it.Label)
+		}
+		return out
+	}
+	if i := slices.Index(trayLabels(), "Update to 9.9.9"); i < 0 || trayLabels()[i+1] != "Check for Updates" {
+		t.Fatalf("tray %q", trayLabels())
+	}
 	click(t, tt, "Install")
 	if fu.checks != 1 || has(tt, "Update available") {
 		t.Fatalf("checks %d, %q", fu.checks, firstTexts(tt))
+	}
+	if slices.Contains(trayLabels(), "Update to 9.9.9") {
+		t.Errorf("tray after Install %q", trayLabels())
 	}
 	// Found again later, the card comes back; once installed, the
 	// restart's card replaces it and a later find leaves that alone.
@@ -333,5 +348,8 @@ func TestUpdateFound(t *testing.T) {
 	a.updateFound("9.9.10")
 	if has(tt, "Update available") || !has(tt, "Update installed") {
 		t.Fatalf("cards: %q", firstTexts(tt))
+	}
+	if slices.ContainsFunc(trayLabels(), func(l string) bool { return strings.HasPrefix(l, "Update to") }) {
+		t.Errorf("tray after the update is installed %q", trayLabels())
 	}
 }
