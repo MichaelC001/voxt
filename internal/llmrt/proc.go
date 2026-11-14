@@ -16,6 +16,8 @@ import (
 
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/llmrt/wire"
+	"github.com/hehehai/VoxtMini/internal/logs"
+	"github.com/hehehai/VoxtMini/internal/procio"
 )
 
 // proc is one voxtmini-llm process.
@@ -23,7 +25,7 @@ type proc struct {
 	rt     *Runtime
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
-	tail   *lineTail
+	tail   *procio.Tail
 	exited chan struct{}
 	ids    atomic.Int64
 
@@ -75,10 +77,10 @@ func (r *Runtime) startProc() (*proc, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("starting %s: %w", r.cfg.Bin, err)
 	}
-	p := &proc{rt: r, cmd: cmd, stdin: stdin, tail: newLineTail(40), exited: make(chan struct{}), pending: map[string]*call{}}
-	var logFile *os.File
+	p := &proc{rt: r, cmd: cmd, stdin: stdin, tail: procio.NewTail(40), exited: make(chan struct{}), pending: map[string]*call{}}
+	var logFile *logs.CappedFile
 	if r.cfg.LogDir != "" {
-		logFile = openLog(filepath.Join(r.cfg.LogDir, "llm.log"))
+		logFile = logs.OpenCapped(filepath.Join(r.cfg.LogDir, "llm.log"), 0)
 	}
 	stderrDone := make(chan struct{})
 	go func() {
@@ -87,12 +89,10 @@ func (r *Runtime) startProc() (*proc, error) {
 		sc.Buffer(make([]byte, 64*1024), 1024*1024)
 		for sc.Scan() {
 			line := sc.Text()
-			p.tail.add(line)
-			if logFile != nil {
-				fmt.Fprintln(logFile, line)
-			}
+			p.tail.Add(line)
+			logFile.Println(logs.Redact(line)) // nil: no log file; redacted as the log ring does
 			if strings.TrimSpace(line) != "" {
-				r.log(stderrLevel(line), line)
+				r.log(procio.StderrLevel(line), line)
 			}
 		}
 	}()
@@ -100,9 +100,7 @@ func (r *Runtime) startProc() (*proc, error) {
 		p.read(stdout)
 		<-stderrDone
 		err := cmd.Wait()
-		if logFile != nil {
-			logFile.Close()
-		}
+		logFile.Close()
 		p.end(err)
 	}()
 	return p, nil
@@ -113,13 +111,13 @@ func (r *Runtime) startProc() (*proc, error) {
 func (p *proc) read(stdout io.Reader) {
 	br := bufio.NewReaderSize(stdout, 64*1024)
 	for {
-		line, err := readLine(br)
+		line, err := procio.ReadLine(br, wire.MaxLine)
 		if len(line) > 0 {
 			p.handle(line)
 		}
 		if err != nil {
 			if err != io.EOF {
-				p.tail.add("stdout: " + err.Error())
+				p.tail.Add("stdout: " + err.Error())
 			}
 			io.Copy(io.Discard, br)
 			return
@@ -127,27 +125,10 @@ func (p *proc) read(stdout io.Reader) {
 	}
 }
 
-// readLine reads one line of at most wire.MaxLine bytes; a longer one is
-// skipped.
-func readLine(r *bufio.Reader) ([]byte, error) {
-	var buf []byte
-	for {
-		chunk, isPrefix, err := r.ReadLine()
-		if len(buf)+len(chunk) <= wire.MaxLine {
-			buf = append(buf, chunk...)
-		} else {
-			buf = buf[:0:0]
-		}
-		if err != nil || !isPrefix {
-			return buf, err
-		}
-	}
-}
-
 func (p *proc) handle(line []byte) {
 	m, err := wire.Decode(line)
 	if err != nil {
-		p.tail.add("stdout: " + string(line))
+		p.tail.Add("stdout: " + string(line))
 		return
 	}
 	switch m.Kind() {
@@ -299,60 +280,10 @@ func (p *proc) busy() bool {
 	return len(p.pending) > 0
 }
 
-// openLog opens the stderr log for appending, keeping one previous file
-// once it passes 10 MB.
-func openLog(path string) *os.File {
-	if st, err := os.Stat(path); err == nil && st.Size() > 10<<20 {
-		os.Rename(path, path+".1")
-	}
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil
-	}
-	return f
-}
-
-// stderrLevel guesses the level of a free-form stderr line.
-func stderrLevel(line string) core.Severity {
-	l := strings.ToLower(line)
-	switch {
-	case strings.Contains(l, "fatal") || strings.Contains(l, "error"):
-		return core.SeverityError
-	case strings.Contains(l, "warning"):
-		return core.SeverityWarning
-	}
-	return core.SeverityInfo
-}
-
 func severity(level string) core.Severity {
 	switch s := core.Severity(level); s {
 	case core.SeverityDebug, core.SeverityInfo, core.SeverityWarning, core.SeverityError:
 		return s
 	}
 	return core.SeverityInfo
-}
-
-// lineTail keeps the last lines written to it.
-type lineTail struct {
-	mu    sync.Mutex
-	max   int
-	lines []string
-}
-
-func newLineTail(max int) *lineTail { return &lineTail{max: max} }
-
-func (t *lineTail) add(line string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.lines = append(t.lines, line)
-	if len(t.lines) > t.max {
-		t.lines = t.lines[len(t.lines)-t.max:]
-	}
-}
-
-func (t *lineTail) String() string {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return strings.Join(t.lines, "\n")
 }

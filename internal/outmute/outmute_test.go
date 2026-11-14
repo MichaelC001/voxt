@@ -201,6 +201,7 @@ func (f outputFunc) Recover(ctx context.Context, p proto.OutputRecoverParams) (p
 const spk, pods = "BuiltInSpeakerDevice", "5C-52-30-AA-01-02:output"
 
 func TestMuteAndRestore(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.c.Engage("s1")
 	r.muted(spk, true)
@@ -237,6 +238,7 @@ func TestMuteAndRestore(t *testing.T) {
 }
 
 func TestUserMutedAlready(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.sys.UserMute(spk, true)
 	r.c.Engage("s1")
@@ -249,6 +251,7 @@ func TestUserMutedAlready(t *testing.T) {
 }
 
 func TestCannotMute(t *testing.T) {
+	t.Parallel()
 	for _, d := range []helpertest.OutputDevice{
 		helpertest.Display, // a mute it cannot set
 		{ID: 70, UID: "NoMute:1", Name: "USB DAC", NoMute: true},
@@ -288,6 +291,7 @@ func TestCannotMute(t *testing.T) {
 }
 
 func TestOutputChanges(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.c.Engage("s1")
 	r.muted(spk, true)
@@ -310,6 +314,7 @@ func TestOutputChanges(t *testing.T) {
 }
 
 func TestUserUnmutes(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.c.Engage("s1")
 	r.muted(spk, true)
@@ -332,6 +337,7 @@ func TestUserUnmutes(t *testing.T) {
 }
 
 func TestLostAnswers(t *testing.T) {
+	t.Parallel()
 	t.Run("muted, the answer lost", func(t *testing.T) {
 		r := newRig(t)
 		r.out.setLost(proto.MethodOutputMute)
@@ -378,6 +384,7 @@ func TestLostAnswers(t *testing.T) {
 }
 
 func TestLateCalls(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	ran := false
 	r.c.Release("s1", func() { ran = true }) // stopped before its cue ended
@@ -404,6 +411,7 @@ func TestLateCalls(t *testing.T) {
 }
 
 func TestHelperRestarts(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.c.Engage("s1")
 	r.muted(spk, true)
@@ -424,6 +432,7 @@ func TestHelperRestarts(t *testing.T) {
 }
 
 func TestAppRestarts(t *testing.T) {
+	t.Parallel()
 	t.Run("the helper died too", func(t *testing.T) {
 		r := newRig(t)
 		r.c.Engage("s1")
@@ -461,6 +470,7 @@ func TestAppRestarts(t *testing.T) {
 }
 
 func TestSleep(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.c.Engage("s1")
 	r.muted(spk, true)
@@ -478,6 +488,7 @@ func TestSleep(t *testing.T) {
 }
 
 func TestOlderHelper(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.c.HelperReady(false)
 	r.c.Engage("s1")
@@ -490,6 +501,7 @@ func TestOlderHelper(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.c.Engage("s1")
 	r.muted(spk, true)
@@ -503,6 +515,7 @@ func TestClose(t *testing.T) {
 // thread's and the cue's), output changes and user unmutes meanwhile; at
 // the end nothing is muted and the helper holds no claim (-race).
 func TestManySessions(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	var wg sync.WaitGroup
 	for i := range 40 {
@@ -535,6 +548,7 @@ func TestManySessions(t *testing.T) {
 }
 
 func TestErrorsClassified(t *testing.T) {
+	t.Parallel()
 	r := newRig(t)
 	r.out.setFail(proto.MethodOutputMute, &proto.Error{Code: proto.CodeDeviceUnavailable, Message: "gone"})
 	r.c.Engage("s1")

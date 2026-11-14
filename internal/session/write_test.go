@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/hehehai/VoxtMini/internal/compose"
@@ -482,39 +483,41 @@ func TestWarmLLM(t *testing.T) {
 		{"rewrite", store.KindRewrite, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			model := &prefillLLM{fakeLLM: &fakeLLM{text: `{"title":"Hi","content":"Hello."}`}}
-			h := newHarness(t, &fakeFile{text: "hello aura link"}, model, func(c *Config, s *settings.Settings) {
-				s.Features.Transcribe.Enhance = tc.enhance
-			})
-			id, err := h.m.Start(StartRequest{Kind: tc.kind, Target: slack})
-			if err != nil {
-				t.Fatal(err)
-			}
-			h.rec.waitFor(t, "recording", func(s Snapshot) bool { return s.State == Recording })
-			h.speak(id, 3)
-			h.rec.wait(t)
-			var prefills []llm.Request
-			for deadline := time.Now().Add(time.Second); ; time.Sleep(time.Millisecond) {
-				model.mu.Lock()
-				prefills = model.prefills
-				model.mu.Unlock()
-				if len(prefills) > 0 || time.Now().After(deadline) {
-					break
+			synctest.Test(t, func(t *testing.T) {
+				model := &prefillLLM{fakeLLM: &fakeLLM{text: `{"title":"Hi","content":"Hello."}`}}
+				h := newHarness(t, &fakeFile{text: "hello aura link"}, model, func(c *Config, s *settings.Settings) {
+					s.Features.Transcribe.Enhance = tc.enhance
+				})
+				id, err := h.m.Start(StartRequest{Kind: tc.kind, Target: slack})
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-			if len(prefills) != map[bool]int{true: 1, false: 0}[tc.warm] {
-				t.Fatalf("%d prefills", len(prefills))
-			}
-			if !tc.warm {
-				return
-			}
-			chat := model.reqs[0]
-			p := prefills[0]
-			n := len(chat.Messages)
-			if p.Skill != chat.Skill || len(p.Messages) != n || n < 2 || !reflect.DeepEqual(p.Messages[:n-1], chat.Messages[:n-1]) ||
-				p.Messages[n-1].Content == chat.Messages[n-1].Content {
-				t.Errorf("prefill %+v\nchat %+v", p, chat)
-			}
+				h.rec.waitFor(t, "recording", func(s Snapshot) bool { return s.State == Recording })
+				h.speak(id, 3)
+				h.rec.wait(t)
+				var prefills []llm.Request
+				for deadline := time.Now().Add(time.Second); ; time.Sleep(time.Millisecond) {
+					model.mu.Lock()
+					prefills = model.prefills
+					model.mu.Unlock()
+					if len(prefills) > 0 || time.Now().After(deadline) {
+						break
+					}
+				}
+				if len(prefills) != map[bool]int{true: 1, false: 0}[tc.warm] {
+					t.Fatalf("%d prefills", len(prefills))
+				}
+				if !tc.warm {
+					return
+				}
+				chat := model.reqs[0]
+				p := prefills[0]
+				n := len(chat.Messages)
+				if p.Skill != chat.Skill || len(p.Messages) != n || n < 2 || !reflect.DeepEqual(p.Messages[:n-1], chat.Messages[:n-1]) ||
+					p.Messages[n-1].Content == chat.Messages[n-1].Content {
+					t.Errorf("prefill %+v\nchat %+v", p, chat)
+				}
+			})
 		})
 	}
 }

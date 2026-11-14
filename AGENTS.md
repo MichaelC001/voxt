@@ -21,11 +21,13 @@ This repository held Voxt (Swift) until the tag `voxt-final`; everything since i
 
 ## Commands
 
-Run from `VoxtMini/`; Go 1.27.1 (`GOTOOLCHAIN=auto` fetches it).
+Run from `VoxtMini/`; Go 1.27.4 (`GOTOOLCHAIN=auto` fetches it).
 
 ```sh
 CGO_ENABLED=0 go test ./...                                  # all tests (Linux and Mac)
+scripts/test-main.sh [-n 8] [-run RE] [-v]                   # the root package's tests in N processes (~10 s instead of ~70 s); then go test -p 8 ./internal/... for the rest
 go tool mygo vet .                                           # vet + MyGo's UI checks
+scripts/lint.sh                                              # dead code: staticcheck U1000 + deadcode -test print nothing (CI)
 CGO_ENABLED=1 go test -race ./...                            # needs cgo
 VOXTMINI_SNAPSHOTS=/tmp/shots go test -run TestSnapshots .    # pages as PNG
 go test -run TestKeyParity ./internal/i18n                   # strings and zh-Hans

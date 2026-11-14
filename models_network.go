@@ -15,10 +15,10 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	famsettings "github.com/hehehai/actnowkit/settings"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/settings"
+	famsettings "github.com/hehehai/actnowkit/settings"
 )
 
 // networkPath is the Network dialog's deep link (actnow.Links).

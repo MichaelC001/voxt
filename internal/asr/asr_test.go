@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/hehehai/VoxtMini/internal/asr"
+	"github.com/hehehai/VoxtMini/internal/core"
 )
 
 func TestWAVAndFrames(t *testing.T) {
@@ -149,5 +153,27 @@ func TestNoSpeech(t *testing.T) {
 		if got := asr.NoSpeech(tc.code, tc.detail); got != tc.want {
 			t.Errorf("NoSpeech(%q, %q) = %v", tc.code, tc.detail, got)
 		}
+	}
+}
+
+// TestClientsRedirects: the remote services' clients follow no redirect
+// to another host (where their keys would go too).
+func TestClientsRedirects(t *testing.T) {
+	var leaked atomic.Int32
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { leaked.Add(1) }))
+	defer other.Close()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL, http.StatusTemporaryRedirect)
+	}))
+	defer srv.Close()
+	for name, c := range map[string]*http.Client{"http": asr.NewHTTPClient(nil, 0), "ws": asr.WSClient(nil)} {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+		req.Header.Set("x-api-key", "sk-secret")
+		if _, err := c.Do(req); !errors.Is(err, core.ErrRedirect) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if leaked.Load() != 0 {
+		t.Error("a request reached the other host")
 	}
 }

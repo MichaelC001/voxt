@@ -157,9 +157,6 @@ var curatedProfiles = []Profile{
 	},
 }
 
-// Profiles lists the curated models, the recommended one first.
-func Profiles() []Profile { return append([]Profile(nil), profiles...) }
-
 // Lookup is the profile of id.
 func Lookup(id string) (Profile, bool) {
 	for _, p := range profiles {

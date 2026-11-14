@@ -5,7 +5,6 @@ package main
 
 import (
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
 )
 
@@ -20,13 +19,6 @@ func (a *app) pageWidth(c *ui.Context) float32 {
 		side = px(t, railWidth)
 	}
 	return w - side
-}
-
-// panelFits says whether a side panel w wide fits beside the page while
-// the page's main column keeps 480 DIPs; when it does not, the panel
-// shows as a drawer over the page (sidePanel).
-func (a *app) panelFits(c *ui.Context, w float32) bool {
-	return a.pageWidth(c)-w >= px(c.Theme(), 480)
 }
 
 // sidePanel shows fn in a side panel w wide, at the right of the page:
@@ -49,18 +41,6 @@ func sidePanel(c *ui.Context, key string, w float32, inline bool, label string, 
 			Shadow(-8, 0, 24, 0, ui.RGBA(0, 0, 0, 0.12)).Label(label)
 		panel.Children(fn)
 		if close != nil && (panel.PressedOutside() || panel.OverlayShortcut(0, ui.KeyEscape)) {
-			close()
-		}
-	})
-}
-
-// panelHeader is a side panel's title row: the title (15, semibold) and
-// a close icon button.
-func panelHeader(c *ui.Context, title string, close func()) {
-	t := c.Theme()
-	ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Children(func() {
-		sectionHeading(c, title).Grow(1)
-		if iconButton(c.Key("panel-close"), icons.Close, i18n.T("Close")).Clicked() {
 			close()
 		}
 	})

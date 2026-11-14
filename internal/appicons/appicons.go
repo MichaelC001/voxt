@@ -91,6 +91,19 @@ func (b *Book) Retry() {
 	}
 }
 
+// Forget forgets the icons that are there, loading or wanted, keeping
+// only what is known to have none (Missing, Failed): the lists left the
+// screen and their bitmaps go; the next ones ask again (the disk cache
+// answers quickly).
+func (b *Book) Forget() {
+	for k, s := range b.states {
+		if s != Missing && s != Failed {
+			delete(b.states, k)
+		}
+	}
+	b.wanted = nil
+}
+
 // TTL is how long an icon on disk is fresh: an app's update may bring a
 // new one.
 const TTL = 7 * 24 * time.Hour

@@ -79,8 +79,8 @@ type Request struct {
 	FirstTokenTimeout time.Duration
 	StallTimeout      time.Duration
 
-	// Skill tags the call for usage accounting and its default
-	// temperature (DefaultTemperature).
+	// Skill names the call's task, which picks its default temperature
+	// (DefaultTemperature).
 	Skill Skill
 
 	// Translate describes a translation (SkillTranslateText) for a model

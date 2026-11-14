@@ -31,11 +31,17 @@ import (
 // helper/ (mygo.json macos.helperEntitlements).
 const BinName = "voxtmini-helper"
 
-// Find looks for voxtmini-helper: $VOXTMINI_HELPER, then the app's
+// EnvBin names a helper to run in place of the app's: development builds
+// only (Find's env).
+const EnvBin = "VOXTMINI_HELPER"
+
+// Find looks for voxtmini-helper: $VOXTMINI_HELPER when env (a
+// development build: a published one must not run what the environment
+// names, which would inherit VoxtMini's permissions), then the app's
 // resources (packaged, mygo dev, or go run from the project). It returns
 // an absolute path, or "" when there is none.
-func Find(resources string) string {
-	if p := os.Getenv("VOXTMINI_HELPER"); p != "" {
+func Find(resources string, env bool) string {
+	if p := os.Getenv(EnvBin); p != "" && env {
 		if abs, err := filepath.Abs(p); err == nil {
 			return abs
 		}

@@ -34,7 +34,7 @@ type helperHost struct {
 }
 
 func newHelperHost(resources, logDir string) *helperHost {
-	return &helperHost{bin: helper.Find(resources), logDir: logDir,
+	return &helperHost{bin: helper.Find(resources, devOverrides()), logDir: logDir,
 		stale: func() bool { return appbundle.Updated(resources, mygo.App.Version()) }}
 }
 

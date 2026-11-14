@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/hehehai/VoxtMini/internal/core"
 )
 
 // The Codex CLI's public OAuth client.
@@ -60,7 +62,7 @@ var (
 type Config struct {
 	Issuer   string       // DefaultIssuer
 	ClientID string       // DefaultClientID
-	HTTP     *http.Client // http.DefaultClient; the app passes its proxied one
+	HTTP     *http.Client // nil: one without a proxy; the app passes its proxied one
 	Port     int          // 0: DefaultPort, then FallbackPort; AnyPort in tests
 	Now      func() time.Time
 }
@@ -74,7 +76,7 @@ func (c Config) withDefaults() Config {
 		c.ClientID = DefaultClientID
 	}
 	if c.HTTP == nil {
-		c.HTTP = http.DefaultClient
+		c.HTTP = &http.Client{CheckRedirect: core.CheckRedirect} // tokens: same host only
 	}
 	if c.Now == nil {
 		c.Now = time.Now

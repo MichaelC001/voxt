@@ -69,7 +69,7 @@ func TestEvalLongASR(t *testing.T) {
 		ids = strings.Split(env, ",")
 	}
 	exe, _ := os.Executable()
-	server, err := omni.Locate(exe)
+	server, err := omni.Locate(exe, true)
 	if err != nil {
 		t.Fatal(err)
 	}

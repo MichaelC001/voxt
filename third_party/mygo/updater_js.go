@@ -39,6 +39,10 @@ type Update struct {
 // Enabled reports whether the app can update itself: not in browsers.
 func (u *UpdaterModule) Enabled() bool { return false }
 
+// Configured reports whether the build links an update feed: never in
+// browsers.
+func (u *UpdaterModule) Configured() bool { return false }
+
 // Check returns ErrUpdatesDisabled.
 func (u *UpdaterModule) Check(ctx context.Context) (*Update, error) {
 	return nil, ErrUpdatesDisabled

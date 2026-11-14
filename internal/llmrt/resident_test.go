@@ -63,6 +63,7 @@ var hi = []llm.Message{{Role: llm.User, Content: "hi"}}
 // UnloadIdle never stops a chat in progress, nor another model, and
 // unloads an idle one.
 func TestModelEvents(t *testing.T) {
+	t.Parallel()
 	var h heard
 	rt, _ := newRuntime(t, "piece-ms=20,"+llmrttest.Opt("reply", strings.Repeat("word ", 20)), h.tune)
 	ctx := context.Background()
@@ -120,6 +121,7 @@ func TestModelEvents(t *testing.T) {
 // idle stop, a crash during a chat (the retry's process loads it again),
 // Unload, Stop.
 func TestModelEventsEnds(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	t.Run("idle", func(t *testing.T) {
 		var h heard

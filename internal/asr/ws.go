@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/hehehai/VoxtMini/internal/core"
 )
 
 // WSClient is the HTTP client WebSocket handshakes go through: the proxy
 // proxy (the family's network.proxy rule; nil: the environment's), HTTP/1.1 only (a
 // WebSocket upgrade needs it), dial and TLS timeouts.
 func WSClient(proxy ProxyFunc) *http.Client {
-	return &http.Client{Transport: &http.Transport{
+	return &http.Client{CheckRedirect: core.CheckRedirect, Transport: &http.Transport{
 		Proxy:               proxyOf(proxy),
 		DialContext:         (&net.Dialer{Timeout: ConnectTimeout, KeepAlive: 30 * time.Second}).DialContext,
 		TLSHandshakeTimeout: ConnectTimeout,

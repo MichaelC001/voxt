@@ -57,6 +57,7 @@ func piecesDone(st asr.Stream) int {
 // pauses while it records; Finish recognises the rest only, and the text
 // joins them in order.
 func TestLivePieces(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Text: "p{n}"}, nil)
 	a := piecesASR(t, f)
 	st, err := a.Open(context.Background(), asr.StreamRequest{SampleRate: sampleRate, Lang: "zh", Hints: []string{"VoxtMini"}})
@@ -97,6 +98,7 @@ func TestLivePieces(t *testing.T) {
 // TestLiveNoPiecesWhenShort: a recording shorter than PiecesAfter keeps
 // one Final over everything.
 func TestLiveNoPiecesWhenShort(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Text: "p{n}"}, nil)
 	a := piecesASR(t, f)
 	st, err := a.Open(context.Background(), asr.StreamRequest{SampleRate: sampleRate})
@@ -120,6 +122,7 @@ func TestLiveNoPiecesWhenShort(t *testing.T) {
 // ends the stream with the error, and Salvage gives the text the live
 // preview had, for the session to go on with.
 func TestLiveFinalFailsWithText(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		o    omnitest.Opts
@@ -159,6 +162,7 @@ func TestLiveFinalFailsWithText(t *testing.T) {
 // TestSalvage: the pieces' text wins when it covers at least what the
 // preview heard (a preview that stopped early), else the preview's.
 func TestSalvage(t *testing.T) {
+	t.Parallel()
 	s := &live{pc: &pieces{done: 200, texts: []string{"one.", "two"}}}
 	s.asm.apply(1, 0, "preview", true)
 	s.previewed = 100
@@ -178,6 +182,7 @@ func TestSalvage(t *testing.T) {
 // TestSlowFinal: a Final that takes longer than the stall watch, with
 // the server's heartbeat coming, succeeds: progress, not a wall clock.
 func TestSlowFinal(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Delay: time.Second, Text: "slow"}, func(c *Config) { c.StallTimeout = 300 * time.Millisecond })
 	res, err := f.asr(t, ASRFast).Transcribe(context.Background(), asr.FileRequest{Audio: tone(time.Second, 0.3)})
 	if err != nil || res.Text != "slow" {
@@ -186,6 +191,7 @@ func TestSlowFinal(t *testing.T) {
 }
 
 func TestLongestPause(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		segs   []vad.Segment
 		n, min int

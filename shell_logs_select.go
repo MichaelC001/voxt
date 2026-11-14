@@ -18,10 +18,10 @@ import (
 	"slices"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/listsel"
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/logs"
+	"github.com/hehehai/actnowkit/listsel"
 )
 
 // logSelection is the logs view's selection, with the app's state.

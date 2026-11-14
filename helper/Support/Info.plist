@@ -17,7 +17,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 the SGLang-Omni and VoxtMini contributors. Licensed under the Apache License 2.0.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>VoxtMini records your voice while you use its shortcut and recognises it on this Mac: the audio never leaves it.</string>
+	<string>VoxtMini records your voice while you use its shortcut and recognises it on this Mac, unless you choose a remote speech service for a feature: then that feature's recordings go to the service.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>With Apple Speech chosen, macOS recognises your recordings on this Mac only: the audio never leaves it.</string>
 </dict>

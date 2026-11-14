@@ -16,13 +16,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hehehai/actnowkit/sounds"
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/helper"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/outmute"
 	"github.com/hehehai/VoxtMini/internal/session"
+	"github.com/hehehai/actnowkit/sounds"
 )
 
 // muteSource is the logs' source of the output's lines.

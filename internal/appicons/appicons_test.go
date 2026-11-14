@@ -38,6 +38,13 @@ func TestBook(t *testing.T) {
 	if rest := b.Take(10); len(rest) != 1 || b.Pending() != 0 {
 		t.Errorf("rest %+v", rest)
 	}
+	// Forget keeps only what has no icon.
+	b.Set("com.example.gone", Missing)
+	b.Want(proto.AppRef{BundleID: "com.apple.Mail"})
+	b.Forget()
+	if b.State("com.apple.Notes") != Unknown || b.State("com.tinyspeck.slackmacgap") != Unknown || b.State("com.example.gone") != Missing || b.Pending() != 0 {
+		t.Errorf("forget: %v %v %v %d", b.State("com.apple.Notes"), b.State("com.tinyspeck.slackmacgap"), b.State("com.example.gone"), b.Pending())
+	}
 }
 
 func TestCache(t *testing.T) {

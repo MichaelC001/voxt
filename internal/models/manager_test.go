@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	voxtmini    = "dev.hehehai.voxtnew"
+	voxtmini   = "dev.hehehai.voxtnew"
 	audiosmith = "dev.hehehai.audiosmith"
 	dicta      = "dev.hehehai.dicta"
 )

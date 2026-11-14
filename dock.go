@@ -38,6 +38,26 @@ func (a *app) watchDock() {
 	a.win.OnShow(func() { a.post(a.applyDock) })
 	a.win.OnHide(func() { a.post(a.applyDock) })
 	a.applyDock()
+	a.win.OnShow(func() { a.post(a.windowBack) })
+	a.win.OnHide(func() { a.post(a.windowAway) })
+}
+
+// windowAway runs when the main window hides (closed into the menu bar):
+// what only a shown page needs stops or goes. Its memTick stops itself.
+func (a *app) windowAway() {
+	a.winAway = true
+	a.logsOnScreen.Store(false) // shell.go: new lines redraw nothing
+	a.dropIcons()               // appicons.go
+}
+
+// windowBack runs when the main window shows again: the Local models
+// page measures again (memTick stopped while hidden); the post itself
+// redraws, with the lines that came meanwhile.
+func (a *app) windowBack() {
+	a.winAway = false
+	if a.currentPage() == modelsPath[1:] && !a.memPolling {
+		a.modelsShown() // models_memory.go
+	}
 }
 
 // windowShown is whether the main window shows (tests: the fake's).

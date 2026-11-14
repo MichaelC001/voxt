@@ -10,13 +10,13 @@ import (
 	"fmt"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/hfhub"
-	fammodels "github.com/hehehai/actnowkit/models"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
 	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/uitext"
+	"github.com/hehehai/actnowkit/hfhub"
+	fammodels "github.com/hehehai/actnowkit/models"
 )
 
 // modelCard is one model: what it is good at, its languages, its size

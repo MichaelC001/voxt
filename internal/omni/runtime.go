@@ -70,10 +70,12 @@ type Config struct {
 const beforeLoadTimeout = 5 * time.Second
 
 // Locate finds the runtime: $VOXTMINI_OMNI_RUNTIME (a directory with
-// bin/qwen3_asr_server, or the binary itself), else the app bundle's
-// Contents/Resources/omni beside exe (the running executable,
-// Contents/MacOS/VoxtMini). It returns the server binary's path.
-func Locate(exe string) (string, error) {
+// bin/qwen3_asr_server, or the binary itself) when env (a development
+// build: a published one must not run what the environment names), else
+// the app bundle's Contents/Resources/omni beside exe (the running
+// executable, Contents/MacOS/VoxtMini). It returns the server binary's
+// path.
+func Locate(exe string, env bool) (string, error) {
 	var tried []string
 	try := func(p string) (string, bool) {
 		tried = append(tried, p)
@@ -84,11 +86,11 @@ func Locate(exe string) (string, error) {
 		}
 		return p, err == nil && fi.Mode().IsRegular()
 	}
-	if env := strings.TrimSpace(os.Getenv(EnvRuntime)); env != "" {
-		if p, ok := try(env); ok {
+	if dir := strings.TrimSpace(os.Getenv(EnvRuntime)); dir != "" && env {
+		if p, ok := try(dir); ok {
 			return p, nil
 		}
-		return "", fmt.Errorf("omni: %s=%s has no %s", EnvRuntime, env, ServerBinary)
+		return "", fmt.Errorf("omni: %s=%s has no %s", EnvRuntime, dir, ServerBinary)
 	}
 	if exe != "" {
 		if p, ok := try(filepath.Join(filepath.Dir(exe), "..", "Resources", "omni")); ok {

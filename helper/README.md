@@ -13,7 +13,7 @@ The small Swift process VoxtMini runs beside its window, for what MyGo cannot do
 
 It speaks [helper protocol 1](../docs/helper-protocol.md) over stdin and stdout; `internal/helper` supervises it (handshake, restarts, stderr to `~/Library/Logs/VoxtNew/helper.log`, call timings). The helper keeps no settings: Go decides (which device, when ⌘C may run, the delays, the keys) and passes it in the params. Its shapes come from the M0 spikes on a Mac (the project's `research/spikes.md`).
 
-macOS checks the helper's permissions against VoxtMini.app, its responsible process: the prompts and System Settings name VoxtMini, and a helper outside the bundle (`VOXTMINI_HELPER`) has the app's grants too.
+macOS checks the helper's permissions against VoxtMini.app, its responsible process: the prompts and System Settings name VoxtMini, and a helper outside the bundle (`VOXTMINI_HELPER`) has the app's grants too. That is why only development builds honour `VOXTMINI_HELPER` (and `VOXTMINI_LLM`, `VOXTMINI_OMNI_RUNTIME`, `VOXTMINI_DEV_LLM`); a published build, one with an update feed, runs only what it ships (`dev_overrides.go`).
 
 ## Layout
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/hehehai/VoxtMini/internal/deliver"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
 	"github.com/hehehai/VoxtMini/internal/overlay/layout"
@@ -341,7 +342,7 @@ func (a *app) copyBubble(copyText func(string), b cardBlock) {
 	if b.title.text != "" {
 		text = b.title.text + "\n\n" + text
 	}
-	copyText(text)
+	copyText(deliver.Sanitize(text))
 	a.ov.bubbleCopied = b.text.text
 	a.ov.bubbleSeq++
 	seq := a.ov.bubbleSeq

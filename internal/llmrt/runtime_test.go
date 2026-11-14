@@ -105,6 +105,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 }
 
 func TestChatStreamsOnTheCallersGoroutine(t *testing.T) {
+	t.Parallel()
 	log := filepath.Join(t.TempDir(), "chats.jsonl")
 	rt, logs := newRuntime(t, llmrttest.Opt("reply", "The meeting is at three.")+","+llmrttest.Opt("chat-log", log), nil)
 	if st := rt.Status(); st.State != Stopped || st.Starts != 0 {
@@ -167,7 +168,24 @@ func goroutineID() string {
 	return f[1]
 }
 
+// TestCacheLimitSent: Config.CacheLimitMB goes with the load (Open's
+// warm-up, every session's; MLX's limit holds for the process).
+func TestCacheLimitSent(t *testing.T) {
+	rt, logs := newRuntime(t, "", func(c *Config) { c.CacheLimitMB = 512 })
+	b, err := NewModel(rt, Fast, mlxDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Warm(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !logs.has("fake load: cache limit 512 MB") {
+		t.Errorf("log lines %+v", logs.lines)
+	}
+}
+
 func TestIdleStopAndRestart(t *testing.T) {
+	t.Parallel()
 	rt, logs := newRuntime(t, "", func(c *Config) { c.IdleTimeout = 80 * time.Millisecond })
 	b, err := NewModel(rt, Fast, mlxDir(t))
 	if err != nil {
@@ -192,6 +210,7 @@ func TestIdleStopAndRestart(t *testing.T) {
 // kept (never) → stopped after the new time, counted from the change;
 // back to never, it stays.
 func TestSetIdleTimeout(t *testing.T) {
+	t.Parallel()
 	rt, logs := newRuntime(t, "", nil) // IdleTimeout -1
 	b, err := NewModel(rt, Fast, mlxDir(t))
 	if err != nil {
@@ -235,6 +254,7 @@ func TestSetIdleTimeout(t *testing.T) {
 // A process that dies during a chat fails it; llm.Client starts another
 // and tries again.
 func TestCrashRetries(t *testing.T) {
+	t.Parallel()
 	marker := filepath.Join(t.TempDir(), "crashed")
 	rt, logs := newRuntime(t, llmrttest.Opt("crash-once", marker), nil)
 	chat, err := Open(context.Background(), rt, Balanced, mlxDir(t))
@@ -258,6 +278,7 @@ func TestCrashRetries(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
+	t.Parallel()
 	rt, _ := newRuntime(t, "piece-ms=30,"+llmrttest.Opt("reply", strings.Repeat("word ", 40)), nil)
 	chat, _ := Open(context.Background(), rt, Balanced, mlxDir(t))
 	ctx, cancel := context.WithCancel(context.Background())
@@ -283,6 +304,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestCancelThatHangsKills(t *testing.T) {
+	t.Parallel()
 	rt, _ := newRuntime(t, "hang-cancel,piece-ms=200,"+llmrttest.Opt("reply", strings.Repeat("word ", 40)), func(c *Config) { c.CancelGrace = 100 * time.Millisecond })
 	b, _ := NewModel(rt, Balanced, mlxDir(t))
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
@@ -299,6 +321,7 @@ func TestCancelThatHangsKills(t *testing.T) {
 }
 
 func TestStartFailures(t *testing.T) {
+	t.Parallel()
 	msg := []llm.Message{{Role: llm.User, Content: "hi"}}
 	// Another protocol: refused, and never started again.
 	rt, _ := newRuntime(t, "mismatch", nil)
@@ -341,6 +364,7 @@ func TestStartFailures(t *testing.T) {
 }
 
 func TestWarmAndMemory(t *testing.T) {
+	t.Parallel()
 	rt, _ := newRuntime(t, "load-ms=20", nil)
 	if res, err := rt.Memory(context.Background()); err != nil || res.Model != nil || rt.Status().Starts != 0 {
 		t.Fatalf("Memory started the process: %+v %v", res, err)
@@ -362,6 +386,7 @@ func TestWarmAndMemory(t *testing.T) {
 // Prefill sends the prompt with maxTokens 0, and the chat after it with
 // the same system prompt reports a prompt cache hit in its log line.
 func TestPrefill(t *testing.T) {
+	t.Parallel()
 	log := filepath.Join(t.TempDir(), "chats.jsonl")
 	rt, logs := newRuntime(t, llmrttest.Opt("chat-log", log), nil)
 	b, err := NewModel(rt, Fast, mlxDir(t))
@@ -393,6 +418,7 @@ func TestPrefill(t *testing.T) {
 }
 
 func TestOpenNotInstalled(t *testing.T) {
+	t.Parallel()
 	rt := New(Config{})
 	for _, c := range []struct{ id, dir string }{{"llm.nope", t.TempDir()}, {Balanced, t.TempDir()}, {Translate, t.TempDir()}} {
 		if _, err := Open(context.Background(), rt, c.id, c.dir); !errors.Is(err, local.ErrNotInstalled) {

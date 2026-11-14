@@ -20,13 +20,13 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/registry"
-	"github.com/hehehai/actnowkit/shortcuts"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/hotkey"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/settings"
 	"github.com/hehehai/VoxtMini/internal/uitext"
+	"github.com/hehehai/actnowkit/registry"
+	"github.com/hehehai/actnowkit/shortcuts"
 )
 
 // shortcutID is the family's id of feature's i-th shortcut, as

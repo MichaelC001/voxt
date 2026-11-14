@@ -50,9 +50,6 @@ var all = []Language{
 // Codes are the three languages' codes, in the settings' order.
 var Codes = []string{English, Chinese, Japanese}
 
-// All returns the three languages. The slice is a copy.
-func All() []Language { return slices.Clone(all) }
-
 // aliases are the other spellings of the three's primary subtags.
 var aliases = map[string]string{
 	"eng": English,

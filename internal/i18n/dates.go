@@ -24,12 +24,3 @@ func DateTime(t time.Time) string {
 	}
 	return t.Format("Jan 2, 2006 15:04")
 }
-
-// Date formats a day in the active language ("Jan 2, 2006" / "2006年1月2日").
-func Date(t time.Time) string {
-	t = t.Local()
-	if Locale() == "zh-Hans" {
-		return fmt.Sprintf("%d年%d月%d日", t.Year(), t.Month(), t.Day())
-	}
-	return t.Format("Jan 2, 2006")
-}

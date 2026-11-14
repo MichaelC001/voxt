@@ -14,11 +14,6 @@ const (
 	SkillRewrite Skill = "rewrite"
 )
 
-// Skills lists every skill, in settings order.
-func Skills() []Skill {
-	return []Skill{SkillTranscribeEnhance, SkillTranslateText, SkillRewrite}
-}
-
 // DefaultTemperature is the sampling temperature a skill uses when neither
 // the request nor the model sets one: low for clean-up and translation,
 // which must keep to the input, higher for rewriting and writing, which

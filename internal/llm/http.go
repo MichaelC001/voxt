@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/hehehai/VoxtMini/internal/core"
 )
 
 // maxBody caps a non-streamed response body.
@@ -27,8 +29,13 @@ func (t *httpTransport) httpClient() *http.Client {
 	if t.client != nil {
 		return t.client
 	}
-	return http.DefaultClient
+	return defaultClient
 }
+
+// defaultClient is the client of a transport made without one: as
+// http.DefaultClient, but redirects keep to the same host and scheme
+// (core.CheckRedirect), the requests carrying keys.
+var defaultClient = &http.Client{CheckRedirect: core.CheckRedirect}
 
 // authHeaders fetches the key and returns the request headers.
 func (t *httpTransport) headers(ctx context.Context) (http.Header, error) {

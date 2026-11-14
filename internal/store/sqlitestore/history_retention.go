@@ -130,7 +130,28 @@ func (r *historyRepo) Prune(ctx context.Context, rt store.Retention) (int, error
 	if err != nil {
 		return 0, wrap("history clean-up", err)
 	}
-	return len(rows.Values), r.removeAudios(rows.Values)
+	err = r.removeAudios(rows.Values)
+	r.compact(ctx, len(rows.Values))
+	return len(rows.Values), err
+}
+
+// vacuumAfter is how many entries a delete removes before the file is
+// rebuilt smaller: about 2 MB of pages, against a VACUUM of a few tens of
+// milliseconds for a history of thousands.
+const vacuumAfter = 1000
+
+// compact gives the space of n deleted entries back to the disk (SQLite
+// keeps freed pages in the file otherwise), when they are many: VACUUM,
+// then the WAL it filled is emptied. Best effort: the deletion stands
+// whatever it says.
+func (r *historyRepo) compact(ctx context.Context, n int) {
+	if n < vacuumAfter {
+		return
+	}
+	if _, err := r.db.Execute(ctx, "VACUUM"); err != nil {
+		return
+	}
+	r.db.Query(ctx, "PRAGMA wal_checkpoint(TRUNCATE)")
 }
 
 func (r *historyRepo) CountPrune(ctx context.Context, rt store.Retention) (int, error) {

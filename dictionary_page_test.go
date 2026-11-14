@@ -11,6 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/hehehai/VoxtMini/internal/appctx"
+	"github.com/hehehai/VoxtMini/internal/dict"
 	"github.com/hehehai/VoxtMini/internal/store"
 )
 
@@ -177,6 +178,15 @@ func TestDictionaryImportExport(t *testing.T) {
 	a.importTerms()
 	if len(a.toasts) == 0 || !strings.Contains(a.toasts[0], "not a CSV or text list") {
 		t.Errorf("bad import %q", a.toasts)
+	}
+	// A file too large to read.
+	big := filepath.Join(dir, "big.txt")
+	os.WriteFile(big, make([]byte, dict.MaxImportBytes+1), 0o644)
+	chooseImportFile = func(a *app, then func(string)) { then(big) }
+	a.toasts = nil
+	a.importTerms()
+	if len(a.toasts) == 0 || !strings.Contains(a.toasts[0], "larger than 5 MB") {
+		t.Errorf("big import %q", a.toasts)
 	}
 }
 

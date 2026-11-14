@@ -94,6 +94,7 @@ func main() {
 	a.openIcons(cacheDir)                         // appicons.go
 	a.muteJournal = outputJournal(home, cacheDir) // mute_link.go
 	a.connectShell(logDir)                        // shell.go
+	logIgnoredOverrides()                         // dev_overrides.go
 	a.connectHelper()                             // helperlink.go
 	a.upd, a.bundleStale = pluginUpdates{}, h.stale
 	a.connectUpdates() // updates.go

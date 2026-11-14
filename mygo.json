@@ -16,7 +16,7 @@
     "minimumSystemVersion": "15.0",
     "infoPlist": {
       "LSApplicationCategoryType": "public.app-category.productivity",
-      "NSMicrophoneUsageDescription": "VoxtMini records your voice while you use its shortcut and recognises it on this Mac: the audio never leaves it. 录音只在你使用快捷键时进行，并在这台 Mac 上识别：音频不会离开这台 Mac。",
+      "NSMicrophoneUsageDescription": "VoxtMini records your voice while you use its shortcut and recognises it on this Mac, unless you choose a remote speech service for a feature: then that feature's recordings go to the service. 录音只在你使用快捷键时进行，默认在这台 Mac 上识别；只有你为某个功能选了远程语音服务，该功能的录音才会发给这个服务。",
       "NSSpeechRecognitionUsageDescription": "With Apple Speech chosen, macOS recognises your recordings on this Mac only: the audio never leaves it. 选用 Apple 语音识别时，由 macOS 只在这台 Mac 上识别你的录音：音频不会离开这台 Mac。"
     },
     "entitlements": "helper/Support/app.entitlements",

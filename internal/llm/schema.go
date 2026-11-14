@@ -60,16 +60,12 @@ func (s *Schema) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// Object, Array, String… build schemas tersely.
+// Object and String build schemas tersely (the tests have more:
+// schema_helpers_test.go).
 func Object(props map[string]*Schema, required ...string) *Schema {
 	return &Schema{Type: "object", Properties: props, Required: required, Closed: true}
 }
-func Array(items *Schema) *Schema   { return &Schema{Type: "array", Items: items} }
-func String() *Schema               { return &Schema{Type: "string"} }
-func Number() *Schema               { return &Schema{Type: "number"} }
-func Integer() *Schema              { return &Schema{Type: "integer"} }
-func Boolean() *Schema              { return &Schema{Type: "boolean"} }
-func Enum(values ...string) *Schema { return &Schema{Type: "string", Enum: values} }
+func String() *Schema { return &Schema{Type: "string"} }
 
 // Range sets minimum and maximum and returns s.
 func (s *Schema) Range(lo, hi float64) *Schema { s.Minimum, s.Maximum = &lo, &hi; return s }

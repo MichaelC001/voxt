@@ -41,11 +41,6 @@ func (a *app) noticePosted(n core.Notification) {
 	a.notices = slices.Insert(a.notices, 0, n)
 }
 
-// notify posts a notification (on any goroutine).
-func (a *app) notify(sev core.Severity, title, body, link string) {
-	a.notes.Post(core.Notification{Severity: sev, Title: title, Body: body, Link: link})
-}
-
 // dismissNotice removes one notification (its card's ×).
 func (a *app) dismissNotice(id string) {
 	a.notices = slices.DeleteFunc(a.notices, func(n core.Notification) bool { return n.ID == id })

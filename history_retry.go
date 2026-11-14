@@ -176,26 +176,41 @@ func (a *app) entryRetryButton(c *ui.Context, e store.Entry) {
 // checked for their end.
 const recordingSweep = time.Hour
 
+// pruneSweeps is how many sweeps apart the history's clean-up runs again
+// (a day): it runs at the start and with each new entry, but an app left
+// running for weeks without one would keep entries past their age.
+const pruneSweeps = 24
+
 // expireRecordings deletes the recordings kept for a retry once their
-// time is up (store.Entry.AudioUntil): now, then every recordingSweep.
+// time is up (store.Entry.AudioUntil): now, then every recordingSweep;
+// sweep says what else is due.
 func (a *app) expireRecordings() {
-	hs := a.lib.store.History()
 	go func() {
-		for {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			n, err := hs.ExpireAudio(ctx, time.Now())
-			cancel()
-			if n > 0 || err != nil {
-				msg := fmt.Sprintf("deleted %d recordings kept for a retry", n)
-				if err != nil {
-					msg += ": " + err.Error()
-				}
-				a.logs.Append(core.LogEntry{Time: time.Now(), Level: core.SeverityInfo, Source: sessionSource, Message: msg})
-				a.post(a.historyChanged)
-			}
+		for n := 0; ; n++ {
+			a.sweep(n)
 			time.Sleep(recordingSweep)
 		}
 	}()
+}
+
+// sweep is the n-th sweep (off the main thread): the recordings past
+// their time, and every pruneSweeps the history's clean-up.
+func (a *app) sweep(n int) {
+	hs := a.lib.store.History()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	gone, err := hs.ExpireAudio(ctx, time.Now())
+	cancel()
+	if gone > 0 || err != nil {
+		msg := fmt.Sprintf("deleted %d recordings kept for a retry", gone)
+		if err != nil {
+			msg += ": " + err.Error()
+		}
+		a.logs.Append(core.LogEntry{Time: time.Now(), Level: core.SeverityInfo, Source: sessionSource, Message: msg})
+		a.post(a.historyChanged)
+	}
+	if n > 0 && n%pruneSweeps == 0 {
+		a.post(a.pruneHistory) // history_settings_ops.go
+	}
 }
 
 // recordingKeptText says, in the details, why a recording is kept when

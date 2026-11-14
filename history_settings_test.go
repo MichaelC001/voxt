@@ -179,6 +179,21 @@ func TestHistoryCleanupRuns(t *testing.T) {
 	}
 }
 
+// TestHistoryCleanupDaily: with no new entry, the hourly sweep runs the
+// clean-up once a day (an app left running keeps no entry past its age).
+func TestHistoryCleanupDaily(t *testing.T) {
+	a, _, _ := newTestApp(t)
+	seedAged(t, a, 1, 100) // 90 days kept: the 100-day-old one is due
+	a.sweep(1)
+	if got := entryIDs(t, a); len(got) != 2 {
+		t.Fatalf("an hour's sweep cleaned up: %v", got)
+	}
+	a.sweep(pruneSweeps)
+	if got := entryIDs(t, a); !slices.Equal(got, []string{"aged-1"}) {
+		t.Errorf("the day's sweep: %v", got)
+	}
+}
+
 // TestHistoryRecordingsFolder: Choose… moves the recordings and saves
 // the folder; new recordings go there; Use the default moves them back;
 // a folder missing at the start falls back to the default and says so.

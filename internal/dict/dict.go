@@ -27,6 +27,9 @@ const (
 	MaxAliases    = 10
 	MaxNoteChars  = 500
 	MaxImportRows = 10000
+	// MaxImportBytes is the largest file Import is given: 10,000 full
+	// rows are well under it.
+	MaxImportBytes = 5 << 20
 )
 
 // Errors of Check.
@@ -162,7 +165,8 @@ var csvHeader = []string{"term", "aliases", "note", "enabled", "category"}
 
 // Export writes terms in format: CSV with a header (term, aliases joined
 // by "; ", note, enabled as true/false, the category's name, "" for the
-// default one), or text, a term per line with its aliases after " = ",
+// default one; a cell a spreadsheet would read as a formula starts with
+// "'", which Import drops), or text, a term per line with its aliases after " = ",
 // disabled terms commented out, the default category's terms first and
 // each other category's after a "[Name]" line. category names a term's
 // category ("" for the default one or one that no longer exists).
@@ -199,10 +203,41 @@ func Export(terms []store.Term, format string, category func(id string) string) 
 	w := csv.NewWriter(&b)
 	w.Write(csvHeader)
 	for _, t := range terms {
-		w.Write([]string{t.Term, strings.Join(t.Aliases, "; "), t.Note, fmt.Sprint(t.Enabled), name(t)})
+		w.Write([]string{cell(t.Term), cell(strings.Join(t.Aliases, "; ")), cell(t.Note), fmt.Sprint(t.Enabled), cell(name(t))})
 	}
 	w.Flush()
 	return b.Bytes()
+}
+
+// formulaStart are the first characters that make a spreadsheet (Excel,
+// Numbers) read a CSV cell as a formula, which may run commands or send
+// data away (CSV injection).
+const formulaStart = "=+-@\t\r"
+
+// cell is an exported CSV cell: one a spreadsheet would read as a
+// formula gets a leading "'" (OWASP's advice), which uncell drops again
+// on import. So that the round trip is exact, so does one that already
+// starts with "'"s before such a character.
+func cell(s string) string {
+	if escaped(s) {
+		return "'" + s
+	}
+	return s
+}
+
+// uncell undoes cell.
+func uncell(s string) string {
+	if strings.HasPrefix(s, "'") && escaped(s) {
+		return s[1:]
+	}
+	return s
+}
+
+// escaped reports that s, past its leading "'"s, starts with a formula's
+// first character.
+func escaped(s string) bool {
+	s = strings.TrimLeft(s, "'")
+	return s != "" && strings.ContainsRune(formulaStart, rune(s[0]))
 }
 
 // ErrFormat: the file is not a dictionary Import reads.
@@ -216,6 +251,9 @@ var ErrFormat = errors.New("dict: not a dictionary file")
 // name ("" for the default one), not an id: Categorize maps them. Rows
 // without a term are skipped (skipped counts them).
 func Import(data []byte, format string) (terms []store.Term, skipped int, err error) {
+	if len(data) > MaxImportBytes {
+		return nil, 0, fmt.Errorf("%w: larger than %d bytes", ErrFormat, MaxImportBytes)
+	}
 	data = bytes.TrimPrefix(data, []byte("\ufeff"))
 	if !utf8.Valid(data) {
 		return nil, 0, fmt.Errorf("%w: not UTF-8 text", ErrFormat)
@@ -273,7 +311,7 @@ func Import(data []byte, format string) (terms []store.Term, skipped int, err er
 		}
 		get := func(name string) string {
 			if i, ok := col[name]; ok && i < len(rec) {
-				return rec[i]
+				return uncell(rec[i])
 			}
 			return ""
 		}

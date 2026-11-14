@@ -18,7 +18,7 @@ VoxtMini lives in the [hehehai/VoxtMini](https://github.com/hehehai/VoxtMini) re
 
 ## Development
 
-VoxtMini is a Go app on [MyGo](https://github.com/egoist/mygo) (native UI, no cgo) with a small Swift helper. Everything but the helper is plain Go and is tested on Linux; building the app needs a Mac with macOS 15 or later on Apple silicon and Xcode. Go 1.27.1 (`GOTOOLCHAIN=auto` fetches it). Run these from the repository root:
+VoxtMini is a Go app on [MyGo](https://github.com/egoist/mygo) (native UI, no cgo) with a small Swift helper. Everything but the helper is plain Go and is tested on Linux; building the app needs a Mac with macOS 15 or later on Apple silicon and Xcode. Go 1.27.4 (`GOTOOLCHAIN=auto` fetches it). Run these from the repository root:
 
 ```sh
 CGO_ENABLED=0 go test ./...                                  # all tests (Linux and Mac)

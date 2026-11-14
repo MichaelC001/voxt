@@ -243,7 +243,9 @@ func (r *historyRepo) DeleteAll(ctx context.Context, kind store.Kind) (int, erro
 	if err != nil {
 		return 0, wrap("history", err)
 	}
-	return len(rows.Values), r.removeAudios(rows.Values)
+	err = r.removeAudios(rows.Values)
+	r.compact(ctx, len(rows.Values)) // history_retention.go
+	return len(rows.Values), err
 }
 
 func (r *historyRepo) ExpireAudio(ctx context.Context, now time.Time) (int, error) {

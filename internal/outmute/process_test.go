@@ -112,6 +112,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 }
 
 func TestProcessMuteAndRestore(t *testing.T) {
+	t.Parallel()
 	a := startApp(t, t.TempDir(), "")
 	defer a.sup.Stop()
 	a.c.Engage("s1")
@@ -132,6 +133,7 @@ func TestProcessMuteAndRestore(t *testing.T) {
 // TestProcessAppGoesAway: the app quits or crashes while it records; the
 // helper's stdin closes and it unmutes as it exits.
 func TestProcessAppGoesAway(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	a := startApp(t, dir, "")
 	a.c.Engage("s1")
@@ -159,6 +161,7 @@ func TestProcessAppGoesAway(t *testing.T) {
 // TestProcessHelperCrashes: the helper dies right after it muted; the
 // supervisor starts another, which unmutes what the first one claimed.
 func TestProcessHelperCrashes(t *testing.T) {
+	t.Parallel()
 	a := startApp(t, t.TempDir(), "crash-mute")
 	defer a.sup.Stop()
 	a.c.Engage("s1")
@@ -178,6 +181,7 @@ func TestProcessHelperCrashes(t *testing.T) {
 // TestProcessBothDie: the app and the helper are killed together (no
 // stdin to close, no shutdown); the next start unmutes.
 func TestProcessBothDie(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	a := startApp(t, dir, "crash-mute")
 	a.c.Engage("s1")
@@ -194,6 +198,7 @@ func TestProcessBothDie(t *testing.T) {
 }
 
 func TestProcessChanges(t *testing.T) {
+	t.Parallel()
 	a := startApp(t, t.TempDir(), "out-switch=30")
 	defer a.sup.Stop()
 	a.c.Engage("s1")
@@ -220,6 +225,7 @@ func TestProcessChanges(t *testing.T) {
 }
 
 func TestProcessUnmutable(t *testing.T) {
+	t.Parallel()
 	for _, def := range []string{"fixed", "none"} {
 		a := startApp(t, t.TempDir(), "out-default="+def)
 		a.c.Engage("s1")
@@ -239,6 +245,7 @@ func TestProcessUnmutable(t *testing.T) {
 }
 
 func TestProcessOlderHelper(t *testing.T) {
+	t.Parallel()
 	a := startApp(t, t.TempDir(), "no-output")
 	defer a.sup.Stop()
 	a.c.Engage("s1")

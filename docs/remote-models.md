@@ -5,6 +5,7 @@
 ## Rule
 
 - Local models are the default and keep working unchanged. **Audio and text leave the Mac only for a feature whose model the user picked as a remote one.** "Automatic" never picks a remote model, even when no local model is installed.
+- The microphone's usage description (`mygo.json`, `helper/Support/Info.plist`: what macOS shows when it asks for the microphone) says so: recognised on this Mac unless the user picks a remote speech service for a feature (security audit M5; Apple Speech's description stays "on this Mac only", which holds for it).
 - Keys live in the macOS Keychain (service `VoxtMini`, accounts `asr.<id>` / `llm.<id>`, `internal/secrets`), never in the settings, the database or the logs (an error that quotes a key is masked).
 - Requests follow the family's network setting (`network.proxy`, the same proxy rule as model downloads: automatic = environment, then the Mac's system proxy; loopback never proxied). Endpoints must be `https://` / `wss://`, plain `http://` only on loopback (Ollama, LM Studio, oMLX).
 

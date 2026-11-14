@@ -91,6 +91,7 @@ func request[T any](t *testing.T, h *harness, method string, params any) (T, err
 }
 
 func TestHandshakeAndControl(t *testing.T) {
+	t.Parallel()
 	h := start(t, "")
 	st := h.ready(t)
 	if st.Hello == nil || st.Hello.Version != "fake" || st.PID == 0 || !st.Has(proto.MethodBrowserURL) || st.Has("tts.synthesize") {
@@ -138,6 +139,7 @@ func TestHandshakeAndControl(t *testing.T) {
 }
 
 func TestPermissions(t *testing.T) {
+	t.Parallel()
 	h := start(t, "mic=notDetermined,untrusted")
 	h.ready(t)
 	st, err := request[proto.PermissionsResult](t, h, proto.MethodPermissionsStatus, nil)
@@ -216,6 +218,7 @@ func startCapture(ctx context.Context, h *harness, id string, p proto.CapturePar
 }
 
 func TestCaptureStreamsPCM(t *testing.T) {
+	t.Parallel()
 	h := start(t, "frame-ms=10")
 	h.ready(t)
 	c := startCapture(context.Background(), h, "S1", proto.CaptureParams{Devices: []string{"Unplugged", "AirPodsPro:input"}})
@@ -261,6 +264,7 @@ func TestCaptureStreamsPCM(t *testing.T) {
 // TestCapturePlaysRecording: pcm= replays a WAV, resampled to the asked
 // rate, then silence.
 func TestCapturePlaysRecording(t *testing.T) {
+	t.Parallel()
 	pcm := make([]byte, 2*8000) // 0.25 s at 32 kHz: a ramp
 	for i := range 8000 {
 		binary.LittleEndian.PutUint16(pcm[2*i:], uint16(int16(i)))
@@ -288,6 +292,7 @@ func TestCapturePlaysRecording(t *testing.T) {
 }
 
 func TestCancelCapture(t *testing.T) {
+	t.Parallel()
 	h := start(t, "frame-ms=10")
 	h.ready(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -304,6 +309,7 @@ func TestCancelCapture(t *testing.T) {
 }
 
 func TestStuckCancelRestarts(t *testing.T) {
+	t.Parallel()
 	h := start(t, "hang-cancel,frame-ms=10")
 	first := h.ready(t).PID
 	ctx, cancel := context.WithCancel(context.Background())
@@ -332,6 +338,7 @@ func (h *harness) notes1() []proto.Message {
 }
 
 func TestHotkeyEventsGoToOnNotify(t *testing.T) {
+	t.Parallel()
 	h := start(t, "press=transcribe/0,front=com.google.Chrome")
 	h.ready(t)
 	res, err := request[proto.HotkeyStatus](t, h, proto.MethodHotkeyConfigure, proto.HotkeyConfigureParams{Bindings: fnTap})
@@ -367,6 +374,7 @@ func TestHotkeyEventsGoToOnNotify(t *testing.T) {
 // TestEventScript: events= plays notifications of no request in order,
 // with their delays.
 func TestEventScript(t *testing.T) {
+	t.Parallel()
 	script := filepath.Join(t.TempDir(), "events.jsonl")
 	os.WriteFile(script, []byte(`{"method":"app.activated","params":{"pid":901,"bundleId":"com.google.Chrome","name":"Google Chrome"}}
 {"afterMs":50,"method":"hotkey.event","params":{"binding":"transcribe/1","phase":"down","behavior":"longPress","heldMs":300,"t":10}}
@@ -392,6 +400,7 @@ func TestEventScript(t *testing.T) {
 }
 
 func TestTextIO(t *testing.T) {
+	t.Parallel()
 	log := filepath.Join(t.TempDir(), "paste.jsonl")
 	h := start(t, helpertest.Opt("selection", "Hello, world")+","+helpertest.Opt("paste-log", log))
 	h.ready(t)
@@ -430,6 +439,7 @@ func TestTextIO(t *testing.T) {
 // TestTrace: every call reports its phases; a slow control request is
 // logged with them.
 func TestTrace(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var traces []Trace
 	h := start(t, "delay=app.frontmost:250", func(c *Config) {
@@ -469,6 +479,7 @@ func TestTrace(t *testing.T) {
 // the caller notes that its write returned (CI saw "helper -30µs"); the
 // helper's phase is then 0, not negative.
 func TestTraceAnsweredBeforeWritten(t *testing.T) {
+	t.Parallel()
 	start := time.Now()
 	tr := Trace{Start: start, Written: 120 * time.Microsecond}
 	tr.answered(&call{answered: start.Add(90 * time.Microsecond)})
@@ -482,6 +493,7 @@ func TestTraceAnsweredBeforeWritten(t *testing.T) {
 }
 
 func TestCrashRestartsAndFailsCalls(t *testing.T) {
+	t.Parallel()
 	h := start(t, "frame-ms=10")
 	first := h.ready(t).PID
 	_, err := h.sup.Call(context.Background(), "S4", proto.MethodCaptureStart, proto.CaptureParams{Devices: []string{"crash"}}, nil)
@@ -523,6 +535,7 @@ func filepathDir(t *testing.T, h *harness) string {
 }
 
 func TestFailures(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		opts   string
 		reason FailReason
@@ -555,6 +568,7 @@ func TestFailures(t *testing.T) {
 }
 
 func TestRestartAndStop(t *testing.T) {
+	t.Parallel()
 	h := start(t, "")
 	first := h.ready(t).PID
 	if err := h.sup.Restart(); err != nil {
@@ -576,6 +590,7 @@ func TestRestartAndStop(t *testing.T) {
 // TestReplayFixtures runs every fixture's requests through the
 // supervisor against the fake replaying it, and checks the answers match.
 func TestReplayFixtures(t *testing.T) {
+	t.Parallel()
 	paths, _ := filepath.Glob("../../helper/Fixtures/*.jsonl")
 	if len(paths) == 0 {
 		t.Fatal("no fixtures")
@@ -608,18 +623,24 @@ func TestFind(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("VOXTMINI_HELPER", "")
 	os.Unsetenv("VOXTMINI_HELPER")
-	if Find(dir) != "" {
+	if Find(dir, true) != "" {
 		t.Error("found nothing as something")
 	}
 	bin := filepath.Join(dir, "helper", BinName)
 	os.MkdirAll(filepath.Dir(bin), 0o755)
 	os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755)
-	if Find(dir) != bin {
-		t.Errorf("Find = %q", Find(dir))
+	if Find(dir, true) != bin {
+		t.Errorf("Find = %q", Find(dir, true))
 	}
 	t.Setenv("VOXTMINI_HELPER", "/opt/x")
-	if Find(dir) != "/opt/x" {
-		t.Error("the environment does not win")
+	if Find(dir, true) != "/opt/x" {
+		t.Error("the environment does not win in a development build")
+	}
+	if got := Find(dir, false); got != bin {
+		t.Errorf("a published build ran the environment's helper: %q", got)
+	}
+	if got := Find(t.TempDir(), false); got != "" {
+		t.Errorf("a published build without a helper: %q", got)
 	}
 }
 
@@ -628,6 +649,7 @@ func TestFind(t *testing.T) {
 // crash nor on Restart, and a helper speaking another protocol is put
 // down to the update (FailUpdated) rather than a build to redo.
 func TestUpdatedApp(t *testing.T) {
+	t.Parallel()
 	var stale atomicBool
 	t.Run("crash", func(t *testing.T) {
 		stale.set(false)

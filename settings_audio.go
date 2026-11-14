@@ -19,12 +19,12 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/sounds"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
 	"github.com/hehehai/VoxtMini/internal/session"
 	"github.com/hehehai/VoxtMini/internal/settings"
+	"github.com/hehehai/actnowkit/sounds"
 )
 
 // audioState is the audio section's view state, and the player of the

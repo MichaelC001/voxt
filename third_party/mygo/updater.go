@@ -102,6 +102,16 @@ func (u *UpdaterModule) Enabled() bool {
 	return true
 }
 
+// Configured reports whether the build links an update feed and its key:
+// `mygo build` with updates in the configuration, which is how apps tell
+// their published builds from development ones (an app may honour
+// developer overrides, such as other executables to run, only in the
+// latter). Unlike Enabled it ignores where the app is installed and
+// MYGO_ENV.
+func (u *UpdaterModule) Configured() bool {
+	return packageUpdateFeed != "" && packageUpdateKey != ""
+}
+
 // Check asks the update feed for a version newer than the running one and
 // returns it, or nil when the app is up to date.
 func (u *UpdaterModule) Check(ctx context.Context) (*Update, error) {

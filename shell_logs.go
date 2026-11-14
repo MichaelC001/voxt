@@ -10,12 +10,13 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/listsel"
 	"github.com/hehehai/VoxtMini/internal/core"
+	"github.com/hehehai/VoxtMini/internal/deliver"
 	"github.com/hehehai/VoxtMini/internal/helper"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
 	"github.com/hehehai/VoxtMini/internal/uitext"
+	"github.com/hehehai/actnowkit/listsel"
 )
 
 // logLines is how many lines the logs view shows at most.
@@ -177,7 +178,8 @@ func (a *app) logRows(c *ui.Context, lines []core.LogEntry, v logView) {
 	})
 }
 
-// mygoClipboard copies text through the window's services.
+// mygoClipboard copies text (the history's) through the window's
+// services, sanitized as a paste is (internal/deliver's sanitize.go).
 func mygoClipboard(c *ui.Context, text string) {
-	c.Services().WriteClipboard(text)
+	c.Services().WriteClipboard(deliver.Sanitize(text))
 }

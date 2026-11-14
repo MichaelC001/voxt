@@ -14,16 +14,16 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/conformance"
-	"github.com/hehehai/actnowkit/family"
-	fammodels "github.com/hehehai/actnowkit/models"
-	"github.com/hehehai/actnowkit/registry"
-	"github.com/hehehai/actnowkit/shortcuts"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/hotkey"
 	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/settings"
 	"github.com/hehehai/VoxtMini/internal/uitext"
+	"github.com/hehehai/actnowkit/conformance"
+	"github.com/hehehai/actnowkit/family"
+	fammodels "github.com/hehehai/actnowkit/models"
+	"github.com/hehehai/actnowkit/registry"
+	"github.com/hehehai/actnowkit/shortcuts"
 )
 
 // addPeer installs another family app (a fake .app and its manifest,

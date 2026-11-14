@@ -67,7 +67,7 @@ func TestMacE2EOmni(t *testing.T) {
 		t.Skip("set VOXTMINI_OMNI_MODELS (and VOXTMINI_OMNI_RUNTIME) to the models to try")
 	}
 	exe, _ := os.Executable()
-	server, err := omni.Locate(exe)
+	server, err := omni.Locate(exe, true)
 	if err != nil {
 		t.Fatal(err)
 	}

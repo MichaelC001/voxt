@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hehehai/actnowkit/conformance"
 	"github.com/hehehai/VoxtMini/internal/models"
+	"github.com/hehehai/actnowkit/conformance"
 )
 
 func TestRealSystemProxy(t *testing.T) {

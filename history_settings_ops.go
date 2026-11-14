@@ -6,8 +6,8 @@ package main
 // their size, export and deleting them all (internal/recordings).
 //
 // The clean-up runs at the start, after each change of the history (a
-// new entry: historyChanged's observers, events.go) and when its setting
-// changes. Each entry it deletes goes with its recording, kept or kept
+// new entry: historyChanged's observers, events.go), when its setting
+// changes and once a day (history_retry.go's sweep). Each entry it deletes goes with its recording, kept or kept
 // for a while (a failed recognition's); the history's observers hear of
 // it.
 

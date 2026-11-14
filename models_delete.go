@@ -14,10 +14,10 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	fammodels "github.com/hehehai/actnowkit/models"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/uitext"
+	fammodels "github.com/hehehai/actnowkit/models"
 )
 
 // sharedDelete is the deletion of a model other apps use, as confirmed.

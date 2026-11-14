@@ -89,7 +89,4 @@ func TestDates(t *testing.T) {
 	if got, want := DateTime(old), "2024年11月22日 09:05"; got != want {
 		t.Errorf("zh: %q", got)
 	}
-	if got := Date(old); got != "2024年11月22日" {
-		t.Errorf("zh date: %q", got)
-	}
 }

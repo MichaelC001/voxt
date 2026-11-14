@@ -129,9 +129,3 @@ func Installed(hub string, m Model) string {
 	}
 	return SnapshotDir(hub, m, rev)
 }
-
-// Hub is the family's default model library
-// (~/Library/Application Support/ActNow/models/hub, spec v1.0.9), for
-// tools and tests; the app resolves it with the family's settings first
-// (internal/actnow).
-func Hub() string { return fammodels.DefaultHub() }

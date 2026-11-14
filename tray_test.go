@@ -98,3 +98,14 @@ func TestTrayRecent(t *testing.T) {
 		t.Errorf("recent items: found %d, title %v, copied %q", found, title, copied)
 	}
 }
+
+// TestCopyRecentSanitizes: a copied result carries no terminal escapes.
+func TestCopyRecentSanitizes(t *testing.T) {
+	a, _, _ := newTestApp(t)
+	var copied string
+	a.copyText = func(s string) error { copied = s; return nil }
+	a.copyRecent("ls\x1b[201~\r\nrm")
+	if copied != "ls\nrm" {
+		t.Errorf("copied %q", copied)
+	}
+}

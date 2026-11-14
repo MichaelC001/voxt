@@ -305,9 +305,6 @@ func parseResponse(payload []byte) (parsed, error) {
 
 // ---- Errors ----
 
-// codeSuccess is the service's "OK" code.
-const codeSuccess = 20000000
-
 // codeError classifies an error frame's code and message (the docs' error
 // code table, plus the words of the messages for what it leaves out).
 func codeError(code uint32, payload []byte) *asr.Error {

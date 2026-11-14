@@ -1,6 +1,6 @@
 module github.com/hehehai/VoxtMini
 
-go 1.27.1
+go 1.27.4
 
 tool github.com/egoist/mygo/cmd/mygo
 

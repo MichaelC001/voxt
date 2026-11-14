@@ -46,18 +46,6 @@ func (f *biquad) settle(x0 float64) {
 	f.s1 = f.b1*x0 + f.s2
 }
 
-// response is the section's gain at hz.
-func (f *biquad) response(rate, hz float64) float64 {
-	w := 2 * math.Pi * hz / rate
-	z1 := complex(math.Cos(w), -math.Sin(w)) // z⁻¹
-	z2 := z1 * z1
-	num := complex(f.b0, 0) + complex(f.b1, 0)*z1 + complex(f.b2, 0)*z2
-	den := 1 + complex(f.a1, 0)*z1 + complex(f.a2, 0)*z2
-	return abs(num / den)
-}
-
-func abs(c complex128) float64 { return math.Hypot(real(c), imag(c)) }
-
 // primeSamples is how much of the start (20 ms at 16 kHz) gives the offset
 // the filter settles on before its first sample.
 const primeSamples = 320
@@ -93,11 +81,6 @@ func NewHighPass(rate int, hz float64) *HighPass {
 		h.s[i] = highPassBiquad(h.rate, hz, q)
 	}
 	return h
-}
-
-// Response is the filter's gain at hz (1 is 0 dB), from its coefficients.
-func (h *HighPass) Response(hz float64) float64 {
-	return h.s[0].response(h.rate, hz) * h.s[1].response(h.rate, hz)
 }
 
 // Process filters pcm (PCM16 mono, little-endian; an odd last byte is

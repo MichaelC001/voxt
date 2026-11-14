@@ -22,12 +22,12 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
-	"github.com/hehehai/actnowkit/family"
-	"github.com/hehehai/actnowkit/registry"
-	"github.com/hehehai/actnowkit/shortcuts"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/settings"
+	"github.com/hehehai/actnowkit/family"
+	"github.com/hehehai/actnowkit/registry"
+	"github.com/hehehai/actnowkit/shortcuts"
 )
 
 // familyState is the family as the UI knows it (main thread).

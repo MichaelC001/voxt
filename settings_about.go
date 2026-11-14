@@ -9,9 +9,7 @@ package main
 import (
 	"archive/zip"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -173,7 +171,8 @@ func (a *app) runSelfCheck() {
 }
 
 // writeBundle writes the diagnostic bundle (a ZIP) to path: the
-// diagnostics, the settings (they hold no secret) and the log files.
+// diagnostics, the settings and the log files, scrubbed
+// (settings_about_scrub.go).
 func writeBundle(path, diag string, prefs settings.Settings, logDir string) error {
 	tmp := path + ".tmp"
 	f, err := os.Create(tmp)
@@ -191,8 +190,7 @@ func writeBundle(path, diag string, prefs settings.Settings, logDir string) erro
 	}
 	err = put("diagnostics.txt", []byte(diag))
 	if err == nil {
-		data, _ := json.MarshalIndent(prefs, "", "  ")
-		err = put("settings.json", data)
+		err = put("settings.json", scrubSettings(prefs))
 	}
 	if err == nil && logDir != "" {
 		ents, _ := os.ReadDir(logDir)
@@ -206,7 +204,7 @@ func writeBundle(path, diag string, prefs settings.Settings, logDir string) erro
 			}
 			w, cerr := zw.Create("logs/" + e.Name())
 			if cerr == nil {
-				_, cerr = io.Copy(w, src)
+				cerr = copyRedacted(w, src)
 			}
 			src.Close()
 			if cerr != nil {

@@ -30,6 +30,7 @@ func drain(t *testing.T, st asr.Stream) []asr.Event {
 }
 
 func TestLive(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Text: "最终文本"}, nil)
 	a := f.asr(t, ASRFast)
 	st, err := a.Open(context.Background(), asr.StreamRequest{SampleRate: 16000, Lang: "zh", Hints: []string{"VoxtMini"}})
@@ -82,6 +83,7 @@ func TestLive(t *testing.T) {
 // messages the server takes, and shows partials (the fake's: at 1600,
 // 17600 and 33600 samples; one message would make one).
 func TestLiveBacklog(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Text: "ok"}, nil)
 	st, err := f.asr(t, ASRFast).Open(context.Background(), asr.StreamRequest{})
 	if err != nil {
@@ -105,6 +107,7 @@ func TestLiveBacklog(t *testing.T) {
 }
 
 func TestLiveClose(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{}, func(c *Config) { c.IdleTimeout = 200 * time.Millisecond })
 	a := f.asr(t, ASRFast)
 	st, err := a.Open(context.Background(), asr.StreamRequest{})
@@ -126,6 +129,7 @@ func TestLiveClose(t *testing.T) {
 }
 
 func TestLiveCancelled(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Delay: 5 * time.Second}, nil)
 	a := f.asr(t, ASRFast)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -146,6 +150,7 @@ func TestLiveCancelled(t *testing.T) {
 
 // TestLiveStreamAll: asr.StreamAll (the end-to-end helpers) over it.
 func TestLiveStreamAll(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Text: "ok"}, nil)
 	var partials []string
 	res, err := asr.StreamAll(context.Background(), f.asr(t, ASRAccurate), asr.StreamRequest{}, tone(1500*time.Millisecond, 0.3),
@@ -156,6 +161,7 @@ func TestLiveStreamAll(t *testing.T) {
 }
 
 func TestVAD(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{}, nil)
 	v, err := NewVAD(f.rt, f.model(VADSilero))
 	if err != nil {
@@ -226,6 +232,7 @@ func TestVAD(t *testing.T) {
 }
 
 func TestVADFails(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Mode: omnitest.ModeVADError}, nil)
 	v, err := NewVAD(f.rt, f.model(VADSilero))
 	if err != nil {

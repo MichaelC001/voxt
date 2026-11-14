@@ -204,6 +204,25 @@ func TestSaveAndSignOut(t *testing.T) {
 	}
 }
 
+func TestSaveFailureRevokes(t *testing.T) {
+	is := newIssuer(t)
+	st := &memStore{fail: errors.New("keychain refused")}
+	src := NewSource(st, is.cfg())
+	err := src.Save(context.Background(), Tokens{AccessToken: accessToken("a", is.now.Add(time.Hour)), RefreshToken: "rz"})
+	if err == nil {
+		t.Fatal("saved into a failing store")
+	}
+	is.mu.Lock()
+	rv := is.revokes
+	is.mu.Unlock()
+	if len(rv) != 1 || rv[0]["token"] != "rz" {
+		t.Errorf("unsaved sign-in not revoked: %v", rv)
+	}
+	if _, err := src.Headers(context.Background()); !errors.Is(err, ErrSignedOut) {
+		t.Errorf("after a failed save: %v", err)
+	}
+}
+
 func TestRefreshKeptWhenStoreFails(t *testing.T) {
 	is := newIssuer(t)
 	st := stored(t, Tokens{AccessToken: accessToken("a0", is.now), RefreshToken: "r0"})

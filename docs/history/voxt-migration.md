@@ -6,7 +6,7 @@ VoxtMini is a **new app**: Voxt rebuilt from scratch on Go + MyGo with local mod
 
 *Note, 2026-11-14: VoxtMini is published in Voxt's former GitHub repository, hehehai/VoxtMini (Voxt's history kept up to the tag `voxt-final`; Voxt itself continues as SGLang Omni Voxt). actnow.dev renamed its VoxtNew pages to Voxt, so actnow.dev/voxtnew and its download page are gone; downloads are on GitHub Releases until VoxtMini has a page there.*
 
-*Note, 2026-11-11: remote models are back (the user's decision): local models stay the default, and a feature uses a remote speech or language service only when the user sets one up on the Remote models page and picks it on the feature's page ([remote-models.md](remote-models.md)). The announcement draft below was written before; if it is published after this lands, its "remote models are not included" / "no API key is needed" lines need updating (e.g. "local by default; remote models optional").*
+*Note, 2026-11-11: remote models are back (the user's decision): local models stay the default, and a feature uses a remote speech or language service only when the user sets one up on the Remote models page and picks it on the feature's page ([remote-models.md](../remote-models.md)). The announcement draft below was written before; if it is published after this lands, its "remote models are not included" / "no API key is needed" lines need updating (e.g. "local by default; remote models optional").*
 
 ## What this means for Voxt's users
 

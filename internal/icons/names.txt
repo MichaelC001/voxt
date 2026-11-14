@@ -10,7 +10,6 @@ global                  # Translate
 pen-new-round           # Rewrite
 target                  # App enhancement
 cpu                     # Models
-cloud                   # remote services (Models)
 notebook-bookmark       # Dictionary
 shield-keyhole          # Permissions
 clipboard-list          # Logs
@@ -61,7 +60,6 @@ add
 soundwave                # speech models
 chat-round-line          # language models
 download-minimalistic    # download a model
-eye                      # show a hidden model
 eye-closed               # hide a model, every model hidden
 
 # Remote services (remote_page.go).
@@ -73,13 +71,11 @@ accessibility            # a shortcut that needs Accessibility
 # App enhancement (appenhance_page.go).
 widget-2                 # member apps
 link-minimalistic-2      # website rules
-arrow-to-down-left       # the key after inserting (↵)
 window-frame             # the app in front (preview)
 
 # Dictionary (dictionary_page.go).
 pen-2                    # edit a term
 import                   # import terms
-export                   # export terms
 
 # Home and the setup guide (home_page.go, onboarding.go).
 compass                  # open the setup guide

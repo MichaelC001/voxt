@@ -11,6 +11,7 @@ import (
 )
 
 func TestModels(t *testing.T) {
+	t.Parallel()
 	asrs := ASRModels()
 	var ids []string
 	for _, a := range asrs {
@@ -68,6 +69,7 @@ func TestTokenBudget(t *testing.T) {
 }
 
 func TestLanguageHint(t *testing.T) {
+	t.Parallel()
 	s := again(ASRFast)
 	for in, want := range map[string]string{"zh": "zh", "zh-Hans": "zh", "en-US": "en", "ja-JP": "ja", "yue": "zh", "zh-Hant": "", "": "", "  ": "", "sw": "", "xx": ""} {
 		if got := s.languageHint(in, []string{"en"}); got != want {
@@ -77,6 +79,7 @@ func TestLanguageHint(t *testing.T) {
 }
 
 func TestContextBias(t *testing.T) {
+	t.Parallel()
 	q := qwenTuning()
 	if got := q.contextBias([]string{" VoxtMini ", "voxtmini", "", "Aura  Link", "MLX"}, "").context; got != "VoxtMini\nAura Link\nMLX" {
 		t.Errorf("bias %q", got)
@@ -169,6 +172,7 @@ func TestSplitChunks(t *testing.T) {
 }
 
 func TestJoinParts(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		in   []string
 		want string
@@ -185,6 +189,7 @@ func TestJoinParts(t *testing.T) {
 }
 
 func TestAssembler(t *testing.T) {
+	t.Parallel()
 	var a assembler
 	steps := []struct {
 		index, seg int
@@ -221,22 +226,34 @@ func TestLocate(t *testing.T) {
 	}
 	exe := filepath.Join(app, "MacOS", "VoxtMini")
 	t.Setenv(EnvRuntime, "")
-	if got, err := Locate(exe); err != nil || got != bin {
+	if got, err := Locate(exe, true); err != nil || got != bin {
 		t.Errorf("bundle: %q %v", got, err)
 	}
-	if _, err := Locate(filepath.Join(dir, "elsewhere", "VoxtMini")); err == nil || !strings.Contains(err.Error(), EnvRuntime) {
+	if _, err := Locate(filepath.Join(dir, "elsewhere", "VoxtMini"), true); err == nil || !strings.Contains(err.Error(), EnvRuntime) {
 		t.Errorf("none: %v", err)
 	}
 	t.Setenv(EnvRuntime, filepath.Join(app, "Resources", "omni"))
-	if got, err := Locate(""); err != nil || got != bin {
+	if got, err := Locate("", true); err != nil || got != bin {
 		t.Errorf("env dir: %q %v", got, err)
 	}
 	t.Setenv(EnvRuntime, bin)
-	if got, err := Locate(""); err != nil || got != bin {
+	if got, err := Locate("", true); err != nil || got != bin {
 		t.Errorf("env binary: %q %v", got, err)
 	}
 	t.Setenv(EnvRuntime, dir)
-	if _, err := Locate(exe); err == nil {
+	if _, err := Locate(exe, true); err == nil {
 		t.Error("a wrong env dir must not fall back to the bundle")
+	}
+	// A published build ignores the environment: the bundle's runtime, or
+	// none.
+	other := filepath.Join(dir, "other", ServerBinary)
+	os.MkdirAll(filepath.Dir(other), 0o755)
+	os.WriteFile(other, []byte("x"), 0o755)
+	t.Setenv(EnvRuntime, other)
+	if got, err := Locate(exe, false); err != nil || got != bin {
+		t.Errorf("release build with the env set: %q %v", got, err)
+	}
+	if got, err := Locate("", false); err == nil {
+		t.Errorf("release build without a bundle used the env: %q", got)
 	}
 }

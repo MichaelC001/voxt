@@ -13,6 +13,7 @@ import (
 
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
+	"github.com/hehehai/VoxtMini/internal/procio"
 )
 
 // LogSource is the source of the helper's lines in the logs.
@@ -59,7 +60,7 @@ type proc struct {
 	s      *supervisor
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
-	tail   *lineTail
+	tail   *procio.Tail
 	exited chan struct{}
 
 	writeMu sync.Mutex

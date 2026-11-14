@@ -59,13 +59,12 @@ func (p RetryPolicy) delay(n int, e *Error, jitter func() float64) (time.Duratio
 	return d/2 + time.Duration(jitter()*float64(d/2)), true
 }
 
-// Client adds timeouts, retries, usage accounting and JSON output to a
+// Client adds timeouts, retries, usage estimates and JSON output to a
 // Backend. The zero value of every field is usable; Backend is required.
 type Client struct {
 	Backend Backend
 	Timeout time.Duration // per attempt (0: DefaultTimeout); Request.Timeout overrides
 	Retry   RetryPolicy
-	Meter   *Meter // optional
 
 	// Sleep waits between retries; tests replace it. nil: a timer honouring ctx.
 	Sleep func(ctx context.Context, d time.Duration) error
@@ -126,7 +125,6 @@ func (c *Client) Chat(ctx context.Context, req Request) (Response, error) {
 		}
 	}
 	var total Usage
-	start := time.Now()
 	for attempt := 1; ; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return Response{}, ctxErr(ctx, c.Backend.Info().ID, err, timeout)
@@ -159,10 +157,8 @@ func (c *Client) Chat(ctx context.Context, req Request) (Response, error) {
 			resp.Usage, resp.Attempts = total, attempt
 			if resp.Text == "" && resp.FinishReason != FinishLength {
 				err = newErr(CodeEmpty, "provider", c.Backend.Info().ID)
-				c.Meter.record(c.Backend.Info().ID, req, resp, err, time.Since(start))
 				return resp, err
 			}
-			c.Meter.record(c.Backend.Info().ID, req, resp, nil, time.Since(start))
 			return resp, nil
 		}
 		var e *Error
@@ -177,12 +173,10 @@ func (c *Client) Chat(ctx context.Context, req Request) (Response, error) {
 			e = ctxErr(ctx, c.Backend.Info().ID, ctx.Err(), timeout)
 		}
 		if !e.Retryable || streamed || attempt >= c.Retry.attempts() || ctx.Err() != nil {
-			c.Meter.record(c.Backend.Info().ID, req, Response{Usage: total, Attempts: attempt}, e, time.Since(start))
 			return Response{Usage: total, Attempts: attempt}, e
 		}
 		d, ok := c.Retry.delay(attempt, e, rand.Float64)
 		if !ok {
-			c.Meter.record(c.Backend.Info().ID, req, Response{Usage: total, Attempts: attempt}, e, time.Since(start))
 			return Response{Usage: total, Attempts: attempt}, e
 		}
 		if dl, ok := ctx.Deadline(); ok && time.Until(dl) < d {

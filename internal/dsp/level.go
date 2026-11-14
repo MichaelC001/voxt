@@ -328,6 +328,3 @@ func (l *Leveler) Report() Report {
 	r.Limited = l.lim.n
 	return r
 }
-
-// GainDB is the gain now.
-func (l *Leveler) GainDB() float64 { return l.g }

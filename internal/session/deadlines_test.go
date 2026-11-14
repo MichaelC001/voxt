@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/hehehai/VoxtMini/internal/compose"
@@ -129,34 +130,36 @@ func TestCleanupDeadlines(t *testing.T) {
 			func(c *Config) { c.LLMFirstToken, c.LLMTimeout = 200*ms, 600*ms }, "hello VoxtMini", "no answer within 600ms", 3 * time.Second},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			h := newHarness(t, &fakeFile{text: c.text}, &llm.Client{Backend: c.llm}, func(cfg *Config, _ *settings.Settings) {
-				if c.cfg != nil {
-					c.cfg(cfg)
+			inBubble(t, c.name != "past the cap", func(t *testing.T) {
+				h := newHarness(t, &fakeFile{text: c.text}, &llm.Client{Backend: c.llm}, func(cfg *Config, _ *settings.Settings) {
+					if c.cfg != nil {
+						c.cfg(cfg)
+					}
+				})
+				h.speak(h.start(), 5)
+				end := h.rec.wait(t)
+				if end.Result != c.result {
+					t.Errorf("result %q, want %q", end.Result, c.result)
+				}
+				if c.problem == "" {
+					if end.Problem != nil {
+						t.Errorf("problem %+v", end.Problem)
+					}
+				} else if end.Problem == nil || end.Problem.Code != ProblemLLM || !end.Problem.Degraded || !h.logged(c.problem) {
+					t.Errorf("problem %+v, logs %q", end.Problem, h.logs)
+				}
+				if end.Timings.LLM > c.most {
+					t.Errorf("the clean-up took %v", end.Timings.LLM)
+				}
+				c.llm.mu.Lock()
+				reqs := c.llm.reqs
+				c.llm.mu.Unlock()
+				for _, req := range reqs {
+					if req.FirstTokenTimeout == 0 || req.StallTimeout != 500*ms || req.Timeout < req.FirstTokenTimeout {
+						t.Errorf("deadlines %v, %v, %v", req.FirstTokenTimeout, req.StallTimeout, req.Timeout)
+					}
 				}
 			})
-			h.speak(h.start(), 5)
-			end := h.rec.wait(t)
-			if end.Result != c.result {
-				t.Errorf("result %q, want %q", end.Result, c.result)
-			}
-			if c.problem == "" {
-				if end.Problem != nil {
-					t.Errorf("problem %+v", end.Problem)
-				}
-			} else if end.Problem == nil || end.Problem.Code != ProblemLLM || !end.Problem.Degraded || !h.logged(c.problem) {
-				t.Errorf("problem %+v, logs %q", end.Problem, h.logs)
-			}
-			if end.Timings.LLM > c.most {
-				t.Errorf("the clean-up took %v", end.Timings.LLM)
-			}
-			c.llm.mu.Lock()
-			reqs := c.llm.reqs
-			c.llm.mu.Unlock()
-			for _, req := range reqs {
-				if req.FirstTokenTimeout == 0 || req.StallTimeout != 500*ms || req.Timeout < req.FirstTokenTimeout {
-					t.Errorf("deadlines %v, %v, %v", req.FirstTokenTimeout, req.StallTimeout, req.Timeout)
-				}
-			}
 		})
 	}
 }
@@ -176,19 +179,34 @@ func TestWriteDeadlines(t *testing.T) {
 		{"the first token is late", &pacedLLM{scripts: []script{{text: "x", first: -1}}}, "no first token within 1.1s"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			h := newHarness(t, &fakeFile{text: "x"}, &llm.Client{Backend: c.llm}, func(cfg *Config, _ *settings.Settings) {
-				cfg.Select = &fakeSelector{text: "Let's meet on Wednesday."}
-				cfg.LLMStall, cfg.WriteTimeout = 200*ms, 5*time.Second
+			synctest.Test(t, func(t *testing.T) {
+				h := newHarness(t, &fakeFile{text: "x"}, &llm.Client{Backend: c.llm}, func(cfg *Config, _ *settings.Settings) {
+					cfg.Select = &fakeSelector{text: "Let's meet on Wednesday."}
+					cfg.LLMStall, cfg.WriteTimeout = 200*ms, 5*time.Second
+				})
+				h.m.Start(StartRequest{Kind: store.KindTranslate, Target: slack})
+				end := h.rec.wait(t)
+				got := end.Result
+				if end.Problem != nil {
+					got = end.Problem.Err.Error()
+				}
+				if !strings.HasPrefix(got, c.want) {
+					t.Errorf("got %q, want %q", got, c.want)
+				}
 			})
-			h.m.Start(StartRequest{Kind: store.KindTranslate, Target: slack})
-			end := h.rec.wait(t)
-			got := end.Result
-			if end.Problem != nil {
-				got = end.Problem.Err.Error()
-			}
-			if !strings.HasPrefix(got, c.want) {
-				t.Errorf("got %q, want %q", got, c.want)
-			}
 		})
+	}
+}
+
+// inBubble runs f on synctest's fake clock when fake is set, else on the
+// real one. "past the cap" stays real: its cap is both the session's
+// context deadline and llm.Client's attempt timeout, which fire at the
+// same instant of a fake clock in either order, and which one wins picks
+// the error's words (on a real clock the session's, made first, wins).
+func inBubble(t *testing.T, fake bool, f func(*testing.T)) {
+	if fake {
+		synctest.Test(t, f)
+	} else {
+		f(t)
 	}
 }

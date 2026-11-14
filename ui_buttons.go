@@ -93,15 +93,6 @@ func ghostIconButtonSized(c *ui.Context, ic icons.Icon, label string, size float
 	return b
 }
 
-// labelOrIcon is a ghost button with an icon and its label, or only the
-// icon (with the label as its tooltip) when narrow.
-func labelOrIcon(c *ui.Context, ic icons.Icon, label string, narrow bool) ui.Element {
-	if narrow {
-		return iconButton(c, ic, label)
-	}
-	return ghostIconButton(c, ic, label).Label(label)
-}
-
 // dropButton is a ghost button that opens a menu or a popover: its icon,
 // its label and a chevron. Its label names it.
 func dropButton(c *ui.Context, ic icons.Icon, label string) ui.Element {
@@ -116,29 +107,8 @@ func dropButton(c *ui.Context, ic icons.Icon, label string) ui.Element {
 	return b
 }
 
-// dropText is a ghost button that opens a menu: its label and a
-// chevron, on the grey fill while on (a filter is set).
-func dropText(c *ui.Context, label string, on bool) ui.Element {
-	t := c.Theme()
-	k := tok(t)
-	b := ghostBase(c).Padding(px(t, 4), px(t, 6), px(t, 4), px(t, 10)).Gap(px(t, sp1)).AlignItems(ui.Center).Label(label).MinWidth(0).Shrink(1)
-	if on {
-		b.Background(k.Pressed)
-	}
-	b.Children(func() {
-		col := k.Text2
-		if on {
-			col = k.Text
-		}
-		ui.Text(c, label).FontSize(px(t, fsCaption)).TextColor(col).SingleLine().Ellipsis("…").MinWidth(0)
-		ui.Icon(c, icons.AltArrowDown.Linear).Size(px(t, 12), px(t, 12)).TextColor(k.Text3)
-	})
-	return b
-}
-
-// quietButton is an action in a row of dropText filters (Reset): the
-// same size, type and colour as they are, so the row keeps its height
-// when it appears.
+// quietButton is a small ghost action in a row of text (Copy, Add):
+// quiet type and colour, so the row keeps its height when it appears.
 func quietButton(c *ui.Context, ic icons.Icon, label string) ui.Element {
 	t := c.Theme()
 	k := tok(t)
@@ -179,25 +149,6 @@ func iconButton(c *ui.Context, ic icons.Icon, tip string) ui.Element {
 			col = tok(t).Text
 		}
 		ui.Icon(c, ic.Linear).Size(px(t, 16), px(t, 16)).TextColor(col)
-	})
-	return b
-}
-
-// iconToggle is an icon button for something on or off (Star, the
-// inspector): Bold and in the pressed face while on.
-func iconToggle(c *ui.Context, ic icons.Icon, on bool, tip string) ui.Element {
-	t := c.Theme()
-	k := tok(t)
-	b := ghostBase(c).Size(px(t, 28), px(t, 28)).Center().Label(tip).Tooltip(tip).Checked(on)
-	if on {
-		b.Background(k.Pressed)
-	}
-	b.Children(func() {
-		col := k.Text2
-		if on || b.Hovered() {
-			col = k.Text
-		}
-		ui.Icon(c, ic.Get(on)).Size(px(t, 16), px(t, 16)).TextColor(col)
 	})
 	return b
 }
@@ -252,13 +203,4 @@ func playButton(c *ui.Context, playing, stop bool, size float32) ui.Element {
 		ui.Icon(c, ic.Bold).Size(px(t, size*0.44), px(t, size*0.44)).TextColor(k.OnInk)
 	})
 	return b
-}
-
-// playToggle is a small play / pause icon button: playTip while
-// stopped, pauseTip while playing (the label follows).
-func playToggle(c *ui.Context, playing bool, playTip, pauseTip string) ui.Element {
-	if playing {
-		return iconButton(c, icons.Pause, pauseTip)
-	}
-	return iconButton(c, icons.Play, playTip)
 }

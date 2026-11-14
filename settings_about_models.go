@@ -21,7 +21,7 @@ import (
 // beside omniLocate).
 var llmLocate = func() string {
 	resources, _ := mygo.App.Path(mygo.PathResources)
-	return llmrt.Find(resources)
+	return llmrt.Find(resources, devOverrides())
 }
 
 // modelDiagnostics adds the local models' lines to the diagnostics

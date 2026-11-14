@@ -18,9 +18,9 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/sounds"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
+	"github.com/hehehai/actnowkit/sounds"
 )
 
 // soundPickerSpec is what a sound picker shows and does.

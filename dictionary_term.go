@@ -21,14 +21,14 @@ import (
 
 // termEdit is the term dialog's fields: a new term when id is "".
 type termEdit struct {
-	id              string
-	term, aliases   string
-	note            string
-	enabled         bool
-	err             string
-	saving          bool
-	createdAt       time.Time
-	original, title string
+	id            string
+	term, aliases string
+	note          string
+	enabled       bool
+	err           string
+	saving        bool
+	createdAt     time.Time
+	original      string
 	// category and group are the term's ids ("": the default category,
 	// every app).
 	category, group string

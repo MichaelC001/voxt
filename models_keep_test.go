@@ -40,6 +40,15 @@ func TestKeepIdle(t *testing.T) {
 	}
 }
 
+// TestLLMConfigCacheLimit: the language models' runtime bounds MLX's
+// cache, as the speech server's.
+func TestLLMConfigCacheLimit(t *testing.T) {
+	a, _, _ := newTestApp(t)
+	if c := a.llmConfig("bin", t.TempDir()); c.CacheLimitMB != llmCacheMB || llmCacheMB <= 0 {
+		t.Errorf("CacheLimitMB %d", c.CacheLimitMB)
+	}
+}
+
 // TestKeepLoadedRow: the Models page's Advanced section is folded;
 // open, its select shows the choice and saves another; a choice made
 // elsewhere shows too.

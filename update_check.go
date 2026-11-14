@@ -88,7 +88,7 @@ func runUpdateCheck(out string) {
 	rep.Stale = stale()
 	if rep.Stale {
 		// As the app makes it (helperlink.go): it must start nothing.
-		sup := helper.New(helper.Config{Bin: helper.Find(resources), AppVersion: rep.Running, Bus: core.NewBus(), Stale: stale,
+		sup := helper.New(helper.Config{Bin: helper.Find(resources, devOverrides()), AppVersion: rep.Running, Bus: core.NewBus(), Stale: stale,
 			Logf: func(string, ...any) {}})
 		sup.Start(ctx)
 		st := sup.Status()

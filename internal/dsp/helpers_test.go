@@ -178,3 +178,23 @@ func raise(level float64) float64 {
 	d := Defaults()
 	return min(d.MaxGainDB, max(0, d.TargetDB-level))
 }
+
+// response is the section's gain at hz.
+func (f *biquad) response(rate, hz float64) float64 {
+	w := 2 * math.Pi * hz / rate
+	z1 := complex(math.Cos(w), -math.Sin(w)) // z⁻¹
+	z2 := z1 * z1
+	num := complex(f.b0, 0) + complex(f.b1, 0)*z1 + complex(f.b2, 0)*z2
+	den := 1 + complex(f.a1, 0)*z1 + complex(f.a2, 0)*z2
+	return abs(num / den)
+}
+
+func abs(c complex128) float64 { return math.Hypot(real(c), imag(c)) }
+
+// Response is the filter's gain at hz (1 is 0 dB), from its coefficients.
+func (h *HighPass) Response(hz float64) float64 {
+	return h.s[0].response(h.rate, hz) * h.s[1].response(h.rate, hz)
+}
+
+// GainDB is the gain now.
+func (l *Leveler) GainDB() float64 { return l.g }

@@ -91,6 +91,10 @@ type shellState struct {
 	logSel       logSelection // the lines selected (shell_logs_select.go)
 	logsHeight   float32
 	logsDirty    atomic.Bool // a redraw for new lines is on its way
+	// logsOnScreen: the last build showed the logs (page or panel) in a
+	// shown window; only then do new lines redraw.
+	logsOnScreen atomic.Bool
+	winAway      bool // the main window hid (windowAway, dock.go)
 
 	navState          // shell_nav.go
 	menuLocale string // locale the native menu was built in
@@ -106,6 +110,10 @@ func newShellState() shellState {
 		prefs:        settings.Defaults(),
 	}
 }
+
+// logsRedraw is the shortest time between two redraws for new log lines
+// (a model's process may write a line a millisecond).
+const logsRedraw = 100 * time.Millisecond
 
 // openShell wires the shell to the library: its bus, the settings it
 // keeps in the database, and the notification centre, which keeps info
@@ -132,10 +140,18 @@ func (a *app) openShell(lib *library) {
 		a.post(func() { a.settingsChanged(ev.Old, ev.New) })
 	})
 	core.On(a.bus, func(core.LogAppended) {
-		// Many lines may come at once: one redraw for all of them.
-		if a.logsDirty.CompareAndSwap(false, true) {
-			a.post(func() { a.logsDirty.Store(false) })
+		// Lines redraw only the logs that show (else the next build reads
+		// them); many may come at once: one redraw for all of them, at
+		// most every logsRedraw.
+		if !a.logsOnScreen.Load() || !a.logsDirty.CompareAndSwap(false, true) {
+			return
 		}
+		redraw := func() { a.post(func() { a.logsDirty.Store(false) }) }
+		if a.win == nil {
+			redraw() // tests: at once
+			return
+		}
+		time.AfterFunc(logsRedraw, redraw)
 	})
 	a.applyLocale()
 }
@@ -187,11 +203,6 @@ func (a *app) navigate(path string) {
 	a.router.Push(path)
 	a.pageShown(path) // pages.go
 }
-
-// showPage goes to a page by name ("home", "history", "logs",
-// "settings"). Other areas navigate only through it (and read
-// currentPage).
-func (a *app) showPage(name string) { a.navigate("/" + name) }
 
 // currentPage is the name of the page shown: the first part of its path.
 func (a *app) currentPage() string { return section(a.router.Path())[1:] }
@@ -250,6 +261,7 @@ func (a *app) view(c *ui.Context) {
 	a.shortcuts(c)
 	a.syncNav()
 
+	a.logsOnScreen.Store(!a.winAway && (a.logsPanel || section(a.router.Path()) == "/logs"))
 	ui.Column(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		a.sidebarFrame(c, func() { // shell_nav.go: the sidebar or the icon rail
 			a.pages(c)

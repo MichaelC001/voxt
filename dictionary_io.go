@@ -5,6 +5,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -23,13 +25,38 @@ func (a *app) importTerms() {
 	chooseImportFile(a, func(path string) { a.importFile(path) })
 }
 
+// errImportSize: the file is larger than dict.MaxImportBytes.
+var errImportSize = errors.New("larger than the import limit")
+
+// readImport reads a file to import, refusing one over
+// dict.MaxImportBytes before reading it (a big file picked by mistake
+// would sit in memory whole).
+func readImport(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if st, err := f.Stat(); err == nil && st.Size() > dict.MaxImportBytes {
+		return nil, errImportSize
+	}
+	data, err := io.ReadAll(io.LimitReader(f, dict.MaxImportBytes+1))
+	if err == nil && len(data) > dict.MaxImportBytes {
+		return nil, errImportSize
+	}
+	return data, err
+}
+
 // importFile merges the terms of the file at path into the dictionary.
 func (a *app) importFile(path string) {
 	a.dv.importing = true
 	repo := a.lib.store.Dictionary()
 	a.async(func() {
 		msg := func() string {
-			data, err := os.ReadFile(path)
+			data, err := readImport(path)
+			if errors.Is(err, errImportSize) {
+				return i18n.T("Could not import %s: it is larger than 5 MB.", filepath.Base(path))
+			}
 			if err != nil {
 				return i18n.T("Could not import: %v", err)
 			}

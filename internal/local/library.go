@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 
-	fammodels "github.com/hehehai/actnowkit/models"
 	"github.com/hehehai/VoxtMini/internal/asr"
 	"github.com/hehehai/VoxtMini/internal/models"
+	fammodels "github.com/hehehai/actnowkit/models"
 )
 
 // ASROpener opens speech model id (a models catalogue id) from dir, its

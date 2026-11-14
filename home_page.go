@@ -20,6 +20,7 @@ import (
 	"unicode"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/hehehai/VoxtMini/internal/deliver"
 	"github.com/hehehai/VoxtMini/internal/hotkey"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
@@ -311,7 +312,7 @@ func (a *app) homeRecentList(c *ui.Context) {
 					ui.Text(c, uitext.EntryMeta(e)).FontSize(px(t, fsCaption)).TextColor(k.Text3).SingleLine().Ellipsis("…").MinWidth(0)
 				})
 				if iconButton(c.Key("copy"), icons.Copy, i18n.T("Copy")).Label(i18n.T("Copy: %s", title)).Clicked() {
-					c.Services().WriteClipboard(e.Result)
+					c.Services().WriteClipboard(deliver.Sanitize(e.Result))
 					a.toast(i18n.T("Copied"))
 				}
 			})

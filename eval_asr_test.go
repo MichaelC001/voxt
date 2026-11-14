@@ -48,7 +48,7 @@ type liveResult struct {
 func TestEvalASR(t *testing.T) {
 	e := evalSetup(t)
 	exe, _ := os.Executable()
-	server, err := omni.Locate(exe)
+	server, err := omni.Locate(exe, true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,7 +9,6 @@ import (
 	"maps"
 	"net"
 	"net/url"
-	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -228,40 +227,12 @@ type Secrets interface {
 	Secret(ctx context.Context, name string) (string, error)
 }
 
-// SecretsFunc adapts a function to Secrets.
-type SecretsFunc func(ctx context.Context, name string) (string, error)
-
-func (f SecretsFunc) Secret(ctx context.Context, name string) (string, error) { return f(ctx, name) }
-
 // StaticSecrets is an in-memory Secrets (tests, a key read for one call).
 type StaticSecrets map[string]string
 
 func (s StaticSecrets) Secret(_ context.Context, name string) (string, error) {
 	if v, ok := s[name]; ok && v != "" {
 		return v, nil
-	}
-	return "", ErrNoSecret
-}
-
-// EnvSecrets reads $AURALINK_<NAME> ("llm.openai" → AURALINK_LLM_OPENAI),
-// falling back to Fallback. For development and CI only.
-type EnvSecrets struct{ Fallback Secrets }
-
-func (e EnvSecrets) Secret(ctx context.Context, name string) (string, error) {
-	env := "AURALINK_" + strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z':
-			return r - 'a' + 'A'
-		case r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
-			return r
-		}
-		return '_'
-	}, name)
-	if v := os.Getenv(env); v != "" {
-		return v, nil
-	}
-	if e.Fallback != nil {
-		return e.Fallback.Secret(ctx, name)
 	}
 	return "", ErrNoSecret
 }

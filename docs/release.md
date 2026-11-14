@@ -25,10 +25,13 @@ For local releases, `scripts/release.sh --notarize <profile> --publish` uses the
 ## Publishing a version
 
 1. Set the same version in `mygo.json`, `helper/Support/Info.plist` and `llm/Support/Info.plist`. The first standalone release continues the existing sequence at `0.1.0-beta.2`.
-2. Move the release notes from `Unreleased` into a versioned section in `CHANGELOG.md`. Keep the English notes first and the Chinese notes under `### 中文`.
-3. Commit and push the version, then create and push the matching tag, for example `v0.1.0-beta.2`.
-4. The tag workflow builds the app, signs it with Developer ID, notarizes and staples the app and DMG, verifies the bundle, publishes the update to ActNow, then creates a **draft GitHub release** with the DMG attached.
-5. Review and publish the GitHub draft. Beta versions should remain marked as pre-releases. ActNow updates become available after the workflow publishes them.
+2. Run `scripts/vulncheck.sh` (govulncheck on the darwin/arm64 build, needs the network): it must report no vulnerabilities. A Go standard library one is fixed by raising `go.mod`'s Go version (and the version in `AGENTS.md`, `README*.md`, `CONTRIBUTING.md`); a module's by upgrading the module.
+3. Move the release notes from `Unreleased` into a versioned section in `CHANGELOG.md`. Keep the English notes first and the Chinese notes under `### 中文`.
+4. Commit and push the version, then create and push the matching tag, for example `v0.1.0-beta.2`.
+5. The tag workflow builds the app, signs it with Developer ID, notarizes and staples the app and DMG, verifies the bundle, publishes the update to ActNow, then creates a **draft GitHub release** with the DMG attached (`scripts/release-github.sh`, below).
+6. Review and publish the GitHub draft. Beta versions should remain marked as pre-releases. ActNow updates become available after the workflow publishes them.
+
+`scripts/release-github.sh [vVERSION]` is that last step on its own, for a release built on a Mac: it checks that the tag is `v` + `mygo.json`'s version, takes the notes of that version from `CHANGELOG.md` (it stops when there is none), and creates the tag's draft release with every `build/darwin-arm64/*.dmg` attached, marked a pre-release for a version with a `-` (`0.1.0-beta.2`); when the release exists already it turns it back into a draft with the same title and notes and replaces the DMGs. It needs `gh` and `GH_TOKEN` (or `GITHUB_TOKEN`) and never publishes: review the draft and publish it on GitHub.
 
 A manual run from **Actions → Release → Run workflow** makes an artifact for checking the build. With `sign` off, it does not require release secrets and does not publish. With `sign` on, it signs and notarizes but still does not publish.
 

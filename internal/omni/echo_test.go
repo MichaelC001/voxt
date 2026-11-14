@@ -12,6 +12,7 @@ import (
 )
 
 func TestEchoTail(t *testing.T) {
+	t.Parallel()
 	terms := []string{"Voxt", "Omni", "SGLang", "Hugging Face"}
 	for _, c := range []struct {
 		text, kept string
@@ -52,6 +53,7 @@ func TestEchoTail(t *testing.T) {
 }
 
 func TestEchoTailCutOff(t *testing.T) {
+	t.Parallel()
 	terms := []string{"Voxt", "Omni", "SGLang", "Kubernetes"}
 	text := "好的。Voxt\nOmni\nSGLang\nKubern"
 	if cut, found, _ := echoTail(text, terms, true); cut < 0 || text[:cut] != "好的。" || len(found) != 3 {
@@ -66,6 +68,7 @@ func TestEchoTailCutOff(t *testing.T) {
 }
 
 func TestSpokenTokens(t *testing.T) {
+	t.Parallel()
 	for text, want := range map[string]int{
 		"嗯。": 0, "": 0, "Um, okay.": 1, "好的。S G Lang。": 5, "我们用 Omni 和 SGLang。": 6, "Hugging Face": 2, "3.5 GB": 3,
 	} {
@@ -79,6 +82,7 @@ func TestSpokenTokens(t *testing.T) {
 // same audio without the context has none of them; terms the speech has
 // stay.
 func TestFinalEcho(t *testing.T) {
+	t.Parallel()
 	transcribeWith := func(o omnitest.Opts, hints ...string) (string, []omnitest.Record) {
 		f := newFake(t, o, nil)
 		res, err := f.asr(t, ASRFast).Transcribe(context.Background(), asr.FileRequest{Audio: tone(2*time.Second, 0.3), Format: "pcm", Lang: "zh", Hints: hints})
@@ -106,6 +110,7 @@ func TestFinalEcho(t *testing.T) {
 }
 
 func TestHeardAgain(t *testing.T) {
+	t.Parallel()
 	terms := []string{"Omni", "SGLang"}
 	for _, c := range []struct {
 		plain, kept string
@@ -126,6 +131,7 @@ func TestHeardAgain(t *testing.T) {
 // TestLivePiecesEcho: the pieces of a long live session and its rest go
 // through the same guard.
 func TestLivePiecesEcho(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Text: "p{n}。", Echo: true}, nil)
 	a := piecesASR(t, f)
 	st, err := a.Open(context.Background(), asr.StreamRequest{SampleRate: sampleRate, Lang: "zh", Hints: []string{"VoxtMini"}})

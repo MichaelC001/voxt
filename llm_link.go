@@ -44,21 +44,34 @@ func (a *app) llmRuntime() *llmrt.Runtime {
 		a.llmrt.Stop()
 	default:
 		logDir, _ := mygo.App.Path(mygo.PathLogs)
-		logs := a.logs
-		_, idle := keepIdle(a.keepSetting()) // models_keep.go
-		a.llmrt = llmrt.New(llmrt.Config{
-			Bin: llmLocate(), AppVersion: mygo.App.Version(), LogDir: logDir, IdleTimeout: idle,
-			Log: func(e core.LogEntry) {
-				if logs != nil {
-					logs.Append(e)
-				}
-			},
-			OnModel: a.modelEvents(workerLLM), BeforeLoad: a.beforeLoad(), // family_runtime.go
-			OnPace: a.onPace(), // memory_notice.go
-		})
+		a.llmrt = llmrt.New(a.llmConfig(llmLocate(), logDir))
 		a.llmrt.SetTuning(llmTunings(a.keepSetting())) // models_llm_params.go
 	}
 	return a.llmrt
+}
+
+// llmCacheMB bounds MLX's cache of freed buffers in voxtmini-llm, as the
+// speech server's (omni's CacheMB): without it a long Rewrite left the
+// process a GB or more above its weights until the idle unload. A
+// runtime older than the field ignores it (JSON's unknown key).
+const llmCacheMB = 512
+
+// llmConfig is the runtime's configuration: the process bin, its logs in
+// logDir.
+func (a *app) llmConfig(bin, logDir string) llmrt.Config {
+	logs := a.logs
+	_, idle := keepIdle(a.keepSetting()) // models_keep.go
+	return llmrt.Config{
+		Bin: bin, AppVersion: mygo.App.Version(), LogDir: logDir, IdleTimeout: idle,
+		CacheLimitMB: llmCacheMB,
+		Log: func(e core.LogEntry) {
+			if logs != nil {
+				logs.Append(e)
+			}
+		},
+		OnModel: a.modelEvents(workerLLM), BeforeLoad: a.beforeLoad(), // family_runtime.go
+		OnPace: a.onPace(), // memory_notice.go
+	}
 }
 
 // llmMade is the runtime when one was made, else nil (it makes none).
@@ -85,10 +98,11 @@ func (a *app) unloadLLM(id string) {
 	}
 }
 
-// withDevLLM is base with VOXTMINI_DEV_LLM's models, when it is set.
+// withDevLLM is base with VOXTMINI_DEV_LLM's models, when it is set in
+// a development build.
 func (a *app) withDevLLM(base local.Services) local.Services {
 	spec := os.Getenv(llmrt.DevEnv)
-	if spec == "" {
+	if spec == "" || !devOverrides() { // dev_overrides.go
 		return base
 	}
 	models, err := llmrt.ParseDev(spec)

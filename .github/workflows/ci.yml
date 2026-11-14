@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Go on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: MyGo vet
+        run: go tool mygo vet .
+
+      - name: Vet the update-check build
+        run: go vet -tags updatecheck .
+
+      - name: Vendored MyGo is MyGo and our patches
+        run: scripts/vendor-mygo.sh --check
+
+      - name: gofmt and dead code (staticcheck U1000, deadcode)
+        run: scripts/lint.sh
+
+      - name: Tests of internal/...
+        run: go test -p 4 ./internal/...
+
+      - name: Tests of the root package (sharded)
+        run: scripts/test-main.sh -n 4

@@ -43,11 +43,16 @@ const BinName = "voxtmini-llm"
 // LogSource is the source of the process's lines in the logs.
 const LogSource = "llm"
 
-// Find looks for voxtmini-llm: $VOXTMINI_LLM, then the app's resources
-// (packaged, mygo dev, or go run from the project). It returns an
-// absolute path, or "" when there is none.
-func Find(resources string) string {
-	if p := os.Getenv("VOXTMINI_LLM"); p != "" {
+// EnvBin names a voxtmini-llm to run in place of the app's: development
+// builds only (Find's env).
+const EnvBin = "VOXTMINI_LLM"
+
+// Find looks for voxtmini-llm: $VOXTMINI_LLM when env (a development
+// build: a published one must not run what the environment names), then
+// the app's resources (packaged, mygo dev, or go run from the project).
+// It returns an absolute path, or "" when there is none.
+func Find(resources string, env bool) string {
+	if p := os.Getenv(EnvBin); p != "" && env {
 		if abs, err := filepath.Abs(p); err == nil {
 			return abs
 		}

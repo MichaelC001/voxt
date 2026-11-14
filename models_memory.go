@@ -25,6 +25,7 @@ type memoryState struct {
 	modelMem map[string]int64
 	// memPolling: a measure is due (memTick), while the page shows.
 	memPolling bool
+	pressure   pressureBook // models_pressure.go: goroutine-safe
 }
 
 // procMemory measures the process with pid (a test seam).
@@ -101,15 +102,23 @@ func (a *app) modelsShown() {
 	}
 }
 
-// memTick measures again while the page shows, when the window is
-// visible, and stops on another page (the next visit starts it again).
+// memTick measures again while the page shows, and stops on another page
+// or when the window hides (the next visit, or windowBack, starts it
+// again).
 func (a *app) memTick() {
-	if a.currentPage() != modelsPath[1:] {
+	if a.currentPage() != modelsPath[1:] || !a.onScreen() {
 		a.memPolling = false
 		return
 	}
-	if a.win == nil || a.win.IsVisible() {
-		a.readModelMemory()
-	}
+	a.readModelMemory()
 	a.later(memPoll, a.memTick)
+}
+
+// onScreen is whether the main window shows; tests without a window or
+// its fake (winShown) count as shown.
+func (a *app) onScreen() bool {
+	if a.win == nil && a.winShown == nil {
+		return true
+	}
+	return a.windowShown() // dock.go
 }

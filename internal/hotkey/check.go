@@ -144,17 +144,6 @@ func Check(f settings.Features) []Problem {
 	return out
 }
 
-// ProblemsOf are the problems of one feature's bindings, by index.
-func ProblemsOf(ps []Problem, feature string) map[int][]Problem {
-	out := map[int][]Problem{}
-	for _, p := range ps {
-		if p.Feature == feature {
-			out[p.Index] = append(out[p.Index], p)
-		}
-	}
-	return out
-}
-
 // isFKey reports whether a key is F1–F20.
 func isFKey(k string) bool {
 	if len(k) < 2 || k[0] != 'F' {

@@ -15,6 +15,8 @@ import (
 
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
+	"github.com/hehehai/VoxtMini/internal/logs"
+	"github.com/hehehai/VoxtMini/internal/procio"
 )
 
 // spawn starts a process. auto marks an automatic restart.
@@ -108,10 +110,10 @@ func (s *supervisor) startProcess() (*proc, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("starting %s: %w", s.cfg.Bin, err)
 	}
-	p := &proc{s: s, cmd: cmd, stdin: stdin, tail: newLineTail(40), exited: make(chan struct{}), pending: map[string]*call{}}
-	var logFile *os.File
+	p := &proc{s: s, cmd: cmd, stdin: stdin, tail: procio.NewTail(40), exited: make(chan struct{}), pending: map[string]*call{}}
+	var logFile *logs.CappedFile
 	if s.cfg.LogDir != "" {
-		logFile = openLog(filepath.Join(s.cfg.LogDir, "helper.log"))
+		logFile = logs.OpenCapped(filepath.Join(s.cfg.LogDir, "helper.log"), 0)
 	}
 	stderrDone := make(chan struct{})
 	go func() {
@@ -120,12 +122,10 @@ func (s *supervisor) startProcess() (*proc, error) {
 		sc.Buffer(make([]byte, 64*1024), 1024*1024)
 		for sc.Scan() {
 			line := sc.Text()
-			p.tail.add(line)
-			if logFile != nil {
-				fmt.Fprintln(logFile, line)
-			}
+			p.tail.Add(line)
+			logFile.Println(logs.Redact(line)) // nil: no log file; redacted as the log ring does
 			if strings.TrimSpace(line) != "" {
-				s.emit(core.LogEntry{Time: time.Now(), Level: stderrLevel(line), Source: LogSource, Message: line})
+				s.emit(core.LogEntry{Time: time.Now(), Level: procio.StderrLevel(line), Source: LogSource, Message: line})
 			}
 		}
 	}()
@@ -133,26 +133,10 @@ func (s *supervisor) startProcess() (*proc, error) {
 		p.read(stdout)
 		<-stderrDone
 		err := cmd.Wait()
-		if logFile != nil {
-			logFile.Close()
-		}
+		logFile.Close()
 		s.exited(p, err)
 	}()
 	return p, nil
-}
-
-// openLog opens the stderr log for appending, keeping one previous file
-// once it passes 10 MB.
-func openLog(path string) *os.File {
-	if st, err := os.Stat(path); err == nil && st.Size() > 10<<20 {
-		os.Rename(path, path+".1")
-	}
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil
-	}
-	return f
 }
 
 func (s *supervisor) handshake(p *proc) {

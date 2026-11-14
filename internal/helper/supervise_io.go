@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
+	"github.com/hehehai/VoxtMini/internal/procio"
 )
 
 func isClosed(ch chan struct{}) bool {
@@ -30,33 +29,16 @@ func isClosed(ch chan struct{}) bool {
 func (p *proc) read(stdout io.Reader) {
 	r := bufio.NewReaderSize(stdout, 64*1024)
 	for {
-		line, err := readLine(r)
+		line, err := procio.ReadLine(r, proto.MaxLine)
 		if len(line) > 0 {
 			p.handleLine(line, time.Now())
 		}
 		if err != nil {
 			if err != io.EOF {
-				p.tail.add("stdout: " + err.Error())
+				p.tail.Add("stdout: " + err.Error())
 			}
 			io.Copy(io.Discard, r) // drain, so the process is not blocked writing
 			return
-		}
-	}
-}
-
-// readLine reads one line of at most proto.MaxLine bytes; a longer one is
-// skipped.
-func readLine(r *bufio.Reader) ([]byte, error) {
-	var buf []byte
-	for {
-		chunk, isPrefix, err := r.ReadLine()
-		if len(buf)+len(chunk) <= proto.MaxLine {
-			buf = append(buf, chunk...)
-		} else {
-			buf = buf[:0:0]
-		}
-		if err != nil || !isPrefix {
-			return buf, err
 		}
 	}
 }
@@ -65,7 +47,7 @@ func readLine(r *bufio.Reader) ([]byte, error) {
 func (p *proc) handleLine(line []byte, at time.Time) {
 	m, err := proto.Decode(line)
 	if err != nil {
-		p.tail.add("stdout: " + string(line))
+		p.tail.Add("stdout: " + string(line))
 		return
 	}
 	switch m.Kind() {
@@ -126,18 +108,6 @@ func (s *supervisor) emit(e core.LogEntry) {
 		return
 	}
 	s.cfg.Bus.Publish(core.LogAppended{Entry: e})
-}
-
-// stderrLevel guesses the level of a free-form stderr line.
-func stderrLevel(line string) core.Severity {
-	l := strings.ToLower(line)
-	switch {
-	case strings.Contains(l, "fatal") || strings.Contains(l, "error"):
-		return core.SeverityError
-	case strings.Contains(l, "warning"):
-		return core.SeverityWarning
-	}
-	return core.SeverityInfo
 }
 
 func (p *proc) isClosed() bool {
@@ -254,28 +224,4 @@ func (p *proc) drop(id string) {
 	p.mu.Lock()
 	delete(p.pending, id)
 	p.mu.Unlock()
-}
-
-// lineTail keeps the last lines written to it.
-type lineTail struct {
-	mu    sync.Mutex
-	max   int
-	lines []string
-}
-
-func newLineTail(max int) *lineTail { return &lineTail{max: max} }
-
-func (t *lineTail) add(line string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.lines = append(t.lines, line)
-	if len(t.lines) > t.max {
-		t.lines = t.lines[len(t.lines)-t.max:]
-	}
-}
-
-func (t *lineTail) String() string {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return strings.Join(t.lines, "\n")
 }

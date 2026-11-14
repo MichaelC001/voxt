@@ -541,3 +541,12 @@ func TestPresets(t *testing.T) {
 		t.Error("Resolve changed the preset table")
 	}
 }
+
+// TestDefaultClientRedirects: a backend made without a client follows no
+// redirect to another host.
+func TestDefaultClientRedirects(t *testing.T) {
+	c := (&httpTransport{}).httpClient()
+	if c == http.DefaultClient || c.CheckRedirect == nil {
+		t.Error("the default client follows any redirect")
+	}
+}

@@ -186,7 +186,7 @@ func (a *app) copyAnswer(copyText func(string)) {
 	if !a.answer.open || a.answer.text == "" {
 		return
 	}
-	copyText(a.answer.text)
+	copyText(deliver.Sanitize(a.answer.text)) // as a paste: no control characters
 	a.setDelivery(a.answer.id, "copy", proto.App{})
 	a.answer.copySeq++
 	seq, id := a.answer.copySeq, a.answer.id

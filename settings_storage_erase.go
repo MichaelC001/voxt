@@ -16,13 +16,13 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	fammodels "github.com/hehehai/actnowkit/models"
-	"github.com/hehehai/actnowkit/registry"
-	famruntime "github.com/hehehai/actnowkit/runtime"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/datadir"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/uitext"
+	fammodels "github.com/hehehai/actnowkit/models"
+	"github.com/hehehai/actnowkit/registry"
+	famruntime "github.com/hehehai/actnowkit/runtime"
 )
 
 // modelFolderRows are the model library's folder, shared by the family,

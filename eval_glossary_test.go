@@ -5,7 +5,7 @@ package main
 // speech model wrote it without the dictionary (eval.Clip.Heard) goes
 // through Transcribe's clean-up with the whole eval dictionary as the
 // glossary (and the alias the user noted for Auralink), as it was heard
-// and with the dictionary's aliases replaced first (dict.Replace, as the
+// and with the dictionary's aliases replaced first (dict.ReplaceChanges, as the
 // session does); clips without terms check that no term is put in where
 // none was said. Twice: with the eval dictionary (9 terms, the glossary
 // in the system prompt) and with dictLarge (the glossary of the terms the
@@ -67,7 +67,7 @@ func TestEvalGlossary(t *testing.T) {
 						heard = c.Text
 					}
 					if aliases {
-						heard = dict.Replace(heard, dictionary)
+						heard, _ = dict.ReplaceChanges(heard, dictionary)
 					}
 					in := compose.Input{Task: compose.Transcribe, Cleanup: true, MainLanguage: c.Lang, Glossary: terms, Text: heard}
 					req := chatRequest(t, in, true, llm.SkillTranscribeEnhance)

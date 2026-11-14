@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"github.com/hehehai/actnowkit/sounds"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,9 +17,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hehehai/actnowkit/sounds"
+
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/family"
-	"github.com/hehehai/actnowkit/registry"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/helper"
@@ -28,10 +27,12 @@ import (
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/llmrt/llmrttest"
-	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/omni/omnitest"
 	"github.com/hehehai/VoxtMini/internal/overlay/layout"
 	"github.com/hehehai/VoxtMini/internal/permission"
+	"github.com/hehehai/actnowkit/family"
+	fammodels "github.com/hehehai/actnowkit/models"
+	"github.com/hehehai/actnowkit/registry"
 )
 
 // The test binary is also the fake helper (helpertest) and the fake
@@ -59,7 +60,7 @@ func runIsolated(m *testing.M) int {
 		panic(err)
 	}
 	defer os.RemoveAll(tmp)
-	realHub = models.Hub()
+	realHub = fammodels.DefaultHub() // the family's default library, before the environment moves it
 	os.Setenv(family.EnvDir, filepath.Join(tmp, "ActNow"))
 	os.Setenv("HF_HUB_CACHE", filepath.Join(tmp, "hub"))
 	os.Unsetenv("HF_HOME")
@@ -377,4 +378,9 @@ func hudTester(view func(*ui.Context), w, h int) *ui.Tester {
 // highest answer card.
 func cardTester(a *app) *ui.Tester {
 	return hudTester(a.overlayView, layout.AnswerW+2*layout.Pad, layout.CardMaxH+2*layout.Pad)
+}
+
+// notify posts a notification (on any goroutine), as a service would.
+func (a *app) notify(sev core.Severity, title, body, link string) {
+	a.notes.Post(core.Notification{Severity: sev, Title: title, Body: body, Link: link})
 }

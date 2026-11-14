@@ -2,7 +2,8 @@ package main
 
 // How long the runtimes keep a model loaded unused (settings.Models,
 // the Local models page's Advanced section): Automatic leaves each its
-// own idle time (omni's servers 10 min, voxtmini-llm 5 min); the other
+// own idle time (omni's servers 10 min, voxtmini-llm 5 min), a minute
+// when the Mac is short of memory (models_pressure.go); the other
 // choices set one for both, or keep them until VoxtMini quits. A change
 // applies to the running runtimes at once (their idle timers start
 // again). The ActNow family's memory rules stay above it: another app's
@@ -74,7 +75,7 @@ func keepLabel(v string) string {
 func (a *app) modelsAdvanced(c *ui.Context) {
 	t := c.Theme()
 	collapsible(c.Key("models-advanced"), i18n.T("Advanced"), &a.modelAdvanced, nil, func() {
-		help := i18n.T("Loaded models start at once but keep their memory. Automatic unloads a speech model after 10 idle minutes and a language model after 5.")
+		help := i18n.T("Loaded models start at once but keep their memory. Automatic unloads a speech model after 10 idle minutes and a language model after 5, or after 1 minute when the Mac is short of memory.")
 		settingRow(c, "models-keep", i18n.T("Keep models loaded"), help, func() {
 			// The label follows the setting and the language, unless a
 			// choice of this select is on its way to the setting.

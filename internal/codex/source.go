@@ -91,7 +91,9 @@ func (s *Source) Current(ctx context.Context) (Tokens, error) {
 	return s.cur, nil
 }
 
-// Save stores a new sign-in (Login's result).
+// Save stores a new sign-in (Login's result). One that cannot be stored
+// is revoked at the issuer (best effort), so that no live refresh token
+// is left that nobody holds.
 func (s *Source) Save(ctx context.Context, t Tokens) error {
 	if err := s.lock(ctx); err != nil {
 		return err
@@ -99,6 +101,9 @@ func (s *Source) Save(ctx context.Context, t Tokens) error {
 	defer s.unlock()
 	t.fill()
 	if err := s.store.Set(t.Marshal()); err != nil {
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		revoke(rctx, s.cfg, t)
+		cancel()
 		return fmt.Errorf("codex: saving the sign-in: %w", err)
 	}
 	s.cur, s.loaded, s.unsaved, s.rejected = t, true, false, ""

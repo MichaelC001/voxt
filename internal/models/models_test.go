@@ -97,12 +97,12 @@ var pendingPins = map[string]bool{}
 // Japanese, and the planned ones): only VoxtMini used them, and a later
 // actnowkit release removes them. Remove a repo here when it does.
 var droppedPins = map[string]bool{
-	"mlx-community/parakeet-tdt-0.6b-v3":                  true,
-	"mlx-community/SenseVoiceSmall":                       true,
-	"beshkenadze/cohere-transcribe-03-2026-mlx-fp16":      true,
-	"mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit":  true,
-	"OpenMOSS-Team/MOSS-Transcribe-Diarize":               true,
-	"mlx-community/GLM-4-9B-0414-4bit":                    true,
+	"mlx-community/parakeet-tdt-0.6b-v3":                 true,
+	"mlx-community/SenseVoiceSmall":                      true,
+	"beshkenadze/cohere-transcribe-03-2026-mlx-fp16":     true,
+	"mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit": true,
+	"OpenMOSS-Team/MOSS-Transcribe-Diarize":              true,
+	"mlx-community/GLM-4-9B-0414-4bit":                   true,
 }
 
 // TestFamilyPins: VoxtMini's models are the family pins table's rows of

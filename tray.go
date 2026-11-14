@@ -17,6 +17,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/transfer"
+	"github.com/hehehai/VoxtMini/internal/deliver"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/store"
 	"github.com/hehehai/VoxtMini/internal/trayicon"
@@ -169,7 +170,7 @@ func (a *app) copyRecent(text string) {
 	if cp == nil {
 		cp = func(s string) error { return mygo.Clipboard.Write(transfer.TextData(s)) }
 	}
-	if err := cp(text); err != nil {
+	if err := cp(deliver.Sanitize(text)); err != nil {
 		a.toast(i18n.T("Could not copy: %v", err))
 	}
 }

@@ -29,6 +29,10 @@
 // that tells nothing (no value nor selection, a web area) is trusted as
 // before.
 //
+// The text is sanitized first (sanitize.go): no control characters nor
+// terminal escapes, and into a terminal no trailing line break nor auto
+// key after a line break.
+//
 // Policy is here, the mechanics in the helper: the restore delay, the
 // keys after the paste, whether the clipboard keeps the text and how
 // long the check waits are params of textio.paste.
@@ -39,6 +43,7 @@ package deliver
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
@@ -182,6 +187,7 @@ func Secure(f proto.FocusResult) bool { return f.Subrole == "AXSecureTextField" 
 // package comment). Call it off the main thread: it waits for the helper.
 func Insert(ctx context.Context, io TextIO, r Request) Result {
 	start := time.Now()
+	r.Text = Sanitize(r.Text) // sanitize.go
 	res := insert(ctx, io, r)
 	res.Elapsed = time.Since(start)
 	return res
@@ -194,6 +200,7 @@ func Insert(ctx context.Context, io TextIO, r Request) Result {
 func Check(ctx context.Context, io TextIO, r Request) Result {
 	start := time.Now()
 	r.Activate = nil
+	r.Text = Sanitize(r.Text)
 	res := check(ctx, io, r)
 	res.Elapsed = time.Since(start)
 	return res
@@ -207,6 +214,18 @@ func insert(ctx context.Context, io TextIO, r Request) Result {
 	press := r.Press
 	if res.Moved(r.Target) {
 		press = nil // the start app's auto key, not this app's
+	}
+	if Terminal(res.To.BundleID) {
+		// A line break pasted into a terminal may run the line before it
+		// (sanitize.go): none at the end, and no auto key (Return) after
+		// text that has one.
+		if r.Text = strings.TrimRight(r.Text, "\n"); r.Text == "" {
+			res.Reason = ReasonEmpty
+			return res
+		}
+		if strings.Contains(r.Text, "\n") {
+			press = nil
+		}
 	}
 	retry := 0
 	if r.VerifyMS > 0 {

@@ -87,6 +87,7 @@ func TestProgressDeadlines(t *testing.T) {
 // TestShortOfMemory: the overlay's memory notice wants a slow (or
 // stopped) chat and the swap over 90% full, once.
 func TestShortOfMemory(t *testing.T) {
+	t.Parallel()
 	swap := func(percent int64) macx.SystemMemory {
 		return macx.SystemMemory{Pressure: "normal", AvailablePercent: 60, SwapUsedBytes: percent << 30, SwapTotalBytes: 100 << 30}
 	}

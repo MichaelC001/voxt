@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -69,40 +70,42 @@ func TestProgressDeadlines(t *testing.T) {
 			Request{FirstTokenTimeout: 100 * ms, StallTimeout: 50 * ms}, "", "", 3 * time.Second},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			client := &Client{Backend: c.backend, Sleep: noSleep}
-			var streamed strings.Builder
-			req := c.req
-			req.Messages = msgs("x")
-			if c.name != "without OnDelta" {
-				req.OnDelta = func(d string) { streamed.WriteString(d) }
-			}
-			start := time.Now()
-			resp, err := client.Chat(context.Background(), req)
-			took := time.Since(start)
-			if took > c.most {
-				t.Errorf("took %v", took)
-			}
-			if c.backend.calls.Load() != 1 {
-				t.Errorf("%d attempts", c.backend.calls.Load())
-			}
-			var e *Error
-			switch c.wait {
-			case "":
-				if err != nil || resp.Text == "" || strings.Contains(resp.Text, "think") {
-					t.Fatalf("resp %+v, err %v", resp, err)
+			synctest.Test(t, func(t *testing.T) {
+				client := &Client{Backend: c.backend, Sleep: noSleep}
+				var streamed strings.Builder
+				req := c.req
+				req.Messages = msgs("x")
+				if c.name != "without OnDelta" {
+					req.OnDelta = func(d string) { streamed.WriteString(d) }
 				}
-				if req.OnDelta != nil && streamed.String() != resp.Text {
-					t.Errorf("streamed %q, answered %q", streamed.String(), resp.Text)
+				start := time.Now()
+				resp, err := client.Chat(context.Background(), req)
+				took := time.Since(start)
+				if took > c.most {
+					t.Errorf("took %v", took)
 				}
-			case "-":
-				if !errors.As(err, &e) || e.Code != CodeTimeout || e.Params["wait"] != "" {
-					t.Fatalf("err %v", err)
+				if c.backend.calls.Load() != 1 {
+					t.Errorf("%d attempts", c.backend.calls.Load())
 				}
-			default:
-				if !errors.As(err, &e) || e.Code != CodeTimeout || e.Params["wait"] != c.wait || e.Params["deltas"] != c.deltas || e.Retryable {
-					t.Fatalf("err %v", err)
+				var e *Error
+				switch c.wait {
+				case "":
+					if err != nil || resp.Text == "" || strings.Contains(resp.Text, "think") {
+						t.Fatalf("resp %+v, err %v", resp, err)
+					}
+					if req.OnDelta != nil && streamed.String() != resp.Text {
+						t.Errorf("streamed %q, answered %q", streamed.String(), resp.Text)
+					}
+				case "-":
+					if !errors.As(err, &e) || e.Code != CodeTimeout || e.Params["wait"] != "" {
+						t.Fatalf("err %v", err)
+					}
+				default:
+					if !errors.As(err, &e) || e.Code != CodeTimeout || e.Params["wait"] != c.wait || e.Params["deltas"] != c.deltas || e.Retryable {
+						t.Fatalf("err %v", err)
+					}
 				}
-			}
+			})
 		})
 	}
 }

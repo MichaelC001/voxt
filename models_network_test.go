@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	famsettings "github.com/hehehai/actnowkit/settings"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/settings"
 	"github.com/hehehai/VoxtMini/internal/uitext"
+	famsettings "github.com/hehehai/actnowkit/settings"
 )
 
 // familyValue is the family's value of a shared key ("" unset).

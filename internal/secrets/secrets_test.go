@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,12 +16,12 @@ func TestItems(t *testing.T) {
 	defer func() { security = saved }()
 	var stdin string
 	var args []string
-	security = func(in string, a ...string) ([]byte, error) {
+	security = func(in string, a ...string) ([]byte, []byte, error) {
 		stdin, args = in, a
 		if a[0] == "find-generic-password" {
-			return []byte("sk-fromkeychain\n"), nil
+			return nil, []byte("keychain: \"login\"\nattributes:\npassword: \"sk-fromkeychain\"\n"), nil
 		}
-		return nil, nil
+		return nil, nil, nil
 	}
 	k := LLM("deepseek", "VoxtMini DeepSeek API key")
 	if k.Service != "VoxtMini" || k.Account != "llm.deepseek" || ASR("doubao", "").Account != "asr.doubao" {
@@ -29,12 +30,17 @@ func TestItems(t *testing.T) {
 	if err := k.Set(" sk-abc "); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(args, []string{"-i"}) || !strings.Contains(stdin, `-s "VoxtMini" -a "llm.deepseek" -l "VoxtMini DeepSeek API key" -w "sk-abc"`) ||
-		strings.Contains(strings.Join(args, " "), "sk-abc") {
+	if !slices.Equal(args, []string{"-i"}) || !strings.Contains(stdin, `-s "VoxtMini" -a "llm.deepseek" -l "VoxtMini DeepSeek API key" -X `+hex.EncodeToString([]byte("sk-abc"))+"\n") ||
+		strings.Contains(stdin, "sk-abc") || strings.Contains(strings.Join(args, " "), "sk-abc") {
 		t.Errorf("set: args %q stdin %q", args, stdin)
 	}
-	if err := k.Set(`bad"key`); err == nil {
-		t.Error("accepted a quote")
+	// A sign-in's JSON has quotes and backslashes: hex carries it as is.
+	const tokens = `{"access_token":"a\"b","refresh_token":"r"}`
+	if err := k.Set(tokens); err != nil || !strings.Contains(stdin, "-X "+hex.EncodeToString([]byte(tokens))) {
+		t.Errorf("json value: %v, stdin %q", err, stdin)
+	}
+	if err := Secret("a", `bad"label`).Set("v"); err == nil {
+		t.Error("accepted a quote in the label")
 	}
 	if got, err := k.Get(); got != "sk-fromkeychain" || err != nil {
 		t.Errorf("get: %q %v", got, err)
@@ -43,7 +49,7 @@ func TestItems(t *testing.T) {
 	if args[0] != "delete-generic-password" {
 		t.Errorf("empty value deletes: %q", args)
 	}
-	security = func(string, ...string) ([]byte, error) { return nil, ErrNoKeychain }
+	security = func(string, ...string) ([]byte, []byte, error) { return nil, nil, ErrNoKeychain }
 	if got, err := k.Get(); got != "" || err != nil {
 		t.Errorf("no keychain: %q %v", got, err)
 	}
@@ -52,6 +58,25 @@ func TestItems(t *testing.T) {
 	}
 	if Mask("sk-abcdefghijkl") != "sk-…ijkl" || Mask("short") != "•••••" {
 		t.Error(Mask("sk-abcdefghijkl"))
+	}
+}
+
+func TestParsePassword(t *testing.T) {
+	json := `{"a":"b\\c"}`
+	for _, c := range []struct{ in, want string }{
+		{"password: \"sk-abc\"\n", "sk-abc"},
+		{"attributes:\n    \"acct\"<blob>=\"x\"\npassword: 0x" + strings.ToUpper(hex.EncodeToString([]byte(json))) + "  \"{\\\"a\\\"...\"\n", json},
+		{"password: 0x" + hex.EncodeToString([]byte("密钥")) + "\n", "密钥"},
+		{"password: \n", ""},
+	} {
+		if got, err := parsePassword(c.in); got != c.want || err != nil {
+			t.Errorf("parsePassword(%q) = %q, %v; want %q", c.in, got, err, c.want)
+		}
+	}
+	for _, bad := range []string{"", "password: 0xZZ\n", "password: plain\n"} {
+		if _, err := parsePassword(bad); err == nil {
+			t.Errorf("parsePassword(%q) accepted", bad)
+		}
 	}
 }
 
@@ -67,7 +92,7 @@ func TestMacKeychain(t *testing.T) {
 	// not allowed"), so the commands run against a keychain of their own;
 	// the app uses the login keychain, unlocked in the user's session.
 	k := Item{Service: "VoxtMini (test)", Account: "llm.test"}
-	if _, err := security("", "show-keychain-info"); err != nil && strings.Contains(err.Error(), "User interaction is not allowed") {
+	if _, _, err := security("", "show-keychain-info"); err != nil && strings.Contains(err.Error(), "User interaction is not allowed") {
 		file := filepath.Join(t.TempDir(), "test.keychain-db")
 		if out, err := exec.Command("/usr/bin/security", "create-keychain", "-p", "test", file).CombinedOutput(); err != nil {
 			t.Fatalf("create-keychain: %v %s", err, out)
@@ -93,10 +118,25 @@ func TestMacKeychain(t *testing.T) {
 	if got, _ := k.Get(); got != key+"x" {
 		t.Errorf("after replacing: %q", Mask(got))
 	}
+	const tokens = `{"access_token":"a\\"b","email":"ü@example.com"}`
+	if err := k.Set(tokens); err != nil {
+		t.Fatalf("save json: %v", err)
+	}
+	if got, err := k.Get(); err != nil || got != tokens {
+		t.Errorf("json read back %d bytes, %v", len(got), err)
+	}
 	if err := k.Set(""); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
 	if got, err := k.Get(); got != "" {
 		t.Errorf("after removing: %q %v", Mask(got), err)
 	}
+}
+
+// Mask shows a secret without giving it away in test output: "sk-…wxyz".
+func Mask(s string) string {
+	if len(s) <= 8 {
+		return strings.Repeat("•", len(s))
+	}
+	return s[:3] + "…" + s[len(s)-4:]
 }

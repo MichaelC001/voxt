@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/family"
-	fammodels "github.com/hehehai/actnowkit/models"
 	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/models/modelstest"
 	"github.com/hehehai/VoxtMini/internal/uitext"
+	"github.com/hehehai/actnowkit/family"
+	fammodels "github.com/hehehai/actnowkit/models"
 )
 
 // Other family apps, as the tests play them.

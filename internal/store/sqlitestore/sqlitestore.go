@@ -170,11 +170,26 @@ func Open(ctx context.Context, dir string) (*Store, error) {
 			return nil, fmt.Errorf("sqlitestore: migration %d: %w", m.version, err)
 		}
 	}
+	if v < latest && v > 0 {
+		dropOldBackups(path, v) // migrated: the backup just made is the one kept
+	}
 	s := &Store{db: db, dir: dir, path: path}
 	s.documents = &documentRepo{db: db}
 	s.history = &historyRepo{db: db, dir: filepath.Join(dir, audioDir)}
 	s.dictionary = &dictionaryRepo{db: db}
 	return s, nil
+}
+
+// dropOldBackups deletes the backups (path.bak-<v>) of versions before
+// keep, after a migration from keep succeeded: each is a whole copy of
+// the database, and the newest is the one a downgrade would want.
+func dropOldBackups(path string, keep int) {
+	baks, _ := filepath.Glob(path + ".bak-*")
+	for _, b := range baks {
+		if v, err := strconv.Atoi(strings.TrimPrefix(b, path+".bak-")); err == nil && v < keep {
+			os.Remove(b)
+		}
+	}
 }
 
 func openDB(ctx context.Context, path string) (*sqlite.DB, error) {
@@ -227,9 +242,6 @@ func copyFile(src, dst string) error {
 	}
 	return os.Rename(tmp, dst)
 }
-
-// Path is the database file.
-func (s *Store) Path() string { return s.path }
 
 // Dir is the store directory.
 func (s *Store) Dir() string { return s.dir }
@@ -293,14 +305,6 @@ func asBytes(v any) []byte {
 		return x
 	}
 	return nil
-}
-
-// ms converts a time to the schema's Unix milliseconds; the zero time is NULL.
-func ms(t time.Time) any {
-	if t.IsZero() {
-		return nil
-	}
-	return t.UnixMilli()
 }
 
 // fromMS is the inverse of ms; NULL is the zero time.

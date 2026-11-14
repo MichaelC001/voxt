@@ -17,6 +17,7 @@ import (
 )
 
 func TestProfiles(t *testing.T) {
+	t.Parallel()
 	ps := Profiles()
 	if len(ps) != 12 || ps[0].ID != Balanced || ps[1].ID != Fast || ps[2].ID != Translate || ps[3].ID != Qwen3 || ps[4].ID != Gemma4 {
 		t.Fatalf("profiles %+v", ps)
@@ -53,6 +54,7 @@ func TestProfiles(t *testing.T) {
 }
 
 func TestHyMTPrompt(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ text, target, want string }{
 		{"今天天气真好。", "en", "将以下文本翻译为英语，注意只需要输出翻译后的结果，不要额外解释：\n\n今天天气真好。"},
 		{"The weather is nice.", "zh-Hans", "将以下文本翻译为中文，注意只需要输出翻译后的结果，不要额外解释：\n\nThe weather is nice."},
@@ -68,6 +70,7 @@ func TestHyMTPrompt(t *testing.T) {
 // Hy-MT2 gets its own prompt, one user message and its card's sampling;
 // it takes nothing but translations.
 func TestTranslationModel(t *testing.T) {
+	t.Parallel()
 	log := filepath.Join(t.TempDir(), "chats.jsonl")
 	rt, _ := newRuntime(t, llmrttest.Opt("reply", "The weather is nice today.")+","+llmrttest.Opt("chat-log", log), nil)
 	dir := t.TempDir()
@@ -100,6 +103,7 @@ func TestTranslationModel(t *testing.T) {
 }
 
 func TestDevHook(t *testing.T) {
+	t.Parallel()
 	if _, err := ParseDev("llm.balanced"); err == nil {
 		t.Error("id without dir")
 	}
@@ -153,6 +157,7 @@ func (baseServices) LLM(_ context.Context, id string) (local.Chat, local.Model, 
 // TestProfilesMatchTheCatalogue: every curated language model has a
 // profile with its repository, runtime and (GGUF) file.
 func TestProfilesMatchTheCatalogue(t *testing.T) {
+	t.Parallel()
 	n := 0
 	for _, m := range models.Catalog() {
 		if m.Kind != models.LLM {
@@ -173,5 +178,29 @@ func TestProfilesMatchTheCatalogue(t *testing.T) {
 	}
 	if n != len(Profiles()) {
 		t.Errorf("%d catalogue models, %d profiles", n, len(Profiles()))
+	}
+}
+
+// Profiles lists the curated models, the recommended one first.
+func Profiles() []Profile { return append([]Profile(nil), profiles...) }
+
+func TestFind(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(EnvBin, "")
+	if Find(dir, true) != "" {
+		t.Error("found nothing as something")
+	}
+	bin := filepath.Join(dir, "llm", BinName)
+	os.MkdirAll(filepath.Dir(bin), 0o755)
+	os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755)
+	if got := Find(dir, true); got != bin {
+		t.Errorf("Find = %q", got)
+	}
+	t.Setenv(EnvBin, "/opt/x")
+	if Find(dir, true) != "/opt/x" {
+		t.Error("the environment does not win in a development build")
+	}
+	if got := Find(dir, false); got != bin {
+		t.Errorf("a published build ran the environment's voxtmini-llm: %q", got)
 	}
 }

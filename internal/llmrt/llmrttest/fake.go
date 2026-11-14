@@ -35,6 +35,7 @@ package llmrttest
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -224,6 +225,9 @@ func (f *fake) handle(m wire.Message) {
 	case wire.MethodLoad:
 		var p wire.LoadParams
 		m.DecodeParams(&p)
+		if p.CacheLimitMB > 0 { // tests see the limit in the log
+			f.notify(wire.MethodLog, wire.LogParams{Level: "info", Message: fmt.Sprintf("fake load: cache limit %d MB", p.CacheLimitMB)})
+		}
 		go func() {
 			f.queue.Lock()
 			defer f.queue.Unlock()

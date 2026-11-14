@@ -40,7 +40,7 @@ type omniState struct {
 // omniLocate finds the runtime (a test seam).
 var omniLocate = func() (string, error) {
 	exe, _ := os.Executable()
-	return omni.Locate(exe)
+	return omni.Locate(exe, devOverrides())
 }
 
 // omniRuntime is the runtime, made on first use (a.omniMu held).

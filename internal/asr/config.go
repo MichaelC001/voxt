@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/hehehai/VoxtMini/internal/core"
 )
 
 // ProxyFunc is an http.Transport's Proxy: the family's network.proxy rule
@@ -61,9 +63,11 @@ func loopbackHost(host string) bool {
 // NewHTTPClient is an HTTP client through proxy, with dial and TLS
 // timeouts. responseHeader bounds the wait for response headers; 0 means
 // no bound, for slow streaming answers such as a language model's.
-// Requests are otherwise bounded by their context.
+// Requests are otherwise bounded by their context. Redirects go only to
+// the same host, never from https to http (core.CheckRedirect): the
+// requests carry keys.
 func NewHTTPClient(proxy ProxyFunc, responseHeader time.Duration) *http.Client {
-	return &http.Client{Transport: &http.Transport{
+	return &http.Client{CheckRedirect: core.CheckRedirect, Transport: &http.Transport{
 		Proxy:                 proxyOf(proxy),
 		DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		TLSHandshakeTimeout:   15 * time.Second,

@@ -34,8 +34,8 @@ func TestLookup(t *testing.T) {
 	if _, ok := Lookup("fr"); ok {
 		t.Error("French is not one of VoxtMini's languages")
 	}
-	if len(All()) != 3 || !slices.Equal(Codes, []string{"en", "zh", "ja"}) {
-		t.Errorf("All %v, Codes %v", All(), Codes)
+	if len(all) != 3 || !slices.Equal(Codes, []string{"en", "zh", "ja"}) {
+		t.Errorf("all %v, Codes %v", all, Codes)
 	}
 }
 

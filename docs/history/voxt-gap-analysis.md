@@ -4,7 +4,7 @@
 
 **2026-11-13：用户已经回答了第 5 节的问题，范围收窄（只做转录、翻译、转写；只支持英语、简体中文、日语），见[第 6 节](#6-用户的决定2026-11-13)。下面的清单和评估是之前写的，与第 6 节冲突时以第 6 节为准。**
 
-本文列出 Voxt 有而 VoxtMini 还没有（或只有一部分）的功能，逐项评估价值和成本，最后给出迁移路线。已经做了的、而且和 Voxt 行为不同的，仍以 [behavior.md](behavior.md) 为准，这里只写一句并指向它。
+本文列出 Voxt 有而 VoxtMini 还没有（或只有一部分）的功能，逐项评估价值和成本，最后给出迁移路线。已经做了的、而且和 Voxt 行为不同的，仍以 [behavior.md](../behavior.md) 为准，这里只写一句并指向它。
 
 **另有线程正在做的**（本文只标为 ⏳ 进行中，不评估）：
 - **远程模型（ASR + LLM）**：选服务商、URL、Key、模型、高级参数、按功能选择，线程 #1。这一项推翻了 AGENTS.md 里“只用本地模型”的规则，由 #1 改 AGENTS.md 和文档。
@@ -18,7 +18,7 @@
 
 **读过的文档**
 - Voxt：`AGENTS.md`、`README.md`（项目已迁到 sglang-omni/Voxt）、`docs/Architecture.md`、`docs/Meeting.zh-CN.md`、`docs/index.md` 的目录，以及 `docs/` 下各专题文件的文件名。
-- VoxtMini：`AGENTS.md`、`docs/architecture.md`、`docs/plan.md`、`docs/behavior.md`（全文）、`docs/voxt-migration.md`。
+- VoxtMini：`AGENTS.md`、`docs/architecture.md`、`docs/plan.md`、`docs/behavior.md`（全文）、`docs/history/voxt-migration.md`。
 - Auralink：`AGENTS.md`；和 VoxtMini 逐文件比较了文件列表（Auralink 有、VoxtMini 没有的 83 个文件，见 §2.T）。
 
 **核对过的 Voxt 源码**（`Voxt/` 下，共 509 个 Swift 文件；下面每条都在源码里确认过，没有只看文档）
@@ -58,7 +58,7 @@
 
 | # | 功能 | Voxt | VoxtMini | 差距 |
 |---|---|---|---|---|
-| B1 | 本地 MLX 语音模型目录（Whisper、Parakeet、SenseVoice、Qwen3-ASR、FireRed、Moonshine、Voxtral、Granite、Canary 等，可按标签筛选） | `Transcription/MLXModelManager.swift`、`Settings/Models/LocalASRModelCatalogBuilder.swift` | ◐ 只有 Qwen3-ASR 1.7B / 0.6B（`internal/models/catalog.go`），有意精简（behavior 3.1）。`sglang_omni_mlx/native/src` 里已经有 whisper、parakeet、sensevoice、cohere、moss、nemotron 的服务，但 `scripts/build-omni.sh` 只打包 `qwen3_asr_server`。**2026-11-12（#7）**：Voxt 的 11 个语音模型都进了目录（“模型”页的“更多模型”），Qwen3-ASR 1.7B 6bit 可以下载使用，其余 8 个标“即将支持”（[models-page.md](models-page.md)） | Qwen3-ASR 不支持的语言没有可选的模型 |
+| B1 | 本地 MLX 语音模型目录（Whisper、Parakeet、SenseVoice、Qwen3-ASR、FireRed、Moonshine、Voxtral、Granite、Canary 等，可按标签筛选） | `Transcription/MLXModelManager.swift`、`Settings/Models/LocalASRModelCatalogBuilder.swift` | ◐ 只有 Qwen3-ASR 1.7B / 0.6B（`internal/models/catalog.go`），有意精简（behavior 3.1）。`sglang_omni_mlx/native/src` 里已经有 whisper、parakeet、sensevoice、cohere、moss、nemotron 的服务，但 `scripts/build-omni.sh` 只打包 `qwen3_asr_server`。**2026-11-12（#7）**：Voxt 的 11 个语音模型都进了目录（“模型”页的“更多模型”），Qwen3-ASR 1.7B 6bit 可以下载使用，其余 8 个标“即将支持”（[models-page.md](../models-page.md)） | Qwen3-ASR 不支持的语言没有可选的模型 |
 | B2 | **Apple 听写**（“直接听写”：系统的 Speech 框架，不用下载模型，“马上就能用”） | `Transcription/SpeechTranscriber.swift`，`TranscriptionEngine.dictation`（`Settings/TranscriptionTypes.swift`），新设置的默认值 | ○ helper 里没有 `Speech` 框架 | 缺：第一次打开时只能先下 1–2.5 GB 的模型 |
 | B3 | 远程 ASR（OpenAI Whisper、豆包、GLM、阿里百炼、阶跃、小米 MiMo、Gemini） | `Transcription/RemoteASR/*`、`Core/RemoteProviders/*`、`RemoteModelConfiguration.swift:235` | ⏳ #1。Auralink 有 Go 实现：`internal/asr/{aliyun,doubao,openai}`、`internal/asr/ws.go`、`endpoint.go`、`internal/providers`、`internal/secrets` | — |
 | B4 | ASR 提示：词典作 context bias、语言提示；“ASR 提示”对话框可以改各服务商的提示模板 | `Core/Transcription/ASRHintResolver.swift`、`Settings/ASRHintSettingsSheet.swift`、`Resources/Prompts/*/…-asr-hint.txt` | ✅ 本地的部分照 Voxt 调好（`internal/omni/policy.go`，behavior 3.6）；◐ 只有“识别提示”开关（`settings.Dictionary.ASRHints`），不能改模板 | 本地模型不需要改；远程服务商的模板归 #1 |

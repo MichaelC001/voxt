@@ -1,6 +1,8 @@
 package dict
 
 import (
+	"bytes"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"reflect"
@@ -127,6 +129,35 @@ func TestExportImport(t *testing.T) {
 	back, _, err = Import(txt, Text)
 	if err != nil || len(back) != 3 || back[0].Term != "VoxtMini" || len(back[0].Aliases) != 2 || back[1].Category != "" || back[2].Term != "Kubernetes" || back[2].Category != "Work" {
 		t.Errorf("txt round trip %+v %v", back, err)
+	}
+}
+
+// TestExportFormulas: no exported cell starts a spreadsheet formula, and
+// the escape is undone on import.
+func TestExportFormulas(t *testing.T) {
+	terms := []store.Term{
+		{Term: "=HYPERLINK(\"https://x\")", Aliases: []string{"+1", "@me"}, Note: "-2+3", Enabled: true},
+		{Term: "'quoted", Note: "'=kept", Enabled: true},
+	}
+	data := Export(terms, CSV, nil)
+	r := csv.NewReader(bytes.NewReader(bytes.TrimPrefix(data, []byte("\ufeff"))))
+	recs, err := r.ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rec := range recs[1:] {
+		for _, c := range rec {
+			if c != "" && strings.ContainsRune(formulaStart, rune(c[0])) {
+				t.Errorf("cell %q starts a formula", c)
+			}
+		}
+	}
+	back, _, err := Import(data, CSV)
+	if err != nil || !reflect.DeepEqual(back, terms) {
+		t.Errorf("round trip %+v %v", back, err)
+	}
+	if _, _, err := Import(bytes.Repeat([]byte("a\n"), MaxImportBytes/2+1), Text); !errors.Is(err, ErrFormat) {
+		t.Errorf("a file over the limit: %v", err)
 	}
 }
 

@@ -32,14 +32,14 @@ func TestReplace(t *testing.T) {
 		{"pixcall", "pixcall"},
 		{"", ""},
 	} {
-		if got := Replace(c.in, terms); got != c.want {
+		if got := replace(c.in, terms); got != c.want {
 			t.Errorf("%q: %q, want %q", c.in, got, c.want)
 		}
-		if again := Replace(Replace(c.in, terms), terms); again != c.want {
+		if again := replace(replace(c.in, terms), terms); again != c.want {
 			t.Errorf("%q twice: %q", c.in, again)
 		}
 	}
-	if got := Replace("Or Link", nil); got != "Or Link" {
+	if got := replace("Or Link", nil); got != "Or Link" {
 		t.Errorf("no terms: %q", got)
 	}
 }
@@ -60,7 +60,7 @@ func TestReplaceChanges(t *testing.T) {
 	}
 }
 
-// TestUsed: the terms a text has, as Replace matches them.
+// TestUsed: the terms a text has, as ReplaceChanges matches them.
 func TestUsed(t *testing.T) {
 	terms := []store.Term{
 		{ID: "a", Term: "Auralink", Enabled: true},
@@ -73,4 +73,10 @@ func TestUsed(t *testing.T) {
 	if !slices.Equal(got, []string{"a", "k", "d"}) {
 		t.Errorf("Used = %q", got)
 	}
+}
+
+// replace is ReplaceChanges' text alone.
+func replace(text string, terms []store.Term) string {
+	out, _ := ReplaceChanges(text, terms)
+	return out
 }

@@ -60,6 +60,7 @@ func (h *heard) beforeLoads() []string {
 // one busy), idle again, and unloaded when Unload stops it; the next use
 // loads it again.
 func TestModelEvents(t *testing.T) {
+	t.Parallel()
 	var h heard
 	f := newFake(t, omnitest.Opts{}, h.tune)
 	ctx := context.Background()
@@ -100,6 +101,7 @@ func TestModelEvents(t *testing.T) {
 // TestModelEventsEnds: every end of a process is an unload: the idle
 // stop, a crash, a switch of speech model, Close (Silero's too).
 func TestModelEventsEnds(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	pcm := tone(time.Second, 0.3)
 	t.Run("idle", func(t *testing.T) {

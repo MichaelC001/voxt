@@ -10,28 +10,23 @@ import (
 	"github.com/hehehai/VoxtMini/internal/store"
 )
 
-// Replace writes the enabled terms' spelling for their aliases in text,
-// a transcript: aliases are, by definition, what speech recognition
-// writes for a term ("Or Link" for Auralink). Latin aliases match whole
-// words, ignoring case, any run of spaces for a space; Chinese,
-// Japanese and Korean ones match anywhere. At each place the longest
-// match wins, and a term already written as itself stays (so Replace
-// changes its own output no further). An alias two terms share goes to
-// the first.
-func Replace(text string, terms []store.Term) string {
-	out, _ := ReplaceChanges(text, terms)
-	return out
-}
-
-// Change is a replacement Replace made: From as it was in the text, To
+// Change is a replacement ReplaceChanges made: From as it was in the text, To
 // the term (TermID) written instead.
 type Change struct {
 	TermID   string
 	From, To string
 }
 
-// ReplaceChanges is Replace, also returning what it replaced: each
-// (From, To) once, in the text's order.
+// ReplaceChanges writes the enabled terms' spelling for their aliases in text,
+// a transcript: aliases are, by definition, what speech recognition
+// writes for a term ("Or Link" for Auralink). Latin aliases match whole
+// words, ignoring case, any run of spaces for a space; Chinese,
+// Japanese and Korean ones match anywhere. At each place the longest
+// match wins, and a term already written as itself stays (so it
+// changes its own output no further). An alias two terms share goes to
+// the first.
+// It also returns what it replaced: each (From, To) once, in the text's
+// order.
 func ReplaceChanges(text string, terms []store.Term) (string, []Change) {
 	type pattern struct {
 		words []string // the alias (or term), split at its spaces
@@ -97,7 +92,7 @@ func ReplaceChanges(text string, terms []store.Term) (string, []Change) {
 
 // Used lists the ids of the enabled terms written in text, as their
 // spelling (ignoring case, any run of spaces for a space; Latin terms as
-// whole words, as Replace matches): the terms a session's result used.
+// whole words, as ReplaceChanges matches): the terms a session's result used.
 func Used(text string, terms []store.Term) []string {
 	var ids []string
 	for _, t := range terms {

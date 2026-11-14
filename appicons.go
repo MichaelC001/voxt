@@ -30,6 +30,19 @@ type appIconsState struct {
 	iconBook  appicons.Book
 	iconBmps  map[string]*ui.Bitmap // by appicons.Key
 	iconBusy  bool                  // a batch on its way
+	iconGen   int                   // dropIcons' count: a batch of an older one is dropped
+}
+
+// dropIcons frees the icons' bitmaps (a few hundred after the Add apps
+// dialog: 10–15 MB) when no list shows them: App enhancement was left or
+// the window hid. The disk cache keeps them for the next visit.
+func (a *app) dropIcons() {
+	if a.iconBmps == nil && a.iconBook.Pending() == 0 && !a.iconBusy {
+		return
+	}
+	a.iconBmps = nil
+	a.iconBook.Forget()
+	a.iconGen++
 }
 
 // openIcons keeps the icons on disk in cacheDir/icons ("" keeps none).
@@ -77,7 +90,7 @@ func (a *app) flushIcons() {
 	}
 	refs := a.iconBook.Take(iconBatch)
 	a.iconBusy = true
-	cache, sup := a.iconCache, a.host.sup
+	cache, sup, gen := a.iconCache, a.host.sup, a.iconGen
 	var ask appicons.Ask
 	if a.hstatus.Has(proto.MethodAppIcons) {
 		ask = func(refs []proto.AppRef) ([]proto.AppIcon, error) {
@@ -108,6 +121,9 @@ func (a *app) flushIcons() {
 		}
 		a.post(func() {
 			a.iconBusy = false
+			if gen != a.iconGen { // dropped meanwhile: the lists are gone
+				return
+			}
 			if a.iconBmps == nil {
 				a.iconBmps = map[string]*ui.Bitmap{}
 			}

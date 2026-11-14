@@ -15,12 +15,14 @@ appctx hotkey
 appctx settings
 appicons helper/proto
 asr core
+codex core
 compose lang
 datadir store/sqlitestore
 deliver helper/proto
 dict store
 dsp vad
 helper core
+helper logs
 helper helper/proto
 helper/helpertest helper/proto
 helper/helpertest/cmd/fakehelper helper/helpertest
@@ -33,6 +35,7 @@ llmrt lang
 llmrt llm
 llmrt llmrt/wire
 llmrt local
+llmrt logs
 llmrt macx
 llmrt/llmrttest llmrt/wire
 local asr
@@ -109,3 +112,6 @@ remote local
 remote providers
 remote settings
 uitext providers
+helper procio
+llmrt procio
+procio core

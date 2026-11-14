@@ -15,7 +15,7 @@ The plan first said loopback HTTP. JSON lines over the process's own pipes strea
 
 ## 1. Transport
 
-- Go starts the process with no arguments; its working directory is the executable's. It is `VoxtMini.app/Contents/Resources/llm/voxtmini-llm` (with `mlx.metallib` and `llama.framework` beside it), or `$VOXTMINI_LLM`.
+- Go starts the process with no arguments; its working directory is the executable's. It is `VoxtMini.app/Contents/Resources/llm/voxtmini-llm` (with `mlx.metallib` and `llama.framework` beside it), or `$VOXTMINI_LLM` in a development build (`dev_overrides.go`).
 - One JSON message per line (UTF-8, `\n`), at most 4 MiB; Go → process on stdin, process → Go on stdout. stderr is free-form text: the supervisor writes it to `~/Library/Logs/VoxtNew/llm.log` and to the logs panel (source `llm`).
 - The process exits when stdin closes or on `llm.shutdown`. Go starts it on first use and stops it after a while unused (`llmrt.Config.IdleTimeout`): exiting is the one sure way to give a model's memory back.
 

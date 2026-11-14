@@ -36,8 +36,8 @@ type Spec struct {
 	// Server is the binary that serves Kind, beside qwen3_asr_server in
 	// the runtime's bin/ (Runtime resolves it; "": ServerQwen3ASR).
 	Server string
-	ASR *ASRTuning // speech models
-	VAD *VADTuning // Silero
+	ASR    *ASRTuning // speech models
+	VAD    *VADTuning // Silero
 }
 
 // ASRTuning is a speech model's request policy (Voxt's, for Qwen3-ASR).
@@ -177,27 +177,6 @@ var specs = []Spec{
 		Kind: kindSileroVAD,
 		VAD:  &VADTuning{Threshold: 0.5, MinSpeech: 250 * time.Millisecond, MinSilence: 100 * time.Millisecond, SpeechPad: 30 * time.Millisecond, Chunk: 512},
 	},
-}
-
-// Models are the curated models: the speech models (recommended first),
-// then Silero VAD. Copies.
-func Models() []Spec {
-	out := make([]Spec, len(specs))
-	for i, s := range specs {
-		out[i] = s.clone()
-	}
-	return out
-}
-
-// ASRModels are the curated speech models, the recommended one first.
-func ASRModels() []Spec {
-	var out []Spec
-	for _, s := range specs {
-		if s.ASR != nil {
-			out = append(out, s.clone())
-		}
-	}
-	return out
 }
 
 // Lookup finds a curated model by its id.

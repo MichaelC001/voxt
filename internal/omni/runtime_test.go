@@ -110,6 +110,7 @@ func TestNewASR(t *testing.T) {
 }
 
 func TestFinal(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Text: " 发布计划 "}, nil)
 	a := f.asr(t, ASRAccurate)
 	pcm := tone(10*time.Second, 0.3)
@@ -165,6 +166,7 @@ func TestFinal(t *testing.T) {
 // installed bundle, an older release) still starts, without the flag,
 // and the log says so; Silero's server never gets the flag.
 func TestOlderServer(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Older: true}, nil)
 	a := f.asr(t, ASRAccurate)
 	if _, err := a.Transcribe(context.Background(), asr.FileRequest{Audio: tone(2*time.Second, 0.3), Format: "pcm"}); err != nil {
@@ -182,6 +184,7 @@ func TestOlderServer(t *testing.T) {
 // TestFinalChunks: a recording longer than a chunk is several requests
 // sharing one budget, the first's language forced on the rest.
 func TestFinalChunks(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Text: "片段"}, nil)
 	a := f.asr(t, ASRFast)
 	a.spec.ASR.ChunkSeconds, a.spec.ASR.CutSearch = 2, 100*time.Millisecond
@@ -204,6 +207,7 @@ func TestFinalChunks(t *testing.T) {
 }
 
 func TestFinalErrors(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	pcm := tone(time.Second, 0.3)
 	t.Run("error event", func(t *testing.T) {
@@ -269,6 +273,7 @@ func TestFinalErrors(t *testing.T) {
 // TestIdleUnload: a server unused for IdleTimeout stops, and starts
 // again at the next use.
 func TestIdleUnload(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{}, func(c *Config) { c.IdleTimeout = 300 * time.Millisecond })
 	ctx := context.Background()
 	pcm := tone(time.Second, 0.3)
@@ -302,6 +307,7 @@ func TestIdleUnload(t *testing.T) {
 // kept (never) → stopped after the new time, counted from the change;
 // back to never, they stay; one in use counts from the end of its use.
 func TestSetIdleTimeout(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{}, func(c *Config) { c.IdleTimeout = -1 })
 	ctx := context.Background()
 	pcm := tone(time.Second, 0.3)
@@ -352,6 +358,7 @@ func TestSetIdleTimeout(t *testing.T) {
 // TestSetIdleTimeoutInUse: a server in use when the time changes is
 // stopped once unused for the new time after its use ends.
 func TestSetIdleTimeoutInUse(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Delay: 400 * time.Millisecond}, func(c *Config) { c.IdleTimeout = -1 })
 	a := f.asr(t, ASRFast)
 	done := make(chan error, 1)
@@ -375,6 +382,7 @@ func TestSetIdleTimeoutInUse(t *testing.T) {
 // speech model: the first stops before the other starts; Silero stays.
 // Close stops everything.
 func TestSwitch(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{}, nil)
 	ctx := context.Background()
 	pcm := tone(time.Second, 0.3)
@@ -419,6 +427,7 @@ func TestSwitch(t *testing.T) {
 // TestConcurrentStart: uses that come while the server starts share one
 // start.
 func TestConcurrentStart(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Load: 300 * time.Millisecond}, nil)
 	a := f.asr(t, ASRFast)
 	a.Warm()
@@ -439,6 +448,7 @@ func TestConcurrentStart(t *testing.T) {
 // TestUnload: Unload stops a model's server, after the use in progress;
 // the next use starts it again.
 func TestUnload(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{Delay: 400 * time.Millisecond}, nil)
 	a := f.asr(t, ASRFast)
 	done := make(chan error, 1)
@@ -462,6 +472,7 @@ func TestUnload(t *testing.T) {
 }
 
 func TestWithVAD(t *testing.T) {
+	t.Parallel()
 	f := newFake(t, omnitest.Opts{}, nil)
 	a := f.asr(t, ASRFast)
 	if a.VAD() != nil {

@@ -74,8 +74,7 @@ func TestRetries(t *testing.T) {
 		{err: HTTPError("fake", "m", 503, "busy", 0)},
 		text("done"),
 	}}
-	m := &Meter{}
-	c := &Client{Backend: f, Sleep: sleep, Meter: m}
+	c := &Client{Backend: f, Sleep: sleep}
 	resp, err := c.Chat(context.Background(), Request{Messages: msgs("x"), Skill: SkillTranslateText})
 	if err != nil {
 		t.Fatal(err)
@@ -86,9 +85,8 @@ func TestRetries(t *testing.T) {
 	if slept[1] < 500*time.Millisecond || slept[1] > time.Second {
 		t.Fatalf("backoff %v", slept[1])
 	}
-	snap := m.Snapshot()
-	if len(snap) != 1 || snap[0].Calls != 1 || snap[0].Attempts != 3 || snap[0].Skill != SkillTranslateText || snap[0].Usage.TotalTokens != 18 {
-		t.Fatalf("meter %+v", snap)
+	if resp.Usage.TotalTokens != 18 {
+		t.Fatalf("usage %+v", resp.Usage)
 	}
 }
 

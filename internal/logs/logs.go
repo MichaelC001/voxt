@@ -19,9 +19,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hehehai/actnowkit/redact"
 	"github.com/hehehai/VoxtMini/internal/core"
+	"github.com/hehehai/actnowkit/redact"
 )
+
+// Redact removes keys, tokens and proxy passwords from a line, as the
+// ring does (actnowkit's redact.Text): for log files other code writes
+// (the helper's and voxtmini-llm's stderr).
+func Redact(line string) string { return redact.Text(line) }
 
 // Options configure a Ring.
 type Options struct {

@@ -13,6 +13,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
@@ -43,9 +44,22 @@ func (a *app) connectFamilyRuntime() {
 	}
 }
 
-// modelEvents is a runtime's Config.OnModel: its events in the runtime
-// file (on the runtime's event goroutine: the measure is a system call).
+// modelEvents is a runtime's Config.OnModel: its events for the
+// memory-aware unloading (models_pressure.go) and in the runtime file
+// (on the runtime's event goroutine: the measure is a system call).
 func (a *app) modelEvents(worker string) func(resident.Event) {
+	fam := a.familyModelEvents(worker)
+	return func(ev resident.Event) {
+		a.noteModel(ev, time.Now())
+		if fam != nil {
+			fam(ev)
+		}
+	}
+}
+
+// familyModelEvents writes a runtime's events in the runtime file; nil
+// without a family.
+func (a *app) familyModelEvents(worker string) func(resident.Event) {
 	rt, mgr := a.famRuntime(), a.models
 	if rt == nil {
 		return nil

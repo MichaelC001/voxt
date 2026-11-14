@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/hehehai/actnowkit/hfhub"
-	fammodels "github.com/hehehai/actnowkit/models"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/hotkey"
 	"github.com/hehehai/VoxtMini/internal/i18n"
@@ -22,6 +20,8 @@ import (
 	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/models/modelstest"
 	"github.com/hehehai/VoxtMini/internal/settings"
+	"github.com/hehehai/actnowkit/hfhub"
+	fammodels "github.com/hehehai/actnowkit/models"
 )
 
 // seedModels installs the models ids (files of their sizes, no bytes)

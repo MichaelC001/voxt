@@ -29,6 +29,10 @@ import (
 	"github.com/hehehai/VoxtMini/internal/core"
 )
 
+// defaultClient fetches without a client of the app's: as
+// http.DefaultClient, but never redirected from https to http.
+var defaultClient = &http.Client{CheckRedirect: core.NoDowngrade}
+
 // DefaultURL is the announcements' endpoint.
 const DefaultURL = "https://actnow.dev/api/voxtmini/notifications"
 
@@ -57,7 +61,7 @@ type Config struct {
 	URL     string                           // DefaultURL when ""
 	Version string                           // the app's ("" in dev builds: every announcement)
 	Locale  func() string                    // the UI's language now ("en", "zh-Hans", "ja")
-	HTTP    func() *http.Client              // a client through the family's proxy now; nil: http.DefaultClient
+	HTTP    func() *http.Client              // a client through the family's proxy now; nil: defaultClient
 	Docs    Documents                        // nil: memory only
 	Post    func(n core.Notification)        // the notification centre's Post
 	Logf    func(format string, args ...any) // nil: silent
@@ -150,7 +154,7 @@ func (p *Poller) Check(ctx context.Context) (int, error) {
 			req.Header.Set("If-Modified-Since", p.st.LastModified)
 		}
 	}
-	client := http.DefaultClient
+	client := defaultClient
 	if p.cfg.HTTP != nil {
 		client = p.cfg.HTTP()
 	}
