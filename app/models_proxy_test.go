@@ -50,7 +50,7 @@ func TestRealSystemProxy(t *testing.T) {
 		return proxyURL, err
 	}
 	fx := conformance.New(t)
-	opt := models.Options{Store: fx.Peer("dev.hehehai.voxtnew.test"),
+	opt := models.Options{Store: fx.Peer("dev.hehehai.voxtmini.test"),
 		Network: models.Network{Endpoints: []string{"https://huggingface.co"}, Client: models.NewHTTPClient(proxy)}}
 	m := models.Open(opt)
 	defer m.Close()

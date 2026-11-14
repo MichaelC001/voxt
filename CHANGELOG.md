@@ -4,6 +4,8 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.0-beta.3] - 2026-11-14
+
 ### Added
 
 - **Remote models, by your choice**: set up remote speech and language services on the Models page (OpenAI, Doubao, Alibaba Cloud, Gemini Live, StepFun, Z.ai, Xiaomi MiMo; Anthropic, Gemini, DeepSeek, OpenRouter and others; Ollama, LM Studio and oMLX on your Mac) and choose one on a feature's page. Only that feature sends its audio or text, and only to that service; "Automatic" is always a local model. Keys stay in the Keychain and can be shared with the other ActNow apps. OpenAI-style services can use the Responses API, and Rewrite can search the web.
@@ -17,7 +19,8 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 - Notifications when a download finishes or fails while the window is not in front; a Microphone submenu in the menu bar; reorder microphones by dragging them.
 - Announcements from actnow.dev, shown once as notifications.
 - **One editable prompt per feature**, in place of "Your rules": Transcribe's clean-up, Translate and Rewrite each show their prompt, to change as you like, with variables to insert and Reset to default. The input, the dictionary, App enhancement's scene and the output format stay VoxtMini's (see "Show the full prompt"). Rules you had written are kept, added to the end of the prompt.
-- **Generation parameters for local language models** under Models → Advanced: temperature, top-p, max output tokens and repetition penalty, per model; empty keeps VoxtMini's tuned values.
+- **Settings per model**, from a model's ⋯ menu on the Models page: only the knobs that model has (Thinking, temperature, top-p, top-k, min-p, repetition penalty, maximum output; a main-language hint for speech models); empty keeps VoxtMini's tuned values. Compact model cards.
+- A self-check of the network, disk and Keychain under Settings → About, with a proxy connection test; a crash report is offered at the next start.
 
 ### Changed
 
@@ -26,6 +29,7 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 - The Speech Recognition permission is asked for only when a feature uses Apple Speech.
 - VoxtMini now lives in the former Voxt repository on GitHub (hehehai/VoxtMini); Voxt's history ends at the tag `voxt-final`.
 - VoxtMini has its own page on actnow.dev (actnow.dev/voxtmini), linked from Settings → About with its download; updates come from its own feed there.
+- **VoxtMini has its own identity on the Mac** (bundle id `dev.hehehai.voxtmini`, folders `~/Library/…/VoxtMini`, links `voxtmini://`), so it no longer shares one with Voxt 2. The first start moves your history, recordings, dictionary, settings and model claims over by itself. macOS asks once more for the microphone and Accessibility: grant them again.
 
 ### Fixed
 
@@ -49,7 +53,8 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 - 窗口不在前台时，下载完成或失败会发系统通知；菜单栏里有麦克风子菜单；拖动即可调整麦克风顺序。
 - 来自 actnow.dev 的公告，以通知的形式各显示一次。
 - **每个功能一份可编辑的提示词**，取代“你的规则”：转录的整理、翻译和转写各自显示提示词，可以随意修改，可以插入变量，也可以恢复默认。输入说明、词典、应用增强的场景和输出格式仍由 VoxtMini 负责（见“查看完整提示词”）。你写过的规则会保留，接在提示词末尾。
-- **本地语言模型的生成参数**，在模型 → 高级里：温度、Top-p、最大输出 token 数和重复惩罚，按模型设置；留空则使用 VoxtMini 调好的值。
+- **按模型设置**，在模型页模型的 ⋯ 菜单里：只显示这个模型支持的参数（思考、温度、Top-p、Top-k、Min-p、重复惩罚、最大输出；语音识别模型可提示主要语言）；留空则使用 VoxtMini 调好的值。模型卡片更紧凑。
+- 设置 → 诊断与关于 里可以自检网络、磁盘和钥匙串，并测试代理连接；崩溃后下次启动会提示查看报告。
 
 #### 变更
 
@@ -58,6 +63,7 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 - 只有某个功能用 Apple 语音识别时才请求“语音识别”权限。
 - VoxtMini 现在放在 GitHub 上原来 Voxt 的仓库里（hehehai/VoxtMini）；Voxt 的历史到标签 `voxt-final` 为止。
 - VoxtMini 在 actnow.dev 上有了自己的页面（actnow.dev/voxtmini），设置 → 诊断与关于 里链接它和下载页；更新也来自那里它自己的更新源。
+- **VoxtMini 在 Mac 上有了自己的身份**（bundle id `dev.hehehai.voxtmini`，文件夹 `~/Library/…/VoxtMini`，链接 `voxtmini://`），不再和 Voxt 2 共用。第一次启动时自动搬过历史、录音、词典、设置和模型声明。macOS 会再请求一次麦克风和辅助功能权限：请重新授权。
 
 #### 修复
 

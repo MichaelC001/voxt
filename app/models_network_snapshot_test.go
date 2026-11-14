@@ -29,7 +29,7 @@ func snapshotsNetwork(t *testing.T, out string) {
 		}
 		tt.SetScale(2)
 		a.clearNotices()
-		a.openURL("voxtnew://models/network")
+		a.openURL("voxtmini://models/network")
 		save := func(name string) {
 			t.Helper()
 			a.toasts = nil

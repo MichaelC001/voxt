@@ -15,7 +15,7 @@ import (
 	famruntime "github.com/hehehai/actnowkit/runtime"
 )
 
-const testBundle = "dev.hehehai.voxtnew"
+const testBundle = "dev.hehehai.voxtmini"
 
 // noApps is a registry.System that finds no app.
 type noApps struct{}

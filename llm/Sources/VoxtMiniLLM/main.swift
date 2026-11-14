@@ -3,7 +3,7 @@ import VoxtMiniLLMKit
 
 // voxtmini-llm: run by VoxtMini.app (internal/llmrt supervises it), llm
 // protocol 1 on stdin/stdout (docs/llm-protocol.md), free-form
-// diagnostics on stderr (~/Library/Logs/VoxtNew/llm.log). It exits when
+// diagnostics on stderr (~/Library/Logs/VoxtMini/llm.log). It exits when
 // stdin closes or on llm.shutdown.
 
 // The protocol takes stdout over; fd 1 then points at stderr, so that

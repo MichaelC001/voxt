@@ -338,7 +338,7 @@ func TestHomeRecent(t *testing.T) {
 
 // selfFront is VoxtMini as the app in front.
 func selfFront() *proto.App {
-	return &proto.App{PID: os.Getpid(), BundleID: "dev.hehehai.voxtnew", Name: "VoxtMini"}
+	return &proto.App{PID: os.Getpid(), BundleID: "dev.hehehai.voxtmini", Name: "VoxtMini"}
 }
 
 func TestTryPlace(t *testing.T) {

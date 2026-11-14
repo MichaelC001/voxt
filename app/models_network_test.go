@@ -32,7 +32,7 @@ func TestNetworkDialog(t *testing.T) {
 	a.famStarted = true // familySettingsChanged writes the shared settings
 	addPeer(t, a, dictaID, nil)
 	a.familyFound(a.fam.Discover())
-	a.openURL("voxtnew://models/network")
+	a.openURL("voxtmini://models/network")
 	if a.currentPage() != "models" || !a.netOpen || !has(tt, "How model downloads reach Hugging Face") {
 		t.Fatalf("deep link: page %q open %v %q", a.currentPage(), a.netOpen, tt.Texts())
 	}

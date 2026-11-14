@@ -6,7 +6,7 @@ The Swift process that runs VoxtMini's language models, apart from the helper so
 - **chats streamed** as `chat.delta` notifications, **cancelled** within a token by `job.cancel`, with Voxt's repetition guard;
 - **memory reported** with every load and chat (the footprint, its peak, the resident size and MLX's counters).
 
-It speaks [llm protocol 1](../docs/llm-protocol.md) over stdin and stdout; `internal/llmrt` supervises it (started on first use, restarted after a crash, stopped when idle and on quit, stderr to `~/Library/Logs/VoxtNew/llm.log`) and chooses every parameter: the model, its sampling, its token budget, its template variables ([llm-models.md](../docs/llm-models.md)). The process keeps no settings.
+It speaks [llm protocol 1](../docs/llm-protocol.md) over stdin and stdout; `internal/llmrt` supervises it (started on first use, restarted after a crash, stopped when idle and on quit, stderr to `~/Library/Logs/VoxtMini/llm.log`) and chooses every parameter: the model, its sampling, its token budget, its template variables ([llm-models.md](../docs/llm-models.md)). The process keeps no settings.
 
 ## Layout
 

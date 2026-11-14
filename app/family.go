@@ -70,6 +70,14 @@ func (a *app) startFamily() {
 	prefs := a.prefs
 	a.async(func() {
 		ctx := context.Background()
+		// What VoxtMini left under its old bundle id (identity.go), before
+		// the claims are counted: its claims, keys and manifest.
+		if got, err := fam.AdoptOld(ctx, func(id string) bool { _, ok := models.Lookup(id); return ok }); err != nil {
+			log.Printf("family: the old bundle id's files: %v", err)
+		} else if got.Any() {
+			log.Printf("family: took over %s's files: %d claims, %d shared keys, manifest removed %v", actnow.OldBundleID, got.Claims, got.Keys, got.Manifest)
+			m.Refresh()
+		}
 		if !fam.ReadOnly() {
 			// The library moved (spec v1.0.9): bring the models over from
 			// the Hugging Face caches first, once.
@@ -172,7 +180,7 @@ func (a *app) familyFound(found []registry.Found) {
 // data still follows the family's files either way.
 func (a *app) familyOthers() bool {
 	for _, f := range a.famApps {
-		if f.Installed && f.Variant == family.Release && f.App.ID != actnow.AppID {
+		if f.Installed && f.Variant == family.Release && !actnow.IsSelf(f) {
 			return true
 		}
 	}

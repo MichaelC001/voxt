@@ -35,7 +35,7 @@ MAC_DIR=code/VoxtMini-test scripts/mac.sh scripts/mac-dev-install.sh    # build,
 
 The dev signature has **no hardened runtime**, as an ad hoc build: a self-signed certificate has no Team ID, and the hardened runtime's library validation would refuse the app's libraries (SQLite, `llama.framework`, the Omni runtime's). That is why the script signs the finished app itself instead of `go tool mygo build -sign`, which turns the hardened runtime on for every real identity. Releases (`scripts/release.sh`, Developer ID) are signed as before.
 
-Switching from ad hoc builds to the dev identity, or between it and a release build, costs one more grant: the old entries name the other requirement. Reset them first, so a stale Accessibility entry does not stay on without working: `tccutil reset Microphone dev.hehehai.voxtnew` and `tccutil reset Accessibility dev.hehehai.voxtnew`, then open the app and grant again. Deleting the dev keychain, or creating the identity again, does the same. Downloaded models stay.
+Switching from ad hoc builds to the dev identity, or between it and a release build, costs one more grant: the old entries name the other requirement. Reset them first, so a stale Accessibility entry does not stay on without working: `tccutil reset Microphone dev.hehehai.voxtmini` and `tccutil reset Accessibility dev.hehehai.voxtmini`, then open the app and grant again. Entries of the old bundle id (`dev.hehehai.voxtnew`, before 0.1.0-beta.3) may belong to Voxt 2 as well: leave them unless Voxt 2 is not installed. Deleting the dev keychain, or creating the identity again, does the same. Downloaded models stay.
 
 Other ways, without the identity:
 

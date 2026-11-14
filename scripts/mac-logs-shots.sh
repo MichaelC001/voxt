@@ -51,7 +51,7 @@ cat >"$app/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleIdentifier</key><string>dev.hehehai.voxtnew.logscheck</string>
+  <key>CFBundleIdentifier</key><string>dev.hehehai.voxtmini.logscheck</string>
   <key>CFBundleName</key><string>VoxtMiniLogsCheck</string>
   <key>CFBundleExecutable</key><string>VoxtMiniLogsCheck</string>
   <key>CFBundlePackageType</key><string>APPL</string>

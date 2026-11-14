@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/appctx"
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/helper"
@@ -26,7 +27,7 @@ import (
 )
 
 // selfBundleID is VoxtMini's bundle id (mygo.json).
-const selfBundleID = "dev.hehehai.voxtnew"
+const selfBundleID = actnow.BundleID
 
 // urlTimeout is how long a session waits for a browser's address.
 const urlTimeout = 800 * time.Millisecond

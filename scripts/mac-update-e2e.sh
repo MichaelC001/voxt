@@ -18,7 +18,7 @@
 #   C. the archive after a delta that fails (an installed file changed);
 #   D. 0.1.1 is up to date.
 #
-# Its own bundle ID (dev.hehehai.voxtnew.updtest) and directory, on a Mac
+# Its own bundle ID (dev.hehehai.voxtmini.updtest) and directory, on a Mac
 # that may be busy with other work: no window, no app activated, no key,
 # no clipboard, no helper started, no keychain; niced, two jobs, and it
 # stops when less than VOXTMINI_MIN_FREE percent of memory (40) is free.
@@ -40,7 +40,7 @@ if [[ "$ROOT" == "$HOME/code/VoxtMini" ]]; then
 fi
 export GOMAXPROCS=2 GOFLAGS=-p=2 SWIFT_BUILD_JOBS=2
 unset VOXTMINI_HELPER
-ID=dev.hehehai.voxtnew.updtest
+ID=dev.hehehai.voxtmini.updtest
 V0=0.1.0 V1=0.1.1
 WORK="$ROOT/build/update-e2e"
 FAILS=0

@@ -32,7 +32,7 @@ fi
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/voxtmini-gui.XXXXXX")"
 chmod 700 "$work"
-label="dev.hehehai.voxtnew.gui.$$"
+label="dev.hehehai.voxtmini.gui.$$"
 job_pid=""
 cleanup() {
   launchctl bootout "gui/$uid/$label" >/dev/null 2>&1 || true

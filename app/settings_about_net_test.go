@@ -121,7 +121,7 @@ func TestNetworkTestConnection(t *testing.T) {
 	a, _, tt := newTestApp(t)
 	p := &probed{fail: []string{"huggingface.co"}}
 	swapReach(t, p)
-	a.openURL("voxtnew://models/network")
+	a.openURL("voxtmini://models/network")
 	click(t, tt, "Custom")
 	a.netForm.proxyURL = "ftp://127.0.0.1:21"
 	click(t, tt, "Test connection")

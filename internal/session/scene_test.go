@@ -186,7 +186,7 @@ func TestSceneSkipped(t *testing.T) {
 		req  StartRequest
 	}{
 		{"try", StartRequest{Kind: store.KindTranscribe, Target: slack, Try: true}},
-		{"voxtmini in front", StartRequest{Kind: store.KindTranscribe, Target: proto.App{PID: 4242, BundleID: "dev.hehehai.voxtnew", Name: "VoxtMini"}}},
+		{"voxtmini in front", StartRequest{Kind: store.KindTranscribe, Target: proto.App{PID: 4242, BundleID: "dev.hehehai.voxtmini", Name: "VoxtMini"}}},
 		{"no target", StartRequest{Kind: store.KindTranscribe}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -195,7 +195,7 @@ func TestSceneSkipped(t *testing.T) {
 				c.Scene = &SceneConfig{Rules: func() (appctx.Rules, bool) {
 					r := sceneRules()
 					r.Groups = append(r.Groups, appctx.Group{ID: "all", Name: "All", Enabled: true, Prompt: "Everywhere.",
-						Apps: []appctx.App{{BundleID: "dev.hehehai.voxtnew"}}, Features: appctx.DefaultFeatures})
+						Apps: []appctx.App{{BundleID: "dev.hehehai.voxtmini"}}, Features: appctx.DefaultFeatures})
 					return r, true
 				}, IsBrowser: func(string) bool { return true }, URL: u.read}
 			})

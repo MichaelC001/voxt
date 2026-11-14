@@ -17,9 +17,9 @@ import (
 // Links are the deep links of VoxtMini's pages other apps open ("Open
 // VoxtMini settings" in a shortcut conflict).
 var Links = map[string]string{
-	registry.LinkShortcuts: "voxtnew://settings/shortcuts",
-	registry.LinkModels:    "voxtnew://models",
-	registry.LinkNetwork:   "voxtnew://models/network",
+	registry.LinkShortcuts: "voxtmini://settings/shortcuts",
+	registry.LinkModels:    "voxtmini://models",
+	registry.LinkNetwork:   "voxtmini://models/network",
 }
 
 // Capabilities are VoxtMini's (spec §6.2): the family's model library,
@@ -101,9 +101,10 @@ func StampKeys(prefs *settings.Settings, now time.Time) bool {
 
 // Manifest is VoxtMini's manifest for prefs (memory only).
 func (f *Family) Manifest(prefs settings.Settings) registry.Manifest {
+	variant, _ := ownVariant(f.bundleID) // "": registry.Write's, from actnowkit's table
 	return registry.Manifest{
-		App: AppID, BundleID: f.bundleID, Name: "VoxtMini", Version: f.version,
-		Path: registry.BundlePath(), TeamID: registry.TeamID(), URLScheme: "voxtnew",
+		App: AppID, BundleID: f.bundleID, Variant: variant, Name: "VoxtMini", Version: f.version,
+		Path: registry.BundlePath(), TeamID: registry.TeamID(), URLScheme: "voxtmini",
 		Links: Links, Capabilities: Capabilities,
 		Models:    &registry.ModelsInfo{Root: f.Hub()},
 		Shortcuts: Shortcuts(prefs),
@@ -152,7 +153,7 @@ func (f *Family) UsedBy(keys string) []shortcuts.Hit {
 func (f *Family) others() []shortcuts.Holder {
 	var apps []registry.Found
 	for _, a := range f.Found() {
-		if a.App.ID != AppID {
+		if !IsSelf(a) {
 			apps = append(apps, a)
 		}
 	}

@@ -368,7 +368,8 @@ func (u Updates) BetaOn(running string) bool {
 }
 
 // The default shortcuts: the ActNow family's assignment to VoxtMini
-// (actnowkit shortcuts.DefaultsOf("voxtnew"), family spec §10.2), so
+// (actnowkit shortcuts.DefaultsOf("voxtnew"): VoxtMini's row under its
+// old id until actnowkit lists voxtmini; family spec §10.2), so
 // that VoxtMini and Auralink (fn) can run together. Right Option tapped
 // alone transcribes, with Shift translates, with Control rewrites;
 // Control+Option+V pastes the last result.

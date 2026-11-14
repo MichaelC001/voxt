@@ -54,21 +54,25 @@ func main() {
 	if dir := argAfter("--smoke"); dir != "" {
 		os.Exit(runSmoke(dir))
 	}
-	// Keep MyGo paths on VoxtNew so this renamed app keeps the installed app's data and update state.
-	mygo.App.SetName("VoxtNew")
+	// MyGo's folders are …/VoxtMini (data, caches, logs), the single
+	// instance lock and the update window's name too.
+	mygo.App.SetName("VoxtMini")
 	// One VoxtMini at a time (one library, one set of global shortcuts);
 	// a second launch shows the first one's window.
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
 	}
-	// A crash's trace to crash.log in the logs folder, before anything
-	// else may crash; the next start offers to report it (crash_report.go).
 	logDir, _ := mygo.App.Path(mygo.PathLogs)
-	crash := startCrashLog(logDir)
 	home, err := mygo.App.Path(mygo.PathUserData)
 	if err != nil {
 		log.Fatal(err)
 	}
+	cacheDir, _ := mygo.App.Path(mygo.PathCache)
+	// The folders of VoxtMini's old name, moved once (identity.go).
+	renamed := adoptOldName(datadir.Dirs{Data: home, Cache: cacheDir, Logs: logDir})
+	// A crash's trace to crash.log in the logs folder, before anything
+	// else may crash; the next start offers to report it (crash_report.go).
+	crash := startCrashLog(logDir)
 	// The data folder may have moved (Settings → Storage); a move or an
 	// erase asked for finishes here, before the library opens.
 	dataDir, err := datadir.Resolve(home) // internal/datadir
@@ -77,7 +81,6 @@ func main() {
 		return
 	}
 	resources, _ := mygo.App.Path(mygo.PathResources)
-	cacheDir, _ := mygo.App.Path(mygo.PathCache)
 
 	// Wiring: one call per area, each defined in the file of that area.
 	lib, err := openLibrary(dataDir) // library.go
@@ -91,6 +94,7 @@ func main() {
 	a.openIcons(cacheDir)                         // appicons.go
 	a.muteJournal = outputJournal(home, cacheDir) // mute_link.go
 	a.connectShell(logDir, crash)                 // shell.go
+	a.tellRenamed(renamed)                        // identity.go: what moved from the old folders
 	a.tellCrash(crash)                            // crash_report.go: the last run crashed
 	logIgnoredOverrides()                         // dev_overrides.go
 	a.connectHelper()                             // helperlink.go

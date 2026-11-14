@@ -99,11 +99,11 @@ func TestPaletteAndDeepLinks(t *testing.T) {
 	a.updateSettings(func(s *settings.Settings) { s.General.Language = "en" })
 
 	for link, want := range map[string]string{
-		"voxtnew://history":           "/history",
-		"voxtnew:///translate":        "/translate",
-		"voxtnew://settings/audio":    "/settings/audio",
+		"voxtmini://history":          "/history",
+		"voxtmini:///translate":       "/translate",
+		"voxtmini://settings/audio":   "/settings/audio",
 		"/settings/privacy":           "/settings/privacy",
-		"VOXTNEW://app-enhancement/x": "/app-enhancement",
+		"VOXTNEW://app-enhancement/x": "/app-enhancement", // the old scheme, in saved links
 	} {
 		a.settingsOpen = false
 		a.openURL(link)
@@ -112,7 +112,7 @@ func TestPaletteAndDeepLinks(t *testing.T) {
 		}
 	}
 	a.toasts = nil
-	a.openURL("voxtnew://studio")
+	a.openURL("voxtmini://studio")
 	a.openURL("https://example.com/history")
 	if len(a.toasts) != 2 || !strings.Contains(a.toasts[0], "Unknown link") {
 		t.Errorf("unknown links: %q", a.toasts)
@@ -293,8 +293,8 @@ func TestPermissionsMoved(t *testing.T) {
 	}
 	for _, open := range []func(){
 		func() { a.navigate("/permissions") },
-		func() { a.openURL("voxtnew://permissions") },
-		func() { a.openURL("voxtnew://settings/permissions") },
+		func() { a.openURL("voxtmini://permissions") },
+		func() { a.openURL("voxtmini://settings/permissions") },
 		func() { a.navigate("/home"); frames(tt); click(t, tt, "Accessibility: Open Permissions") },
 	} {
 		a.settingsOpen = false

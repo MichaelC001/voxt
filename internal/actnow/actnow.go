@@ -31,12 +31,13 @@ import (
 	famsettings "github.com/hehehai/actnowkit/settings"
 )
 
-// AppID is VoxtMini's id in the family's table.
-const AppID = "voxtnew"
+// AppID is VoxtMini's id in the family (its manifest's and claims'
+// "app"); actnowkit's tables still list it under KitAppID (identity.go).
+const AppID = "voxtmini"
 
 // DevBundleID names VoxtMini when it does not run from a bundle (go run,
 // tests of the app).
-const DevBundleID = "dev.hehehai.voxtnew.dev"
+const DevBundleID = BundleID + ".dev"
 
 // Config is how VoxtMini joins the family.
 type Config struct {
@@ -122,11 +123,11 @@ func Open(cfg Config, prefs settings.Settings) *Family {
 }
 
 // runningBundleID is the bundle's identifier, DevBundleID outside one or
-// for an identifier outside the family.
+// for an identifier that is not VoxtMini's.
 func runningBundleID() string {
 	if p := registry.BundlePath(); p != "" {
 		if id, err := registry.BundleIDAt(p); err == nil {
-			if _, _, err := family.ParseBundleID(id); err == nil {
+			if _, ok := ownVariant(id); ok {
 				return id
 			}
 		}
@@ -198,6 +199,9 @@ func (f *Family) states() map[string]fammodels.AppState {
 // (dev)"), from its bundle id; the id itself outside the family.
 func AppName(bundleID string) string {
 	a, v, err := family.ParseBundleID(bundleID)
+	if own, ok := ownVariant(bundleID); ok {
+		a, v, err = family.App{Name: "VoxtMini"}, own, nil
+	}
 	if err != nil {
 		return bundleID
 	}

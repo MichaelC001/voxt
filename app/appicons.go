@@ -4,7 +4,7 @@ package main
 // its Add apps and Browsers dialogs, its preview). A row asks for its
 // app's icon as it shows (appIcon); at the end of the page's build
 // flushIcons sends the wanted ones to a goroutine a batch at a time: the
-// disk cache (~/Library/Caches/VoxtNew/icons, a week fresh), then the
+// disk cache (~/Library/Caches/VoxtMini/icons, a week fresh), then the
 // helper's app.icons for the rest. Until an icon is there the row keeps
 // its room empty; without one (no helper, a removed app, Linux) it shows
 // the generic app icon.

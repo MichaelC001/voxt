@@ -2,7 +2,7 @@ package main
 
 // Commands: one registry behind the ⌘K palette, the native menu and the
 // window's shortcuts, plus the "?" sheet listing the shortcuts, and
-// voxtnew:// deep links. (From AudioSmith.)
+// voxtmini:// deep links. (From AudioSmith.)
 
 import (
 	"net/url"
@@ -365,13 +365,14 @@ func (a *app) buildMenu() {
 	}))
 }
 
-// openURL follows an voxtnew:// deep link: voxtnew://history,
-// voxtnew://settings/audio, voxtnew:///home, voxtnew://models/network,
-// voxtnew://models/remote. Router paths in notifications go through it
-// too.
+// openURL follows a voxtmini:// deep link: voxtmini://history,
+// voxtmini://settings/audio, voxtmini:///home, voxtmini://models/network,
+// voxtmini://models/remote. Router paths in notifications go through it
+// too, and voxtnew:// links saved before 0.1.0-beta.3 (notifications,
+// announcements); macOS no longer sends those to VoxtMini (identity.go).
 func (a *app) openURL(raw string) {
 	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "" && !strings.EqualFold(u.Scheme, "voxtnew")) {
+	if err != nil || (u.Scheme != "" && !strings.EqualFold(u.Scheme, "voxtmini") && !strings.EqualFold(u.Scheme, "voxtnew")) {
 		a.toast(i18n.T("Unknown link: %s", raw))
 		return
 	}

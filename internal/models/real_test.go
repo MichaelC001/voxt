@@ -30,7 +30,7 @@ func realOnly(t *testing.T) *Manager {
 		t.Skip("set VOXTMINI_MODELS_REAL=1")
 	}
 	fx := conformance.New(t)
-	m := Open(Options{Store: fx.Peer("dev.hehehai.voxtnew.test")})
+	m := Open(Options{Store: fx.Peer("dev.hehehai.voxtmini.test")})
 	t.Cleanup(m.Close)
 	return m
 }
@@ -109,7 +109,7 @@ func waitReal(t *testing.T, m *Manager, id string, limit time.Duration) Status {
 // it by (its SHA-256 when in LFS, else its git blob id), the snapshot is
 // linked beside its place and renamed in holding the repo lock, as hfhub
 // finishes one, and VoxtMini claims it (origin migrated) as $VOXTMINI_MOVE_AS
-// (default dev.hehehai.voxtnew). A model already in $HUB is only claimed.
+// (default dev.hehehai.voxtmini). A model already in $HUB is only claimed.
 //
 //	VOXTMINI_MOVE_FROM=$HOME/voxtmini-models go test -count=1 -v -run TestRealMoveToHub ./internal/models
 func TestRealMoveToHub(t *testing.T) {
@@ -119,14 +119,14 @@ func TestRealMoveToHub(t *testing.T) {
 	}
 	as := os.Getenv("VOXTMINI_MOVE_AS")
 	if as == "" {
-		as = "dev.hehehai.voxtnew"
+		as = "dev.hehehai.voxtmini"
 	}
 	fam := family.Default()
 	if _, err := fam.Ensure(as); err != nil {
 		t.Fatal(err)
 	}
 	hub := Hub()
-	store := &fammodels.Store{Family: fam, Hub: hub, BundleID: as, AppID: "voxtnew"}
+	store := &fammodels.Store{Family: fam, Hub: hub, BundleID: as, AppID: "voxtmini"}
 	ctx := context.Background()
 	for _, m := range Catalog() {
 		if m.Borrowed {

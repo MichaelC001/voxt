@@ -22,7 +22,7 @@ Voxt's model settings (`Voxt/Settings/Models/ModelSettingsView.swift`, `ModelCat
 
 ## Routes
 
-- `/models` is the page; `/models/speech`, `/models/language`, `/models/local`, `/models/remote` open it on that tab or filter (deep links `voxtnew://models/remote`).
+- `/models` is the page; `/models/speech`, `/models/language`, `/models/local`, `/models/remote` open it on that tab or filter (deep links `voxtmini://models/remote`).
 - `/remote` (the old Remote models page) opens `/models` with the Remote filter; `/models/network` still opens Network….
 
 ## Catalogue
@@ -51,4 +51,4 @@ The catalogue's pins follow the family pins table where it has the repo; the new
 
 Kept, each claiming English, Chinese and Japanese on its card: Qwen3-ASR 1.7B 8-bit / 0.6B 4-bit / 1.7B 6-bit (30 languages and 22 dialects), Whisper large-v3-turbo / large-v3 / small (99 languages), Silero VAD (language-free); Qwen3.5 4B / 2B / 9B and Qwen3.6 27B (201 languages), Hy-MT2 1.8B (33 languages, translation only), Qwen3 4B Instruct 2507 (119), Gemma 4 E2B / E4B / 12B (140+), Ministral 3 3B (its card lists Chinese and Japanese among its "dozens"; weaker in them than in English, which its description says), LFM2 1.2B and 8B-A1B (English, Arabic, Chinese, French, German, Japanese, Korean, Spanish).
 
-As every model knows the three, the cards no longer show a languages line, and the speech models no longer list their languages (`omni.Spec.Languages`): the hint is the language's code. `scripts/build-omni.sh` stages only `qwen3_asr_server` and `whisper_server`. The family pins table (actnowkit v0.17.0) still lists the dropped repos for VoxtMini (`voxtnew`), all six VoxtMini's only: `TestFamilyPins` tolerates them (`droppedPins`) until a later actnowkit release removes the rows. Remote services stay (a service, not a model of ours); their language hint is one of the three.
+As every model knows the three, the cards no longer show a languages line, and the speech models no longer list their languages (`omni.Spec.Languages`): the hint is the language's code. `scripts/build-omni.sh` stages only `qwen3_asr_server` and `whisper_server`. The family pins table (actnowkit v0.17.0) still lists the dropped repos for VoxtMini (its row is still `voxtnew`, the old bundle id's), all six VoxtMini's only: `TestFamilyPins` tolerates them (`droppedPins`) until a later actnowkit release removes the rows. Remote services stay (a service, not a model of ours); their language hint is one of the three.

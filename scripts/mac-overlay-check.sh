@@ -46,7 +46,7 @@ cat >"$app/Contents/Info.plist" <<'EOF'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleIdentifier</key><string>dev.hehehai.voxtnew.overlaycheck</string>
+  <key>CFBundleIdentifier</key><string>dev.hehehai.voxtmini.overlaycheck</string>
   <key>CFBundleName</key><string>VoxtMiniOverlayCheck</string>
   <key>CFBundleExecutable</key><string>VoxtMiniOverlayCheck</string>
   <key>CFBundlePackageType</key><string>APPL</string>

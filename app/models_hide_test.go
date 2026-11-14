@@ -58,8 +58,8 @@ func TestModelsRoutes(t *testing.T) {
 		{"/remote", 1, filterRemote, false},
 		{"/models/speech", 0, filterRemote, false},
 		{"/models/local", 0, filterLocal, false},
-		{"voxtnew://remote", 0, filterRemote, true},
-		{"voxtnew://models/language", 1, filterRemote, true},
+		{"voxtmini://remote", 0, filterRemote, true},
+		{"voxtmini://models/language", 1, filterRemote, true},
 	} {
 		if c.link {
 			a.openURL(c.path)
@@ -71,7 +71,7 @@ func TestModelsRoutes(t *testing.T) {
 		}
 	}
 	a.toasts = nil
-	a.openURL("voxtnew://models/nope")
+	a.openURL("voxtmini://models/nope")
 	if len(a.toasts) != 1 {
 		t.Errorf("an unknown sub-path: %q", a.toasts)
 	}

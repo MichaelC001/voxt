@@ -24,7 +24,7 @@ func openModels(t *testing.T, ids ...string) (*models.Manager, string) {
 	if err := modelstest.Seed(fx.Hub, ids...); err != nil {
 		t.Fatal(err)
 	}
-	m := models.Open(models.Options{Store: fx.Peer("dev.hehehai.voxtnew")})
+	m := models.Open(models.Options{Store: fx.Peer("dev.hehehai.voxtmini")})
 	t.Cleanup(m.Close)
 	return m, fx.Hub
 }

@@ -46,7 +46,7 @@ func scratch(t *testing.T, hub string) (*conformance.Fixture, *fammodels.Store) 
 	fx.Hub = hub
 	fx.Register("dev.hehehai.audiosmith")
 	fx.Register("dev.hehehai.dicta")
-	return fx, fx.Peer("dev.hehehai.voxtnew")
+	return fx, fx.Peer("dev.hehehai.voxtmini")
 }
 
 // dead is an endpoint nothing answers: a download would fail.
@@ -161,7 +161,7 @@ func TestAcceptOneStream(t *testing.T) {
 	if n := bytes.Load(); n > mod.Size()+mod.Size()/10 {
 		t.Errorf("%d bytes crossed the proxy for %d: two streams", n, mod.Size())
 	}
-	if !fx.Claimed("dev.hehehai.voxtnew", mod.Ref("")) || !fx.Claimed("dev.hehehai.audiosmith", mod.Ref("")) {
+	if !fx.Claimed("dev.hehehai.voxtmini", mod.Ref("")) || !fx.Claimed("dev.hehehai.audiosmith", mod.Ref("")) {
 		t.Error("both must claim it")
 	}
 	if left := fx.Incomplete(mod.Repo); len(left) > 0 {

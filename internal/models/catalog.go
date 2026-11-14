@@ -77,7 +77,8 @@ type Model struct {
 	Kind    Kind
 	Runtime Runtime
 	// Repo and Revision are the Hugging Face repo and the commit pinned,
-	// the family's pins table's (actnowkit models.PinsOfApp("voxtnew")).
+	// the family's pins table's (actnowkit models.PinsOfApp("voxtnew"),
+	// VoxtMini's row under its old id until actnowkit lists voxtmini).
 	Repo, Revision string
 	// Accept are other commits the runtimes were checked with: one of
 	// them on disk is used instead of downloading the pinned one (family

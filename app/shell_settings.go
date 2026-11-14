@@ -67,6 +67,9 @@ type settingsForm struct {
 	// loginIs is whether macOS opens VoxtMini at login, as last read or
 	// set: the setting changes it only when they differ.
 	loginIs bool
+	// renamed: this start moved the data from the old bundle id's
+	// folders (identity.go).
+	renamed bool
 }
 
 // settingsSection is a section of the settings dialog.
@@ -244,6 +247,9 @@ func (a *app) syncOpenAtLogin() {
 	go func() {
 		on := mygo.App.OpenAtLogin()
 		a.post(func() {
+			if a.reopenAtLogin(on) { // identity.go
+				return
+			}
 			a.loginIs = on
 			if on != a.prefs.General.LaunchAtLogin {
 				a.updateSettings(func(s *settings.Settings) { s.General.LaunchAtLogin = on })

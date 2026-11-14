@@ -67,7 +67,8 @@ echo "VoxtMini $version ($mode) in $dir"
 
 check "the app's signature (deep, strict)" codesign --verify --deep --strict --verbose=2 "$app"
 check "the helper's signature (strict)" codesign --verify --strict --verbose=2 "$helper"
-check "the helper is dev.hehehai.voxtnew.helper" has "$helper" '^Identifier=dev\.hehehai\.voxtnew\.helper$'
+check "the app is dev.hehehai.voxtmini" has "$app" '^Identifier=dev\.hehehai\.voxtmini$'
+check "the helper is dev.hehehai.voxtmini.helper" has "$helper" '^Identifier=dev\.hehehai\.voxtmini\.helper$'
 check "the app may use the microphone (audio-input)" entitled "$app" com.apple.security.device.audio-input
 check "the helper may use the microphone (audio-input)" entitled "$helper" com.apple.security.device.audio-input
 check "the helper is arm64" test "$(lipo -archs "$helper")" = arm64
@@ -91,6 +92,7 @@ if ((want_runtimes)); then
   llm="$res/llm/voxtmini-llm"
   check "the Omni runtime is inside" test -x "$server" -a -f "$res/omni/bin/mlx.metallib"
   check "voxtmini-llm is inside" test -x "$llm" -a -f "$res/llm/mlx.metallib" -a -d "$res/llm/llama.framework"
+  check "voxtmini-llm is dev.hehehai.voxtmini.llm" has "$llm" '^Identifier=dev\.hehehai\.voxtmini\.llm$'
   check "the Omni server starts from the app (its libraries load)" bash -c "'$server' --model-kind none 2>&1 | grep -q -- '--model-kind must be'"
   check "whisper_server starts from the app" bash -c "'$res/omni/bin/whisper_server' --model-kind none 2>&1 | grep -q -- 'only --model-kind whisper'"
   check "the Omni servers take a token (--auth-token-fd)" bash -c "'$server' --model-kind qwen3_asr --model-directory /dev/null --auth-token-fd -1 2>&1 | grep -q -- '--auth-token-fd must' && '$res/omni/bin/whisper_server' --model-kind whisper --model-directory /dev/null --auth-token-fd -1 2>&1 | grep -q -- '--auth-token-fd must'"

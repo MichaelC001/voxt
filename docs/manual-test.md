@@ -14,8 +14,8 @@
 | 名称 | 位置 |
 |---|---|
 | 日志面板 | VoxtMini 里按 ⇧⌘L（来源 `session`、`omni`、`llm`、`helper`） |
-| 日志文件 | `~/Library/Logs/VoxtNew/voxtmini.log`（app，含 Omni 服务的启动、退出、卸载）、`helper.log`（辅助进程：热键、AX、粘贴、URL）、`llm.log`（voxtmini-llm 的 stderr） |
-| 模型文件 | 家族模型库 `$HUB`（默认 `~/.cache/huggingface/hub`）的 `models--<owner>--<name>/snapshots/<commit>/`；VoxtMini 的声明在 `~/Library/Application Support/ActNow/models/claims/dev.hehehai.voxtnew.json` |
+| 日志文件 | `~/Library/Logs/VoxtMini/voxtmini.log`（app，含 Omni 服务的启动、退出、卸载）、`helper.log`（辅助进程：热键、AX、粘贴、URL）、`llm.log`（voxtmini-llm 的 stderr） |
+| 模型文件 | 家族模型库 `$HUB`（默认 `~/.cache/huggingface/hub`）的 `models--<owner>--<name>/snapshots/<commit>/`；VoxtMini 的声明在 `~/Library/Application Support/ActNow/models/claims/dev.hehehai.voxtmini.json` |
 | 模型进程 | `pgrep -fl 'qwen3_asr_server\|voxtmini-llm\|voxtmini-helper'`：`qwen3_asr_server` 每个模型一个（命令行里的 `--model-directory …/models--<owner>--<name>/snapshots/<commit>` 说明是哪个：语音识别模型或 `vad.silero`），`voxtmini-llm` 最多一个 |
 | 历史详情 | 每次会话的识别原文、结果、交付方式、用的语音识别模型和语言模型、各阶段耗时、命中的规则 |
 | 系统设置 | 隐私与安全 → 辅助功能 / 麦克风；网络 → 代理 |
@@ -131,7 +131,7 @@
   2. 在 VoxtMini 的“快速语音识别”上点“删除”，先点“取消”；再点“删除”→“从 VoxtMini 移除”。
   3. 再点“删除”→“为所有 app 删除…”→“删除”。回到 AudioSmith 看它的模型页。
   4. 让 AudioSmith 开始下载一个 VoxtMini 也有的模型，同时看 VoxtMini 的模型页；下载时在 VoxtMini 里删除它。
-  5. 模型页右上角点“网络…”：选“自定义”，填 `ftp://x` 点“保存”；改成 `http://127.0.0.1:7897` 保存；再打开，点“仅为此 app 单独设置”，选“不使用代理”保存。终端里 `open voxtnew://models/network`。
+  5. 模型页右上角点“网络…”：选“自定义”，填 `ftp://x` 点“保存”；改成 `http://127.0.0.1:7897` 保存；再打开，点“仅为此 app 单独设置”，选“不使用代理”保存。终端里 `open voxtmini://models/network`。
 - **应看到**：
   - 第 1 步后卡片写“与 AudioSmith 共用”。装了 Dicta 的 Qwen3 4B / Gemma 4 E4B 时，语言模型里多一张“由 Dicta 安装”的卡片，只有“使用它”，没有“下载”。
   - 第 2 步弹“从 VoxtMini 移除“快速语音识别”？”“AudioSmith 也在使用这个模型，文件（712.8 MB）会保留在这台 Mac 上。”；移除后提示文件为 AudioSmith 保留，`ls ~/.cache/huggingface/hub/models--mlx-community--Qwen3-ASR-0.6B-4bit/snapshots/` 还在。
@@ -605,7 +605,7 @@
   4. （有 AudioSmith 或 Dicta 时）仍是“直到退出 VoxtMini”，模型空闲满 1 分钟后，在另一个 ActNow app 里加载一个大模型，让它发出内存请求。
 - **应看到**：
   - 第 2 步：约 5 分钟后语音识别、Silero 和 `voxtmini-llm` 都退出（日志 `… unloaded after 5m0s unused`、`voxtmini-llm unused for 5m0s: stopping it`）。
-  - 第 3 步：11 分钟后进程都还在；`~/Library/Application Support/ActNow/runtime/dev.hehehai.voxtnew.json` 里它们的 `idleSince` 是转录结束的时间。改回“自动”后，从改的那一刻算起约 5 分钟 `voxtmini-llm` 退出、约 10 分钟语音服务退出，不需要重启。
+  - 第 3 步：11 分钟后进程都还在；`~/Library/Application Support/ActNow/runtime/dev.hehehai.voxtmini.json` 里它们的 `idleSince` 是转录结束的时间。改回“自动”后，从改的那一刻算起约 5 分钟 `voxtmini-llm` 退出、约 10 分钟语音服务退出，不需要重启。
   - 第 4 步：VoxtMini 的空闲模型被卸载（日志 `family: unloading … (idle) for another app`），设置不变；下一次转录照常（冷启动一次）。
 - **不对时看**：日志面板；runtime 文件。
 
@@ -733,7 +733,7 @@
 **9.2c 历史设置（约 6 分钟，需要一个 U 盘或别的外接盘）**
 - **做**：
   1. 历史页点搜索框右边的调节图标，看弹窗；打开“保存录音”，转录两次。
-  2. “存储位置”点“选择…”，选外接盘上的一个空文件夹；看访达里的旧文件夹（`~/Library/Application Support/VoxtNew/audio`）和新文件夹；在历史里“在访达中显示录音”。
+  2. “存储位置”点“选择…”，选外接盘上的一个空文件夹；看访达里的旧文件夹（`~/Library/Application Support/VoxtMini/audio`）和新文件夹；在历史里“在访达中显示录音”。
   3. 退出 VoxtMini，拔掉外接盘，再打开，转录一次；看历史页和弹窗。插回外接盘，再打开弹窗。
   4. “导出录音”选“全部录音”，点“导出…”选桌面上的一个文件夹；再选“仅转录”导出一次到同一个文件夹。
   5. “保留时长”从 3 个月改成 1 周（有一周前的记录时），先点“取消”，再改一次点“删除”。
@@ -789,7 +789,7 @@
   - 第 7 步：两种情况下声音都会回来：结束辅助进程后，新的辅助进程起来时恢复；强制退出 VoxtMini 时立即恢复（辅助进程发现 app 不在了）。
   - 第 8 步：关掉后录音不再静音；录音中关掉，声音立即回来。
   - 第 9 步：Auralink 停止时声音就回来了（VoxtMini 没有接管 Auralink 做的静音，也不会再静音）；两边都停止后设备没有静音。
-- **不对时看**：日志页来源 `audio` 的行（muted / unmuted output device N），`helper.log` 里的 `output:` 行；`~/Library/Application Support/VoxtNew/output-mute/` 里平时应该是空的。
+- **不对时看**：日志页来源 `audio` 的行（muted / unmuted output device N），`helper.log` 里的 `output:` 行；`~/Library/Application Support/VoxtMini/output-mute/` 里平时应该是空的。
 
 **9.4 设置 → 浮窗样式**
 - **做**：开始一次转录，录音中按 ⌘, 打开 设置 → 浮窗样式（或先打开设置再按右 ⌥），拖动“离屏幕边缘”、不透明度和圆角滑块，切换“顶部居中”和“显示录音时长”。做完改回“底部居中”。
@@ -842,6 +842,11 @@
 **9.9 〔可选〕两块显示器**
 - **做**：把光标放到第二块显示器上，转录一次。
 - **应看到**：浮窗出现在光标所在的那块显示器上。
+
+**9.10 从旧 bundle id 升级（0.1.0-beta.3 之前装过的）**
+- **做**：先备份 `~/Library/Application Support/VoxtNew`、`~/Library/Application Support/ActNow`。装着 `dev.hehehai.voxtnew` 的旧 VoxtMini（开着“登录时打开”）时装新版，打开。
+- **应看到**：历史、录音（能播放）、词典、设置都在；`~/Library/{Application Support,Caches,Logs}/VoxtMini` 有内容，`…/VoxtNew` 只剩不是 VoxtMini 的东西（或已删除）；日志里一行 `data: moved N entries from the VoxtNew folders`；ActNow 目录里 `models/claims/dev.hehehai.voxtmini.json` 有原来的模型，`dev.hehehai.voxtnew.json` 的声明和清单没了，模型页不需要重新下载；macOS 重新请求麦克风和辅助功能；系统设置 → 通用 → 登录项里有 VoxtMini（新 id）；`open voxtmini://models` 打开模型页。
+- **不对时看**：日志页来源 `app` 的 `data:`、`family:`、`login:` 行。
 
 ---
 
@@ -910,7 +915,7 @@ MAC_DIR=code/VoxtMini-ov scripts/mac.sh scripts/mac-overlay-check.sh
 MAC_DIR=code/VoxtMini-ov scripts/mac.sh --pull build/overlay-check     # 把结果拿回来
 ```
 
-- 怎么做的：脚本把 app 编译成一个单独的 accessory bundle（`dev.hehehai.voxtnew.overlaycheck`，`LSUIElement`，不是装好的 VoxtMini，不读写它的数据，不启动辅助进程和模型、不建菜单栏图标），用 `open -g` 在后台打开，app 以 `--overlay-check <dir>` 运行 `overlay_check.go`：浅色背景板 + 英文、深色背景板 + 中文各走一遍“迷你胶囊 → 短文本 → 长文本（滚动）→ 处理中 → 插入后消失 → 下一次会话的胶囊 → 出错提示 → 消失”，再走一遍答案卡片：“流式翻译 → 短译文 → 换语言中 → 已复制 → 插入失败的小字 → 长译文（滚动）→ 转写回答 → 追问录音中 → 对话 → 失败 → 消失”。截图由脚本在外面用 `screencapture` 做（`-l` 只截浮窗窗口，`-R` 截背景板连同浮窗），app 自己不需要屏幕录制权限。`nice`、2 个并行任务，空闲内存低于 40% 不启动，跑完退出，最后检查没有残留进程、前台 App 没变。
+- 怎么做的：脚本把 app 编译成一个单独的 accessory bundle（`dev.hehehai.voxtmini.overlaycheck`，`LSUIElement`，不是装好的 VoxtMini，不读写它的数据，不启动辅助进程和模型、不建菜单栏图标），用 `open -g` 在后台打开，app 以 `--overlay-check <dir>` 运行 `overlay_check.go`：浅色背景板 + 英文、深色背景板 + 中文各走一遍“迷你胶囊 → 短文本 → 长文本（滚动）→ 处理中 → 插入后消失 → 下一次会话的胶囊 → 出错提示 → 消失”，再走一遍答案卡片：“流式翻译 → 短译文 → 换语言中 → 已复制 → 插入失败的小字 → 长译文（滚动）→ 转写回答 → 追问录音中 → 对话 → 失败 → 消失”。截图由脚本在外面用 `screencapture` 做（`-l` 只截浮窗窗口，`-R` 截背景板连同浮窗），app 自己不需要屏幕录制权限。`nice`、2 个并行任务，空闲内存低于 40% 不启动，跑完退出，最后检查没有残留进程、前台 App 没变。
 - 看什么：`build/overlay-check/shots/sheet.png`（左列浅色英文，右列深色中文；红线是第一次胶囊的底边和水平中心，每一步浮窗的底边都应该落在红线上、左右对称），`frames.txt`（每一步请求的 frame 和窗口实际的 frame、是否可见、前台 App，以及从窗口截图里量出的浮窗：`ink` 行给出浮窗尺寸、图标左侧和波形右侧的留白、图标和波形的中线、文字左右的留白；出现 `FAIL` 行脚本就返回非 0：锚点（底边或中心）移动了、窗口不在请求的位置、可见性不对、检查程序跑到了前台，或者像素检查不过：胶囊不是 148×48、图标左侧和波形右侧的留白差或中线差超过 1 pt、短文本不居中或浮窗没贴合文字、长文本时浮窗不是 300 宽或文字末尾不在右侧 20 处；答案卡片的笔画不是从左侧 18 开始，或者最下面的笔画不在底部 16 的内边距之上一行以内（有空白或被裁）；`internal/overlay/ink`，Linux 上 `TestOverlayInk` 用同一套量法），以及每一步的 `step-N-window.png`、`step-N-screen.png`。
 - 2026-10-15 在 mac-air 上（复制前的同一套浮窗代码）：40 步全部通过：胶囊 148.0×48.0，图标左侧 17.0、波形右侧 16.5，图标和波形的中线都是 24.0；长文本中英都是 300 宽，文字末尾离右边 21.0；卡片 440 宽，标题笔画 17.5–33.0、分隔线 48.0；语言下拉在卡片顶边上方 6，右边缘对齐胶囊，开关下拉前后卡片 frame 不变；所有可见状态的底边都在 1029、水平中心在 855；前台 App 没变，没有残留进程。前台被别的程序抢走时，结尾会有一条“前台 App 变了”的 `FAIL`，看 frames.txt 里检查程序自己有没有到过前台。
 

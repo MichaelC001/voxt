@@ -2,7 +2,7 @@ import Foundation
 
 // voxtmini-helper: run by VoxtMini.app (internal/helper supervises it),
 // helper protocol 1 on stdin/stdout (docs/helper-protocol.md), free-form
-// diagnostics on stderr (~/Library/Logs/VoxtNew/helper.log). It exits
+// diagnostics on stderr (~/Library/Logs/VoxtMini/helper.log). It exits
 // when stdin closes or on helper.shutdown.
 //
 // The main thread runs the main run loop: NSWorkspace's notifications,

@@ -41,7 +41,7 @@ Download VoxtMini from [actnow.dev/voxtmini](https://actnow.dev/voxtmini) ([down
 
 ## Privacy
 
-By default audio and text never leave the Mac: recognition, clean-up, translation and rewriting all run on it. A feature for which you choose a remote service sends its recordings or text to that service, and only that one; its key stays in the macOS Keychain. VoxtMini has no server of its own, no account and no analytics. Otherwise it goes online only to download the models you choose (from Hugging Face through the system's proxy, or hf-mirror.com) and to check actnow.dev for updates and announcements. The history, its optional recordings, the dictionary and the settings stay in `~/Library/Application Support/VoxtNew/` (the name of VoxtMini's beta, kept so that existing installs keep their data; likewise the bundle id `dev.hehehai.voxtnew` and the `voxtnew://` links).
+By default audio and text never leave the Mac: recognition, clean-up, translation and rewriting all run on it. A feature for which you choose a remote service sends its recordings or text to that service, and only that one; its key stays in the macOS Keychain. VoxtMini has no server of its own, no account and no analytics. Otherwise it goes online only to download the models you choose (from Hugging Face through the system's proxy, or hf-mirror.com) and to check actnow.dev for updates and announcements. The history, its optional recordings, the dictionary and the settings stay in `~/Library/Application Support/VoxtMini/`. Betas before 0.1.0-beta.3 kept them in `…/VoxtNew/` under the bundle id `dev.hehehai.voxtnew`, which another app (Voxt 2) also uses; the first start of a newer VoxtMini moves its own files over and leaves anything else there alone. macOS then asks once more for the microphone and Accessibility.
 
 ## From Voxt to VoxtMini
 
@@ -92,7 +92,7 @@ Apple 芯片、macOS 15 及以上的 Mac（Apple 智能和新版 Apple 语音识
 
 ### 隐私
 
-默认情况下音频和文字不会离开这台 Mac：识别、整理、翻译和改写都在本机完成。你为某个功能选了远程服务时，这个功能的录音或文字只发给那一个服务；密钥保存在 macOS 钥匙串里。VoxtMini 没有自己的服务器，不需要账号，也不做统计。除此之外它只为两件事联网：下载你选择的模型（从 Hugging Face，走系统代理，或用 hf-mirror.com），以及在 actnow.dev 检查更新和公告。历史、可选保存的录音、词典和设置都在 `~/Library/Application Support/VoxtNew/`（VoxtMini 测试版时的名字，保留它是为了让已安装的版本保留数据；bundle id `dev.hehehai.voxtnew` 和 `voxtnew://` 链接同理）。
+默认情况下音频和文字不会离开这台 Mac：识别、整理、翻译和改写都在本机完成。你为某个功能选了远程服务时，这个功能的录音或文字只发给那一个服务；密钥保存在 macOS 钥匙串里。VoxtMini 没有自己的服务器，不需要账号，也不做统计。除此之外它只为两件事联网：下载你选择的模型（从 Hugging Face，走系统代理，或用 hf-mirror.com），以及在 actnow.dev 检查更新和公告。历史、可选保存的录音、词典和设置都在 `~/Library/Application Support/VoxtMini/`。0.1.0-beta.3 之前的测试版放在 `…/VoxtNew/`，bundle id 是 `dev.hehehai.voxtnew`，另一个 app（Voxt 2）也用这个 id；新版 VoxtMini 第一次启动时把自己的文件搬过来，那里别的东西不动。之后 macOS 会再请求一次麦克风和辅助功能权限。
 
 ### 从 Voxt 到 VoxtMini
 

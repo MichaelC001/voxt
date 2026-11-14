@@ -77,7 +77,7 @@ func runIsolated(m *testing.M) int {
 			hub = h.(string)
 		}
 		return actnow.Config{Dir: family.At(filepath.Join(d, "ActNow")), Hub: hub,
-			BundleID: "dev.hehehai.voxtnew", Version: "0.1.0-test", System: noApps{}}
+			BundleID: "dev.hehehai.voxtmini", Version: "0.1.0-test", System: noApps{}}
 	}
 	return m.Run()
 }

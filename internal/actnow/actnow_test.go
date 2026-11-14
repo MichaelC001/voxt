@@ -17,7 +17,7 @@ import (
 
 func open(t *testing.T, fx *conformance.Fixture, prefs settings.Settings) *Family {
 	t.Helper()
-	return Open(Config{BundleID: "dev.hehehai.voxtnew", Version: "0.1.0-beta.1", Dir: fx.Family, Hub: fx.Hub,
+	return Open(Config{BundleID: "dev.hehehai.voxtmini", Version: "0.1.0-beta.1", Dir: fx.Family, Hub: fx.Hub,
 		System: conformance.FixtureSystem{}, Logf: t.Logf}, prefs)
 }
 
@@ -41,13 +41,13 @@ func TestManifest(t *testing.T) {
 	if err := f.WriteManifest(m); err != nil {
 		t.Fatal(err)
 	}
-	got, err := registry.Read(fx.Family, "dev.hehehai.voxtnew")
+	got, err := registry.Read(fx.Family, "dev.hehehai.voxtmini")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.App != AppID || got.Variant != family.Release || got.Name != "VoxtMini" || got.Version != "0.1.0-beta.1" || got.URLScheme != "voxtnew" ||
+	if got.App != AppID || got.Variant != family.Release || got.Name != "VoxtMini" || got.Version != "0.1.0-beta.1" || got.URLScheme != "voxtmini" ||
 		got.Models == nil || got.Models.Root != fx.Hub || !slices.Equal(got.Capabilities, []string{"models.hf", "asr.local", "llm.local", "dictation"}) ||
-		got.Links["shortcuts"] != "voxtnew://settings/shortcuts" {
+		got.Links["shortcuts"] != "voxtmini://settings/shortcuts" {
 		t.Errorf("manifest %+v", got)
 	}
 	type sc struct{ id, keys, trigger string }
@@ -64,12 +64,12 @@ func TestManifest(t *testing.T) {
 		t.Errorf("shortcuts %v, want %v", have, want)
 	}
 	// Unchanged: not written again.
-	fi, _ := os.Stat(fx.Family.AppFile("dev.hehehai.voxtnew"))
-	os.Chtimes(fx.Family.AppFile("dev.hehehai.voxtnew"), fi.ModTime().Add(-time.Hour), fi.ModTime().Add(-time.Hour))
+	fi, _ := os.Stat(fx.Family.AppFile("dev.hehehai.voxtmini"))
+	os.Chtimes(fx.Family.AppFile("dev.hehehai.voxtmini"), fi.ModTime().Add(-time.Hour), fi.ModTime().Add(-time.Hour))
 	if err := f.WriteManifest(m); err != nil {
 		t.Fatal(err)
 	}
-	if fi2, _ := os.Stat(fx.Family.AppFile("dev.hehehai.voxtnew")); !fi2.ModTime().Before(fi.ModTime()) {
+	if fi2, _ := os.Stat(fx.Family.AppFile("dev.hehehai.voxtmini")); !fi2.ModTime().Before(fi.ModTime()) {
 		t.Error("written again")
 	}
 	// New keys: a new time.
@@ -83,7 +83,7 @@ func TestManifest(t *testing.T) {
 	if err := f.WriteManifest(m); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := registry.Read(fx.Family, "dev.hehehai.voxtnew"); got.Version != "0.1.0-beta.1" {
+	if got, _ := registry.Read(fx.Family, "dev.hehehai.voxtmini"); got.Version != "0.1.0-beta.1" {
 		t.Error("written without a path")
 	}
 }
@@ -181,7 +181,7 @@ func TestReadOnly(t *testing.T) {
 	if err := f.WriteManifest(m); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(fx.Family.AppFile("dev.hehehai.voxtnew")); !os.IsNotExist(err) {
+	if _, err := os.Stat(fx.Family.AppFile("dev.hehehai.voxtmini")); !os.IsNotExist(err) {
 		t.Error("a manifest in a read-only directory")
 	}
 	if err := f.Migrate(context.Background(), &prefs); err != nil || prefs.Family.Follow != nil {
