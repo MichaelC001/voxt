@@ -22,7 +22,7 @@ func TestBundleScrubbed(t *testing.T) {
 	dir := t.TempDir()
 	logs := filepath.Join(dir, "logs")
 	os.MkdirAll(logs, 0o755)
-	os.WriteFile(filepath.Join(logs, "helper.log"), []byte("request with key sk-abcdefghijklmnopqrstu and Bearer abcdefghijklmnop\nplain line\n"), 0o644)
+	os.WriteFile(filepath.Join(logs, "helper.log"), []byte("request with key sk-abcdefghijklmnopqrstu and Bearer abcdefghijklmnop\nAuthorization: Bearer qrstuvwxyz012345\n{\"refresh_token\":\"rt-456\"}\nplain line\n"), 0o644)
 	out := filepath.Join(dir, "bundle.zip")
 	if err := writeBundle(out, "diag", prefs, logs); err != nil {
 		t.Fatal(err)
@@ -50,7 +50,9 @@ func TestBundleScrubbed(t *testing.T) {
 			t.Errorf("settings.json lacks %q:\n%s", kept, s)
 		}
 	}
-	if l := files["logs/helper.log"]; strings.Contains(l, "abcdefghijklmnop") || strings.Contains(l, "sk-abc") || !strings.Contains(l, "plain line\n") {
+	if l := files["logs/helper.log"]; strings.Contains(l, "abcdefghijklmnop") || strings.Contains(l, "sk-abc") ||
+		strings.Contains(l, "qrstuvwxyz012345") || strings.Contains(l, "rt-456") ||
+		!strings.Contains(l, "Authorization: Bearer REDACTED") || !strings.Contains(l, "plain line\n") {
 		t.Errorf("helper.log %q", l)
 	}
 }

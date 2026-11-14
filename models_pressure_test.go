@@ -22,11 +22,12 @@ import (
 var (
 	calm     = macx.SystemMemory{Pressure: "normal", SwapUsedBytes: 7 << 30, SwapTotalBytes: 10 << 30}
 	warned   = macx.SystemMemory{Pressure: "warning"}
-	swapping = macx.SystemMemory{Pressure: "normal", SwapUsedBytes: 8 << 30, SwapTotalBytes: 10 << 30}
+	swapping = macx.SystemMemory{Pressure: "normal", SwapUsedBytes: 95, SwapTotalBytes: 100}
 )
 
 // TestPressureUnloads: only Automatic, no session, short of memory
-// (pressure or swap ≥ 80 %), and only the models idle for a minute.
+// (macOS's pressure warning or critical; a full swap alone is not), and
+// only the models idle for a minute.
 func TestPressureUnloads(t *testing.T) {
 	now := time.Unix(1000, 0)
 	marks := map[string]idleMark{
@@ -47,8 +48,8 @@ func TestPressureUnloads(t *testing.T) {
 		{"calm", auto, false, calm, nil},
 		{"warning", auto, false, warned, idle},
 		{"critical", auto, false, macx.SystemMemory{Pressure: "critical"}, idle},
-		{"swap 80%", auto, false, swapping, idle},
-		{"swap 79%", auto, false, macx.SystemMemory{SwapUsedBytes: 79, SwapTotalBytes: 100}, nil},
+		{"swap 95%, pressure normal", auto, false, swapping, nil},
+		{"swap 95%, no level", auto, false, macx.SystemMemory{SwapUsedBytes: 95, SwapTotalBytes: 100}, nil},
 		{"no swap", auto, false, macx.SystemMemory{Pressure: "normal"}, nil},
 		{"a session runs", auto, true, warned, nil},
 		{"15 minutes", settings.Models{KeepLoaded: settings.Keep15Min}, false, warned, nil},
@@ -83,7 +84,8 @@ func installPressure(t *testing.T, a *app, mem macx.SystemMemory) *pressureRig {
 }
 
 // TestPressureUnloadsIdleModels: the models idle for a minute go when
-// the Mac swaps, stay when it does not or after less than a minute; the checks start with the first model loaded and stop
+// macOS reports memory pressure, stay when it does not (a full swap
+// alone included) or after less than a minute; the checks start with the first model loaded and stop
 // when none is.
 func TestPressureUnloadsIdleModels(t *testing.T) {
 	fakeOmni(t, omnitest.Opts{})
@@ -124,9 +126,16 @@ func TestPressureUnloadsIdleModels(t *testing.T) {
 	if st := a.llmrt.Status(); st.State != llmrt.Ready {
 		t.Fatalf("calm: %+v", st)
 	}
-	a.checkPressure(time.Now()) // pressed, but just used
 	rig.mu.Lock()
 	rig.mem = swapping
+	rig.mu.Unlock()
+	a.checkPressure(later) // swap 95 %, pressure normal: all stay
+	if st := a.llmrt.Status(); st.State != llmrt.Ready {
+		t.Fatalf("swap only: %+v", st)
+	}
+	a.checkPressure(time.Now()) // pressed, but just used
+	rig.mu.Lock()
+	rig.mem = warned
 	rig.mu.Unlock()
 	a.checkPressure(time.Now())
 	if st := a.llmrt.Status(); st.State != llmrt.Ready {

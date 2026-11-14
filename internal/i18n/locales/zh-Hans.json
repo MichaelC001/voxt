@@ -573,7 +573,7 @@
   "Light": "浅色",
   "Listening…": "正在听…",
   "Loaded": "已载入",
-  "Loaded models start at once but keep their memory. Automatic unloads a speech model after 10 idle minutes and a language model after 5, or after 1 minute when the Mac is short of memory.": "保持载入的模型能立即开始，但会一直占用内存。“自动”会在语音识别模型闲置 10 分钟、语言模型闲置 5 分钟后卸载；Mac 内存紧张时闲置 1 分钟即卸载。",
+  "Loaded models start at once but keep their memory. Automatic unloads a speech model after 10 idle minutes and a language model after 5, or after 1 minute when macOS reports memory pressure.": "保持载入的模型能立即开始，但会一直占用内存。“自动”会在语音识别模型闲置 10 分钟、语言模型闲置 5 分钟后卸载；macOS 报告内存压力时闲置 1 分钟即卸载。",
   "Loaded · %s in memory": "已载入 · 占用内存 %s",
   "Loading the speech model…": "正在加载语音识别模型…",
   "Local": "本地",

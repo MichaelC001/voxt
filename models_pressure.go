@@ -2,11 +2,13 @@ package main
 
 // Memory-aware unloading (audit #37, WP-A): with "Keep models loaded" on
 // Automatic, a model left idle for a minute is unloaded when the Mac is
-// short of memory (macOS's pressure warning or critical, or swap at least
-// 80 % used), instead of waiting out its 5 or 10 minutes: on a Mac that
-// swaps, an idle model is swapped out anyway (so keeping it does not make
+// short of memory (macOS's memory pressure is warning or critical),
+// instead of waiting out its 5 or 10 minutes: under pressure an idle
+// model is compressed or swapped out anyway (so keeping it does not make
 // the next dictation quicker) and its gigabytes push the user's other
-// apps into swap. A fixed choice keeps its time; a session that runs is
+// apps into swap. The swap's use alone does not count (user,
+// 2026-11-14): on a Mac whose swap stays nearly full it would unload
+// after every dictation. A fixed choice keeps its time; a session that runs is
 // never interrupted.
 //
 // The pressure is read with sysctl (macx.ReadSystemMemory, microseconds)
@@ -34,8 +36,6 @@ const (
 	pressurePoll = 30 * time.Second
 	// pressureIdle is how long a model must be idle to go under pressure.
 	pressureIdle = time.Minute
-	// pressureSwapPercent is the swap use that counts as short of memory.
-	pressureSwapPercent = 80
 )
 
 // sysMemory reads the Mac's memory (a test seam; an error off a Mac).
@@ -105,13 +105,10 @@ func (a *app) pressureTick() {
 	a.schedulePressure()
 }
 
-// shortOfMemory reports whether m says the Mac is short of memory, and
-// how.
+// shortOfMemory reports whether m says the Mac is short of memory:
+// macOS's pressure level only, whatever the swap's use.
 func shortOfMemory(m macx.SystemMemory) bool {
-	if m.Pressure == "warning" || m.Pressure == "critical" {
-		return true
-	}
-	return m.SwapTotalBytes > 0 && m.SwapUsedBytes*100 >= pressureSwapPercent*m.SwapTotalBytes
+	return m.Pressure == "warning" || m.Pressure == "critical"
 }
 
 // pressureUnloads are the models to unload now: with keep Automatic, no
