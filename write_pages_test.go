@@ -29,7 +29,7 @@ func TestTranslatePage(t *testing.T) {
 	for _, s := range []string{
 		"Translate", "Shortcuts", "Right ⌥ ⇧", "Models", "No speech model: only selected text can be translated.",
 		"No language model installed.", "Translation", "Translate into", "Automatic: Simplified Chinese",
-		"Basic clean-up", "Show the result in a card", "Your rules", "Try it",
+		"Basic clean-up", "Show the result in a card", "Prompt", "Try it",
 	} {
 		if !has(tt, s) {
 			t.Errorf("no %q in %q", s, firstTexts(tt))
@@ -56,16 +56,18 @@ func TestTranslatePage(t *testing.T) {
 	if got := a.lib.settings.Get().Features.Translate.Target; got != "" {
 		t.Errorf("target %q", got)
 	}
-	// Its own shortcuts and rules.
+	// Its own shortcuts and prompt.
 	click(t, tt, "Add a shortcut")
 	if hs := a.lib.settings.Get().Features.Translate.Hotkeys; len(hs) != 2 || hs[1].Keys != "RightCommand" {
 		t.Errorf("shortcuts %+v", hs)
 	}
-	click(t, tt, "Your rules for Translate")
-	tt.Type("Use British spelling.")
+	click(t, tt, "Prompt for Translate")
+	tt.Key(ui.Ctrl, ui.KeyEnd)
+	tt.Type(" Use British spelling.")
 	click(t, tt, "Show the full prompt")
-	if p := a.lib.settings.Get().Features.Translate.Prompt; p != "Use British spelling." || a.lib.settings.Get().Features.Transcribe.Prompt != "" {
-		t.Errorf("rules %q", p)
+	want := compose.DefaultPrompt(compose.Translate, compose.English) + " Use British spelling."
+	if p := a.lib.settings.Get().Features.Translate.Prompt; p != want || a.lib.settings.Get().Features.Transcribe.Prompt != "" {
+		t.Errorf("prompt %q", p)
 	}
 	if !has(tt, "Spoken text, as below; selected text is translated without the clean-up and keeps its form.") {
 		t.Errorf("preview %q", firstTexts(tt))

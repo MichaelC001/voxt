@@ -45,13 +45,17 @@ type featureUI struct {
 	svcSeen  string
 	// lang is Translate's target select.
 	lang string
-	// prompt is the rules as typed; promptSeen the saved value it was
-	// last set from; promptDirty an edit not saved yet, promptSeq which
-	// edit (its timer saves only the last one).
+	// prompt is the task prompt as typed; promptSeen what it was last
+	// set from (the saved prompt, or the built-in one); promptDirty an
+	// edit not saved yet, promptSeq which edit (its timer saves only the
+	// last one); caret the editor's last selection, in runes, where a
+	// variable goes (caretSet once it was focused).
 	prompt      string
 	promptSeen  string
 	promptDirty bool
 	promptSeq   int
+	caret       [2]int
+	caretSet    bool
 	preview     bool
 	// block says why the Try area's Start did not start.
 	block *sessionNotice
@@ -123,7 +127,7 @@ func (a *app) featurePage(c *ui.Context, feature string) {
 			default:
 				a.trEnhance(c)
 			}
-			a.featureRules(c, feature)
+			a.featurePrompt(c, feature)
 			a.featureTry(c, feature)
 		})
 	})

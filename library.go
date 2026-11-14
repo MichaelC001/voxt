@@ -36,7 +36,10 @@ func openLibrary(dataDir string) (*library, error) {
 	if err != nil {
 		log.Printf("settings: %v", err) // the defaults, until the next change saves them
 	}
-	if err := l.settings.Update(ctx, session.ScopeLanguages); err != nil {
+	if err := l.settings.Update(ctx, func(s *settings.Settings) {
+		session.ScopeLanguages(s)
+		session.MergeRules(s) // version 4's "Your rules"
+	}); err != nil {
 		log.Printf("settings: %v", err)
 	}
 	return l, nil

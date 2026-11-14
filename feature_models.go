@@ -154,7 +154,7 @@ func (a *app) trEnhance(c *ui.Context) {
 	sectionTitle(c, i18n.T("Clean-up"))
 	f := &a.prefs.Features.Transcribe
 	settingRow(c, "tr-enhance", i18n.T("Clean up with a language model"),
-		i18n.T("Sends the recognised text to the language model with the rules below, and types its answer. Off, the text is typed as recognised. If the model fails or is slow, the recognised text is typed."), func() {
+		i18n.T("Sends the recognised text to the language model with the prompt below, and types its answer. Off, the text is typed as recognised. If the model fails or is slow, the recognised text is typed."), func() {
 			if ui.Switch(c.Key("tr-enhance-switch"), &f.Enhance).Label(i18n.T("Clean up with a language model")).Changed() {
 				on := f.Enhance
 				a.updateSettings(func(s *settings.Settings) { s.Features.Transcribe.Enhance = on })

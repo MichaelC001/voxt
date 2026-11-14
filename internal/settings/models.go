@@ -21,6 +21,10 @@ type Models struct {
 	// HiddenRemote key. Hiding deletes nothing and changes no feature's
 	// choice (docs/models-page.md).
 	Hidden []string `json:"hidden,omitempty"`
+	// LLMParams are the local language models' generation parameters the
+	// user set, by catalogue id ("llm.balanced"); a model not listed
+	// runs with VoxtMini's tuned ones (llm_params.go).
+	LLMParams map[string]LLMParams `json:"llmParams,omitempty"`
 }
 
 // HiddenRemote is the Hidden key of remote service id of kind ("asr",

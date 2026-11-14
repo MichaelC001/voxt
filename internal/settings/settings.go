@@ -24,7 +24,7 @@ import (
 
 // Version is the schema version Defaults writes. Bump it when a field's
 // meaning changes, and migrate older documents in Migrate.
-const Version = 4
+const Version = 5
 
 // Settings is the whole document.
 type Settings struct {
@@ -264,13 +264,19 @@ type EndCommand struct {
 // Feature is what every feature has: its shortcuts, the models it uses
 // (internal/local's Model.ID; "" = the first local one installed, the
 // recommended one; "remote:<id>" = a remote service the user chose,
-// RemoteID) and the user's addition to its task prompt, which the
-// composer merges with the built-in rules.
+// RemoteID) and its task prompt.
 type Feature struct {
 	Hotkeys []Hotkey `json:"hotkeys,omitempty"`
 	ASR     string   `json:"asr,omitempty"`
 	LLM     string   `json:"llm,omitempty"`
-	Prompt  string   `json:"prompt,omitempty"`
+	// Prompt is the feature's task prompt as the user edited it, which
+	// replaces the built-in one (compose.DefaultPrompt); "" = the
+	// built-in one. Before version 5 it held rules added to the built-in
+	// prompt: Migrate moves them to Rules.
+	Prompt string `json:"prompt,omitempty"`
+	// Rules are version 4's rules ("Your rules") until the app merges
+	// them into Prompt at start (session.MergeRules); "" afterwards.
+	Rules string `json:"rules,omitempty"`
 }
 
 // Transcribe: speech → text, inserted where the cursor is.
@@ -415,6 +421,15 @@ func Migrate(data []byte) (Settings, error) {
 	}
 	if s.Version < 4 {
 		migrateShortcuts(&s.Features)
+	}
+	if s.Version < 5 {
+		// Version 5: Prompt is the whole task prompt, no longer rules
+		// added to it; session.MergeRules makes one of the rules.
+		for _, f := range []*Feature{&s.Features.Transcribe.Feature, &s.Features.Translate.Feature, &s.Features.Rewrite.Feature} {
+			if f.Rules == "" {
+				f.Rules, f.Prompt = f.Prompt, ""
+			}
+		}
 	}
 	migrateSoundPreset(&s.Audio)
 	s.Version = Version

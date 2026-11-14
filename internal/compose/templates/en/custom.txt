@@ -1,2 +1,0 @@
-The user's own rules (where they differ from the rules above, follow them):
-{{TASK_PROMPT}}

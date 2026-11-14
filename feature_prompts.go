@@ -1,6 +1,6 @@
 package main
 
-// Translate's and Rewrite's own settings and every feature's rules, with
+// Translate's and Rewrite's own settings and every feature's prompt, with
 // the preview of the whole prompt (feature_page.go).
 
 import (
@@ -84,7 +84,7 @@ func (a *app) rewriteSettings(c *ui.Context) {
 		})
 }
 
-// ---- Your rules ----
+// ---- The prompt ----
 
 // variableInfo says what a prompt variable holds.
 func variableInfo(name string) string {
@@ -101,30 +101,61 @@ func variableInfo(name string) string {
 	return ""
 }
 
-// promptOf is a feature's saved rules.
+// featureTask is the composer's task of a feature.
+func featureTask(feature string) compose.Task {
+	switch feature {
+	case hotkey.Translate:
+		return compose.Translate
+	case hotkey.Rewrite:
+		return compose.Rewrite
+	}
+	return compose.Transcribe
+}
+
+// promptOf is a feature's saved prompt ("" = the built-in one).
 func promptOf(s settings.Settings, feature string) string {
 	return featureOf(s, feature).Prompt
 }
 
-// promptSync sets the rules from the settings when they changed
-// elsewhere and nothing typed waits to be saved.
+// defaultPrompt is the feature's built-in prompt in the main language's
+// set, as the editor shows it.
+func (a *app) defaultPrompt(feature string) string {
+	return compose.DefaultPrompt(featureTask(feature), compose.TemplateSet(session.MainLanguage(a.prefs, i18n.Locale())))
+}
+
+// promptSync sets the editor from the settings when they changed
+// elsewhere (or the main language, which picks the built-in prompt) and
+// nothing typed waits to be saved.
 func (a *app) promptSync(feature string) {
 	u := a.fui(feature)
 	saved := promptOf(a.prefs, feature)
-	if !u.promptDirty && saved != u.promptSeen {
-		u.prompt, u.promptSeen = saved, saved
+	shown := saved
+	if shown == "" {
+		shown = a.defaultPrompt(feature)
+	}
+	if !u.promptDirty && shown != u.promptSeen {
+		u.prompt, u.promptSeen = shown, shown
 	}
 }
 
-// savePrompt saves the rules as typed.
+// savePrompt saves the prompt as typed: the built-in one (in either
+// language) or nothing is saved as "", which follows the main language.
 func (a *app) savePrompt(feature string) {
 	u := a.fui(feature)
 	u.promptDirty = false
-	v := u.prompt
-	if strings.TrimSpace(v) == "" {
+	v := strings.TrimSpace(u.prompt)
+	if compose.IsDefault(featureTask(feature), v) {
 		v = ""
 	}
+	if v == "" {
+		u.prompt = a.defaultPrompt(feature)
+	}
+	// What promptSync compares with: the saved prompt as it will show, so
+	// the text as typed (and its caret) stays.
 	u.promptSeen = v
+	if v == "" {
+		u.promptSeen = u.prompt
+	}
 	if v == promptOf(a.prefs, feature) {
 		return
 	}
@@ -140,33 +171,43 @@ func (a *app) savePrompt(feature string) {
 	})
 }
 
-// promptSaveDelay is how long the rules wait after the last key before
-// they are saved (they are saved at once when the field loses focus).
+// insertVariable puts token at the editor's last caret (its end when it
+// was never focused), replacing a selection, and saves.
+func (a *app) insertVariable(feature, token string) {
+	u := a.fui(feature)
+	r := []rune(u.prompt)
+	start, end := len(r), len(r)
+	if u.caretSet {
+		start, end = min(u.caret[0], len(r)), min(u.caret[1], len(r))
+		if start > end {
+			start, end = end, start
+		}
+	}
+	u.prompt = string(r[:start]) + token + string(r[end:])
+	at := start + len([]rune(token))
+	u.caret, u.caretSet = [2]int{at, at}, true
+	a.savePrompt(feature)
+}
+
+// promptSaveDelay is how long the prompt waits after the last key before
+// it is saved (it is saved at once when the field loses focus).
 const promptSaveDelay = 800 * time.Millisecond
 
-func (a *app) featureRules(c *ui.Context, feature string) {
+// featurePrompt is the feature's task prompt, the user's to edit (it
+// replaces the built-in one; the rest of the request stays the app's,
+// which the full prompt below shows), with the variables to insert.
+func (a *app) featurePrompt(c *ui.Context, feature string) {
 	t := c.Theme()
 	k := tok(t)
 	p := uitext.FeaturePrefix(feature)
 	u := a.fui(feature)
 	a.promptSync(feature)
-	var tip, label, placeholder string
-	switch feature {
-	case hotkey.Translate:
-		tip = i18n.T("These rules are merged with the built-in translation rules; where they disagree, yours win.")
-		label = i18n.T("Your rules for Translate")
-		placeholder = i18n.T("For example: use British spelling; keep product names in English; write dates as 15 October 2026.")
-	case hotkey.Rewrite:
-		tip = i18n.T("These rules are merged with the built-in writing rules; where they disagree, yours win.")
-		label = i18n.T("Your rules for Rewrite")
-		placeholder = i18n.T("For example: write plainly, without emoji; sign mails with my first name.")
-	default:
-		tip = i18n.T("These rules are merged with the built-in clean-up rules; where they disagree, yours win.")
-		label = i18n.T("Your rules for Transcribe")
-		placeholder = i18n.T("For example: write numbers as digits; keep English product names as they are; end every sentence with a full stop.")
+	sectionTitleTip(c, i18n.T("Prompt"), i18n.T("Tells the model what to do. VoxtMini adds the rest itself: what the input is, your dictionary, App enhancement's scene and the output format."))
+	in := ui.TextArea(c.Key(p+"-prompt"), &u.prompt).Label(i18n.T("Prompt for %s", uitext.FeatureTitle(feature))).MinHeight(px(t, 200))
+	if in.Focused() {
+		s, e := in.TextSelection()
+		u.caret, u.caretSet = [2]int{s, e}, true
 	}
-	sectionTitleTip(c, i18n.T("Your rules"), tip)
-	in := ui.TextArea(c.Key(p+"-prompt"), &u.prompt).Label(label).Placeholder(placeholder).MinHeight(px(t, 88))
 	if in.Changed() {
 		u.promptDirty = true
 		u.promptSeq++
@@ -182,31 +223,30 @@ func (a *app) featureRules(c *ui.Context, feature string) {
 	} else if u.promptDirty && !in.Focused() {
 		a.savePrompt(feature) // it lost the focus
 	}
-	ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Wrap().Children(func() {
-		caption(c, i18n.T("Variables (click one to copy it):")).Grow(1).MinWidth(0)
-		empty := u.prompt == "" && promptOf(a.prefs, feature) == ""
-		if ghostIconButton(c.Key(p+"-prompt-reset"), icons.Refresh, i18n.T("Reset to default")).Label(i18n.T("Reset your rules")).Disabled(empty).Clicked() {
+	ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Children(func() {
+		// The variables as chips, inserted at the caret; what each holds
+		// is its tooltip.
+		ui.Row(c.Key(p + "-vars")).Wrap().Gap(px(t, 6)).Grow(1).MinWidth(0).Children(func() {
+			for _, name := range compose.TaskVariables(featureTask(feature)) {
+				token := "{{" + name + "}}"
+				ui.Row(c.Key("var-" + name)).AlignItems(ui.Center).Children(func() {
+					b := ui.ButtonBase(c.Key("insert")).Padding(px(t, 2), px(t, 6)).Radius(px(t, radiusChip)).Background(k.Hover).Label(i18n.T("Insert %s", token)).Tooltip(variableInfo(name)).Shrink(0)
+					if b.Hovered() {
+						b.Background(k.Pressed)
+					}
+					b.Children(func() {
+						ui.Text(c, token).FontSize(px(t, fsCaption)).Font("monospace").SingleLine()
+					})
+					if b.Clicked() {
+						a.insertVariable(feature, token)
+					}
+				})
+			}
+		})
+		custom := promptOf(a.prefs, feature) != "" || u.promptDirty && !compose.IsDefault(featureTask(feature), u.prompt)
+		if ghostIconButton(c.Key(p+"-prompt-reset"), icons.Refresh, i18n.T("Reset to default")).Disabled(!custom).Shrink(0).Clicked() {
 			u.prompt = ""
 			a.savePrompt(feature)
-		}
-	})
-	// The variables as chips; what each holds is its tooltip.
-	ui.Row(c.Key(p + "-vars")).Wrap().Gap(px(t, 6)).Children(func() {
-		for _, name := range compose.VariableNames {
-			token := "{{" + name + "}}"
-			ui.Row(c.Key("var-" + name)).AlignItems(ui.Center).Children(func() {
-				b := ui.ButtonBase(c.Key("copy")).Padding(px(t, 2), px(t, 6)).Radius(px(t, radiusChip)).Background(k.Hover).Label(token).Tooltip(variableInfo(name)).Shrink(0)
-				if b.Hovered() {
-					b.Background(k.Pressed)
-				}
-				b.Children(func() {
-					ui.Text(c, token).FontSize(px(t, fsCaption)).Font("monospace").SingleLine()
-				})
-				if b.Clicked() {
-					c.Services().WriteClipboard(token)
-					a.toast(i18n.T("Copied"))
-				}
-			})
 		}
 	})
 	collapsible(c.Key(p+"-preview"), i18n.T("Show the full prompt"), &u.preview, nil, func() {
@@ -221,11 +261,15 @@ func rewriteSample() (instruction, selection string) {
 }
 
 // composedPreview is the request a session would send with the settings
-// and the rules as typed, for the sample text.
+// and the prompt as typed, for the sample text.
 func (a *app) composedPreview(feature string) (compose.Output, error) {
 	g := a.prefs.General
+	prompt := a.fui(feature).prompt
+	if compose.IsDefault(featureTask(feature), prompt) {
+		prompt = ""
+	}
 	in := compose.Input{
-		TaskPrompt: a.fui(feature).prompt, MainLanguage: session.MainLanguage(a.prefs, i18n.Locale()), OtherLanguages: g.OtherLanguages,
+		TaskPrompt: prompt, MainLanguage: session.MainLanguage(a.prefs, i18n.Locale()), OtherLanguages: g.OtherLanguages,
 	}
 	switch feature {
 	case hotkey.Translate:

@@ -7,7 +7,8 @@
 //	       + Input policy    what the input is (speech, a selection, an instruction)
 //	       + [Cleanup]       basic clean-up of speech recognition
 //	       + [Structure]     lists and paragraphs (Transcribe only), or Form: keep it as said
-//	       + Task            the feature's rules, then the user's addition to them
+//	       + Task            what to produce: the feature's prompt, the user's to edit
+//	                         (TaskPrompt; DefaultPrompt is the built-in one)
 //	       + [Scene]         app enhancement: the app and the group's rules (M5)
 //	       + [Glossary]      the dictionary's terms (a dictionary of up to GlossaryAllUpTo), or the rule for a <glossary> block
 //	       + Output contract only the final text
@@ -23,8 +24,11 @@
 // keeps, stay the same from one dictation to the next.
 //
 // The rules are embedded templates in two sets, English and Simplified
-// Chinese, chosen by the user's main language. Variables, in the
-// templates and in the user's own prompts: {{USER_MAIN_LANGUAGE}},
+// Chinese, chosen by the user's main language. Only the Task layer is the
+// user's: what the app needs to work (the input policy, the switches'
+// layers, the scene, the glossary, the output contract with the target
+// language and Simplified Chinese) stays the app's. Variables, in the
+// templates and in the user's prompts: {{USER_MAIN_LANGUAGE}},
 // {{USER_OTHER_LANGUAGES}}, {{TARGET_LANGUAGE}}, {{APP_NAME}};
 // "{{#if NAME}}…{{/if}}" keeps its text only when NAME is not empty.
 //
@@ -97,8 +101,9 @@ type Input struct {
 	// Transcribe).
 	Cleanup   bool
 	Structure bool
-	// TaskPrompt is the user's addition to the task's rules
-	// (settings.Feature.Prompt); "" for none.
+	// TaskPrompt is the feature's task prompt as the user edited it
+	// (settings.Feature.Prompt), which replaces the built-in one
+	// (DefaultPrompt); "" for the built-in one.
 	TaskPrompt string
 	// Scene is the matched app enhancement group; nil for none.
 	Scene *Scene
@@ -274,7 +279,7 @@ func Build(in Input) (Output, error) {
 		} else {
 			add("form", render("form", nil))
 		}
-		add("task", render("task-transcribe", nil))
+		add(task(in, render))
 	case Translate:
 		if in.Selected {
 			add("selection", render("input-selection", nil))
@@ -285,7 +290,7 @@ func Build(in Input) (Output, error) {
 			}
 			add("form", render("form", nil))
 		}
-		add("task", render("task-translate", nil))
+		add(task(in, render))
 		if in.Strict {
 			add("strict", render("strict", nil))
 		}
@@ -298,17 +303,10 @@ func Build(in Input) (Output, error) {
 		if in.Cleanup {
 			add("cleanup", render("cleanup-instruction", nil))
 		}
-		if selected {
-			add("task", render("task-rewrite", nil))
-		} else {
-			add("task", render("task-generate", nil))
-		}
+		add(task(in, render))
 		if len(in.Previous) > 0 {
 			add("followup", render("followup", nil))
 		}
-	}
-	if p := strings.TrimSpace(in.TaskPrompt); p != "" {
-		add("custom", render("custom", map[string]string{"TASK_PROMPT": Render(p, vars, nil)}))
 	}
 	if s := in.Scene; s != nil && strings.TrimSpace(s.AppName) != "" {
 		add("scene", render("scene", map[string]string{"SCENE_PROMPT": Render(strings.TrimSpace(s.Prompt), vars, nil)}))
@@ -350,6 +348,35 @@ func Build(in Input) (Output, error) {
 		}
 	}
 	return out, nil
+}
+
+// task is the Task layer: the user's prompt (layer "custom"), else the
+// built-in one. The user's prompt sees the public variables only, not the
+// templates' switches.
+func task(in Input, render func(string, map[string]string) string) (layer, text string) {
+	if p := strings.TrimSpace(in.TaskPrompt); p != "" {
+		return "custom", Render(p, Variables(in, TemplateSet(in.MainLanguage)), nil)
+	}
+	return "task", render("task-"+string(in.Task), nil)
+}
+
+// DefaultPrompt is task's built-in prompt in template set set, as the
+// user edits it: with its variables ("{{TARGET_LANGUAGE}}"), unfilled.
+// "" for an unknown task.
+func DefaultPrompt(task Task, set string) string {
+	switch task {
+	case Transcribe, Translate, Rewrite:
+		return template(set, "task-"+string(task))
+	}
+	return ""
+}
+
+// IsDefault says whether prompt is task's built-in prompt in either set
+// (or blank): the settings keep "" for it, so that it follows the main
+// language and later versions' wording.
+func IsDefault(task Task, prompt string) bool {
+	p := strings.TrimSpace(prompt)
+	return p == "" || p == DefaultPrompt(task, English) || p == DefaultPrompt(task, Chinese)
 }
 
 // withGlossary is a user message msg after the glossary block, if any.
@@ -416,6 +443,18 @@ func Variables(in Input, set string) map[string]string {
 // VariableNames are the variables a user's prompt may use, for the
 // feature pages.
 var VariableNames = []string{"USER_MAIN_LANGUAGE", "USER_OTHER_LANGUAGES", "TARGET_LANGUAGE", "APP_NAME"}
+
+// TaskVariables are the variables task's prompt can use: TARGET_LANGUAGE
+// is Translate's only.
+func TaskVariables(task Task) []string {
+	var out []string
+	for _, v := range VariableNames {
+		if v != "TARGET_LANGUAGE" || task == Translate {
+			out = append(out, v)
+		}
+	}
+	return out
+}
 
 var ifBlock = regexp.MustCompile(`(?s)\{\{#if ([A-Z_]+)\}\}(.*?)\{\{/if\}\}`)
 

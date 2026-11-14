@@ -156,6 +156,7 @@ func (b *Backend) params(req llm.Request) (wire.ChatParams, error) {
 	if req.MaxTokens > 0 {
 		p.MaxTokens = req.MaxTokens
 	}
+	b.rt.Tuning(b.profile.ID).apply(&p) // the user's, over the profile's
 	p.PrefillStepSize = b.profile.PrefillStepSize(chars)
 	if req.Seed != nil {
 		seed := uint64(*req.Seed)

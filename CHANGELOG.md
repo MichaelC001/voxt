@@ -16,6 +16,8 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 - **Show icon in Dock** (off by default); closing the window keeps VoxtMini running with either icon.
 - Notifications when a download finishes or fails while the window is not in front; a Microphone submenu in the menu bar; reorder microphones by dragging them.
 - Announcements from actnow.dev, shown once as notifications.
+- **One editable prompt per feature**, in place of "Your rules": Transcribe's clean-up, Translate and Rewrite each show their prompt, to change as you like, with variables to insert and Reset to default. The input, the dictionary, App enhancement's scene and the output format stay VoxtMini's (see "Show the full prompt"). Rules you had written are kept, added to the end of the prompt.
+- **Generation parameters for local language models** under Models → Advanced: temperature, top-p, max output tokens and repetition penalty, per model; empty keeps VoxtMini's tuned values.
 
 ### Changed
 
@@ -45,6 +47,8 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 - **在程序坞中显示图标**（默认关）；关掉窗口后，无论显示哪个图标，VoxtMini 都继续运行。
 - 窗口不在前台时，下载完成或失败会发系统通知；菜单栏里有麦克风子菜单；拖动即可调整麦克风顺序。
 - 来自 actnow.dev 的公告，以通知的形式各显示一次。
+- **每个功能一份可编辑的提示词**，取代“你的规则”：转录的整理、翻译和转写各自显示提示词，可以随意修改，可以插入变量，也可以恢复默认。输入说明、词典、应用增强的场景和输出格式仍由 VoxtMini 负责（见“查看完整提示词”）。你写过的规则会保留，接在提示词末尾。
+- **本地语言模型的生成参数**，在模型 → 高级里：温度、Top-p、最大输出 token 数和重复惩罚，按模型设置；留空则使用 VoxtMini 调好的值。
 
 #### 变更
 

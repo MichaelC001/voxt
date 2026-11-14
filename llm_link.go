@@ -56,6 +56,7 @@ func (a *app) llmRuntime() *llmrt.Runtime {
 			OnModel: a.modelEvents(workerLLM), BeforeLoad: a.beforeLoad(), // family_runtime.go
 			OnPace: a.onPace(), // memory_notice.go
 		})
+		a.llmrt.SetTuning(llmTunings(a.keepSetting())) // models_llm_params.go
 	}
 	return a.llmrt
 }

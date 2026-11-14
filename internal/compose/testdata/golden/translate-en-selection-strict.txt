@@ -13,7 +13,7 @@ Task: translate the text into Simplified Chinese.
 
 Strict: an earlier answer came back in the source language. Write the whole answer in Simplified Chinese and do not copy the source's sentences; only names, code, URLs and numbers stay as written.
 
-Output: only the translation, without quotes, labels, notes, the source text or <input> tags. If there is nothing to translate, return an empty string.
+Output: only the translation into Simplified Chinese, without quotes, labels, notes, the source text or <input> tags. If there is nothing to translate, return an empty string.
 
 ---- user ----
 <input>

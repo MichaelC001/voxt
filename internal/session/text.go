@@ -3,7 +3,9 @@ package session
 import (
 	"slices"
 	"strings"
+	"unicode"
 
+	"github.com/hehehai/VoxtMini/internal/compose"
 	"github.com/hehehai/VoxtMini/internal/lang"
 	"github.com/hehehai/VoxtMini/internal/settings"
 )
@@ -37,6 +39,35 @@ func MainLanguage(s settings.Settings, locale string) string {
 		return m
 	}
 	return lang.Canonical(locale)
+}
+
+// MergeRules makes each feature's task prompt of version 4's rules
+// (settings.Feature.Rules, "Your rules"): the built-in prompt with the
+// rules after it, so that nothing the user wrote is lost and the prompt
+// still does what it did. The set is the main language's; without one,
+// Chinese when the rules are written in Chinese. The app runs it once
+// over the stored settings, as ScopeLanguages.
+func MergeRules(s *settings.Settings) {
+	for task, f := range map[compose.Task]*settings.Feature{
+		compose.Transcribe: &s.Features.Transcribe.Feature,
+		compose.Translate:  &s.Features.Translate.Feature,
+		compose.Rewrite:    &s.Features.Rewrite.Feature,
+	} {
+		rules := strings.TrimSpace(f.Rules)
+		f.Rules = ""
+		if rules == "" {
+			continue
+		}
+		main := s.General.MainLanguage
+		if main == "" && strings.ContainsFunc(rules, func(r rune) bool { return unicode.Is(unicode.Han, r) }) {
+			main = lang.Chinese
+		}
+		base := strings.TrimSpace(f.Prompt)
+		if base == "" {
+			base = compose.DefaultPrompt(task, compose.TemplateSet(main))
+		}
+		f.Prompt = base + "\n\n" + rules
+	}
 }
 
 // ScopeLanguages keeps the settings' languages to VoxtMini's three

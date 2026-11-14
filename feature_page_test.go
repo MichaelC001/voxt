@@ -11,6 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/hehehai/VoxtMini/internal/asr"
+	"github.com/hehehai/VoxtMini/internal/compose"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
 	"github.com/hehehai/VoxtMini/internal/hotkey"
 	"github.com/hehehai/VoxtMini/internal/i18n"
@@ -46,7 +47,7 @@ func TestTranscribePageRenders(t *testing.T) {
 		"Paste the last result", "⌃⌥V",
 		"Models", "No speech model installed.", "Open Models",
 		"Clean-up", "Clean up with a language model", "Basic clean-up", "Structure",
-		"Your rules", "{{USER_MAIN_LANGUAGE}}", "{{APP_NAME}}", "Show the full prompt",
+		"Prompt", "{{USER_MAIN_LANGUAGE}}", "{{APP_NAME}}", "Show the full prompt",
 		"Try it", "Start",
 	} {
 		if !has(tt, s) {
@@ -216,32 +217,49 @@ func TestTranscribeServicesAndSwitches(t *testing.T) {
 	}
 }
 
-func TestTranscribeRules(t *testing.T) {
+// TestTranscribePrompt: the editor shows the built-in prompt; an edit
+// replaces it and is saved when the field loses focus; a variable goes in
+// at the caret; Reset brings the built-in one back (saved as "").
+func TestTranscribePrompt(t *testing.T) {
 	a, tt := trTester(t)
-	click(t, tt, "Your rules for Transcribe")
-	tt.Type("Write {{USER_MAIN_LANGUAGE}} numbers as digits.")
+	u := a.fui(hotkey.Transcribe)
+	def := compose.DefaultPrompt(compose.Transcribe, compose.English)
+	if frames(tt); u.prompt != def {
+		t.Fatalf("editor %q", u.prompt)
+	}
+	click(t, tt, "Prompt for Transcribe")
+	tt.Key(ui.Ctrl, ui.KeyEnd)
+	tt.Type(" Write numbers as digits in ")
 	frames(tt)
-	if !a.fui(hotkey.Transcribe).promptDirty {
+	if !u.promptDirty {
 		t.Fatal("not dirty after typing")
 	}
-	// Leaving the field saves it.
-	click(t, tt, "Show the full prompt")
-	if p := a.lib.settings.Get().Features.Transcribe.Prompt; p != "Write {{USER_MAIN_LANGUAGE}} numbers as digits." {
+	click(t, tt, "Insert {{USER_MAIN_LANGUAGE}}") // leaves the field: saved, then the variable at the caret
+	want := def + " Write numbers as digits in {{USER_MAIN_LANGUAGE}}"
+	if p := a.lib.settings.Get().Features.Transcribe.Prompt; p != want {
 		t.Fatalf("prompt %q", p)
 	}
-	// The preview has the rules, with the variable filled in.
-	if !a.fui(hotkey.Transcribe).preview || !strings.Contains(strings.Join(tt.Texts(), "\n"), "Write English numbers as digits.") {
+	// The preview has the prompt, with the variable filled in, and the
+	// app's output contract after it.
+	click(t, tt, "Show the full prompt")
+	text := strings.Join(tt.Texts(), "\n")
+	if !strings.Contains(text, "Write numbers as digits in English") || !strings.Contains(text, "Output: only the final text") {
 		t.Errorf("preview: %q", tt.Texts())
 	}
-	click(t, tt, "Reset your rules")
-	if p := a.lib.settings.Get().Features.Transcribe.Prompt; p != "" || a.fui(hotkey.Transcribe).prompt != "" {
-		t.Fatalf("reset: %q %q", p, a.fui(hotkey.Transcribe).prompt)
+	click(t, tt, "Reset to default")
+	if p := a.lib.settings.Get().Features.Transcribe.Prompt; p != "" || u.prompt != def {
+		t.Fatalf("reset: %q %q", p, u.prompt)
 	}
-	// A change elsewhere shows.
+	// A change elsewhere shows; the built-in prompt follows the main language.
 	a.updateSettings(func(s *settings.Settings) { s.Features.Transcribe.Prompt = "Be brief." })
 	frames(tt)
-	if a.fui(hotkey.Transcribe).prompt != "Be brief." {
-		t.Errorf("not set from the settings: %q", a.fui(hotkey.Transcribe).prompt)
+	if u.prompt != "Be brief." {
+		t.Errorf("not set from the settings: %q", u.prompt)
+	}
+	a.updateSettings(func(s *settings.Settings) { s.Features.Transcribe.Prompt, s.General.MainLanguage = "", "zh" })
+	frames(tt)
+	if u.prompt != compose.DefaultPrompt(compose.Transcribe, compose.Chinese) {
+		t.Errorf("main language: %q", u.prompt)
 	}
 }
 

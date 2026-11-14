@@ -35,6 +35,8 @@ type Runtime struct {
 	heldBytes int64
 	work      int
 	tracker   resident.Tracker
+	// tunings are the user's overrides by model id (SetTuning).
+	tunings map[string]Tuning
 }
 
 // New returns a Runtime for cfg.

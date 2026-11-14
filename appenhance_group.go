@@ -92,7 +92,7 @@ func (a *app) aeScene(c *ui.Context, g appctx.Group) {
 	t := c.Theme()
 	k := tok(t)
 	p := &a.aePage
-	sectionTitleTip(c, i18n.T("Scene prompt"), i18n.T("Added on top of the features' basic clean-up and your rules, never instead of them: say what is special here (tone, format, names)."))
+	sectionTitleTip(c, i18n.T("Scene prompt"), i18n.T("Added on top of the features' prompts, never instead of them: say what is special here (tone, format, names)."))
 	in := ui.TextArea(c.Key("ae-prompt"), &p.prompt).Label(i18n.T("Scene prompt of the group")).
 		Placeholder(i18n.T("For example: this is a team chat; keep it short and casual, no greetings or sign-offs.")).MinHeight(px(t, 88))
 	if in.Changed() {

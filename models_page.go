@@ -72,6 +72,9 @@ type modelsState struct {
 	modelAdvanced bool
 	modelKeepSel  string
 	modelKeepFor  string
+	// llmForm is the language models' parameters as typed
+	// (models_llm_params.go).
+	llmForm llmParamsForm
 
 	// presetSel is the shortcut presets' select (settings_shortcuts.go).
 	presetSel string

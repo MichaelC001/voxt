@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -568,5 +569,44 @@ func TestSimplifiedRule(t *testing.T) {
 		if got != c.want {
 			t.Errorf("%s %s: the rule %v", c.in.Task, c.in.MainLanguage, got)
 		}
+	}
+}
+
+// TestTaskPrompt: the user's prompt replaces the Task layer, with the
+// public variables filled; the built-in one is DefaultPrompt; the app's
+// layers (output contract, target language, Simplified Chinese) stay.
+func TestTaskPrompt(t *testing.T) {
+	for _, task := range []Task{Transcribe, Translate, Rewrite} {
+		for _, set := range []string{English, Chinese} {
+			d := DefaultPrompt(task, set)
+			if d == "" || strings.Contains(d, "{{#if") || !IsDefault(task, "\n"+d+" ") {
+				t.Errorf("%s/%s default %q", task, set, d)
+			}
+		}
+		if IsDefault(task, "Write tersely.") || !IsDefault(task, " ") {
+			t.Errorf("%s: IsDefault", task)
+		}
+	}
+	if DefaultPrompt("x", English) != "" {
+		t.Error("unknown task")
+	}
+	in := Input{Task: Translate, MainLanguage: "zh", TargetLanguage: "en", Text: "你好", TaskPrompt: "只译成{{TARGET_LANGUAGE}}，{{#if SELECTED}}x{{/if}}保持简短。"}
+	out, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(out.Layers, "custom") || slices.Contains(out.Layers, "task") || !strings.Contains(out.System, "只译成英语，保持简短。") ||
+		strings.Contains(out.System, "全部翻译") || !strings.Contains(out.System, "只输出英语译文") {
+		t.Errorf("layers %v\n%s", out.Layers, out.System)
+	}
+	// Rewrite has one task prompt for a selection and for writing anew.
+	a, _ := Build(Input{Task: Rewrite, MainLanguage: "en", Instruction: "shorter", Text: "some text"})
+	b, _ := Build(Input{Task: Rewrite, MainLanguage: "en", Instruction: "a reply"})
+	d := DefaultPrompt(Rewrite, English)
+	if !strings.Contains(a.System, d) || !strings.Contains(b.System, d) {
+		t.Error("rewrite's task prompt")
+	}
+	if !slices.Equal(TaskVariables(Translate), VariableNames) || slices.Contains(TaskVariables(Rewrite), "TARGET_LANGUAGE") {
+		t.Error("TaskVariables")
 	}
 }
