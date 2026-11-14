@@ -47,7 +47,7 @@ On mac-air, from the persistent models and runtimes:
 ```sh
 # the whole eval, about 37 minutes; tables in build/eval (asr.md, llm.md, glossary.md, long.md, rewrite.md)
 MAC_DIR=code/VoxtMini-xyz scripts/mac.sh 'VOXTMINI_EVAL=1 VOXTMINI_OMNI_RUNTIME=$HOME/voxtmini-runtime/omni \
-  VOXTMINI_LLM=$HOME/voxtmini-runtime/llm/voxtmini-llm VOXTMINI_EVAL_OUT=build/eval go test -count=1 -timeout 2h -run TestEval -v .'
+  VOXTMINI_LLM=$HOME/voxtmini-runtime/llm/voxtmini-llm VOXTMINI_EVAL_OUT=build/eval go test -count=1 -timeout 2h -run TestEval -v ./app'
 # quick: a clip of each kind, checked against floors (part of scripts/mac-regress.sh)
 … VOXTMINI_EVAL_QUICK=1 …
 # some clips only

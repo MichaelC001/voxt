@@ -41,7 +41,7 @@ VoxtMini is a Go app on [MyGo](https://github.com/egoist/mygo) (native macOS UI 
 ```sh
 CGO_ENABLED=0 go test ./...          # everything; runs on Linux
 go tool mygo vet .                   # go vet and MyGo's UI-lifetime checks
-VOXTMINI_SNAPSHOTS=/tmp/shots go test -run TestSnapshots .   # every page as PNG, light/dark, en/zh-Hans
+VOXTMINI_SNAPSHOTS=/tmp/shots go test -run TestSnapshots ./app   # every page as PNG, light/dark, en/zh-Hans
 cd helper && swift test              # the Swift helper (on a Mac), against the same protocol fixtures
 scripts/build-llm.sh --test          # voxtmini-llm's Swift tests (on a Mac)
 scripts/mac.sh scripts/mac-e2e.sh    # headless Mac tests: the real helper, fake models

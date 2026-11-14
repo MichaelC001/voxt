@@ -25,7 +25,7 @@ CGO_ENABLED=0 go test ./...                                  # all tests (Linux 
 go tool mygo vet .                                           # go vet and MyGo's UI checks
 git ls-files '*.go' ':!:third_party/**' | xargs gofmt -l    # must print nothing
 go test -run TestKeyParity ./internal/i18n                   # strings and zh-Hans
-VOXTMINI_SNAPSHOTS=/tmp/shots go test -run TestSnapshots .   # every page as PNG
+VOXTMINI_SNAPSHOTS=/tmp/shots go test -run TestSnapshots ./app   # every page as PNG
 cd helper && swift test                                      # the Swift helper (on a Mac)
 scripts/build-helper.sh && scripts/build-llm.sh && go tool mygo build   # build the app (on a Mac)
 scripts/release.sh                                           # the release build, runtimes inside (docs/release.md)

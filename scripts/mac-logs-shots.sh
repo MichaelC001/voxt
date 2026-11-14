@@ -39,7 +39,7 @@ app="$out/VoxtMiniLogsCheck.app"
 rm -rf "$out"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 echo "== build"
-nice -n 10 go build -tags logscheck -o "$app/Contents/MacOS/VoxtMiniLogsCheck" .
+nice -n 10 go build -tags logscheck -o "$app/Contents/MacOS/VoxtMiniLogsCheck" ./app
 swiftc -O scripts/logs-shots/drive.swift -o "$out/drive"
 # The store's SQLite, which mygo build puts in an app: from a built one.
 for lib in "$HOME"/code/VoxtMini*/build/darwin-arm64/VoxtMini.app/Contents/Resources/libmygo-sqlite3.dylib \

@@ -113,14 +113,14 @@ dev_llm="llm.balanced=$(snap llm.balanced),llm.fast=$(snap llm.fast),llm.transla
 step helper-build 'built|helper' scripts/build-helper.sh --out "$OUT/helper"
 step helper-swift-test 'Executed .* tests' bash -c 'cd helper && swift test -j 2'
 step omni-e2e 'MEASURE asr.accurate live|^(ok|FAIL)' env VOXTMINI_MAC_E2E=1 VOXTMINI_OMNI_MODELS="$omni_models" \
-  go test -count=1 -run TestMacE2EOmni -v .
+  go test -count=1 -run TestMacE2EOmni -v ./app
 step llm-real '^(ok|FAIL)' env VOXTMINI_LLM_REAL=1 VOXTMINI_DEV_LLM="$dev_llm" \
-  go test -count=1 -timeout 30m -run 'TestLLM' -v .
+  go test -count=1 -timeout 30m -run 'TestLLM' -v ./app
 if ((FULL)); then
-  step eval-full '^(ok|FAIL)' env VOXTMINI_EVAL=1 VOXTMINI_EVAL_OUT="$OUT/eval" go test -count=1 -timeout 2h -run 'TestEval' -v .
+  step eval-full '^(ok|FAIL)' env VOXTMINI_EVAL=1 VOXTMINI_EVAL_OUT="$OUT/eval" go test -count=1 -timeout 2h -run 'TestEval' -v ./app
 else
   step eval-quick '^(ok|FAIL)' env VOXTMINI_EVAL=1 VOXTMINI_EVAL_QUICK=1 VOXTMINI_EVAL_OUT="$OUT/eval" \
-    go test -count=1 -timeout 1h -run 'TestEval' -v .
+    go test -count=1 -timeout 1h -run 'TestEval' -v ./app
 fi
 
 # The app, with the runtimes inside (APFS clones: no copy on disk).

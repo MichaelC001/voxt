@@ -1,8 +1,8 @@
 // Command testshard runs one package's tests in N processes at once, the
-// tests split so that each process takes about as long: the root package's
+// tests split so that each process takes about as long: the app package's
 // end-to-end tests wait in real time and none of them is parallel, so one
 // process takes a minute where eight take ten seconds. scripts/test-main.sh
-// runs it for the root package.
+// runs it for the app package (app/).
 //
 //	go run ./internal/tools/testshard [-n 8] [-race] [-run RE] [-v] [-times FILE] [-timeout 10m] [PKG]
 //

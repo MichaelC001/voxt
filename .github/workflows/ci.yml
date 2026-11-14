@@ -32,7 +32,7 @@ jobs:
         run: go tool mygo vet .
 
       - name: Vet the update-check build
-        run: go vet -tags updatecheck .
+        run: go vet -tags updatecheck ./app
 
       - name: Vendored MyGo is MyGo and our patches
         run: scripts/vendor-mygo.sh --check
@@ -43,5 +43,5 @@ jobs:
       - name: Tests of internal/...
         run: go test -p 4 ./internal/...
 
-      - name: Tests of the root package (sharded)
+      - name: Tests of the app package (app/, sharded)
         run: scripts/test-main.sh -n 4

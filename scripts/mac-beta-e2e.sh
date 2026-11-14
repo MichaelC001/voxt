@@ -100,7 +100,7 @@ cp helper/Support/Info.plist "$WORK/orig/helper/Support/"
 step "Go modules and the tools (before SSL_CERT_FILE, which trusts the test certificate only)"
 nice -n 10 go mod download
 nice -n 10 go build -o "$WORK/update-server" ./scripts/update-server
-nice -n 10 go build -tags updatecheck -o /dev/null .
+nice -n 10 go build -tags updatecheck -o /dev/null ./app
 
 step "a test key and the feed"
 go tool mygo keygen -o "$WORK/keys" >/dev/null

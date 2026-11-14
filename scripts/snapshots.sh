@@ -36,16 +36,17 @@ tmp="${SNAP_TMP:-/tmp/voxtmini-snapcheck-${USER:-$(id -u)}}"
 sets=(main min home overlay ink)
 
 render() { # render SRC_DIR OUT_DIR
-	local src="$1" out="$2"
+	local src="$1" out="$2" pkg=.
+	[ -d "$src/app" ] && pkg=./app # package main moved into app/; a BASE before that has it at the root
 	rm -rf "$out"
 	mkdir -p "${sets[@]/#/$out/}"
 	echo "rendering $(git -C "$src" rev-parse --short HEAD)$(git -C "$src" diff --quiet HEAD -- . 2>/dev/null || echo '+changes') into $out" >&2
 	run() { (cd "$src" && nice -n 19 env GOMAXPROCS=4 CGO_ENABLED=0 "$@" >&2); }
-	run env VOXTMINI_SNAPSHOTS="$out/main" go test -count=1 -timeout 30m -run 'TestSnapshots' .
-	run env VOXTMINI_SNAPSHOTS="$out/min" VOXTMINI_SNAPSHOTS_SIZE=min go test -count=1 -timeout 30m -run 'TestSnapshots' .
-	run env VOXTMINI_HOME_SHOTS="$out/home" go test -count=1 -timeout 30m -run 'TestHomeSnapshots' .
-	run env VOXTMINI_OVERLAY_SHOTS="$out/overlay" go test -count=1 -timeout 30m -run 'TestOverlayShots' .
-	run env VOXTMINI_INK="$out/ink" go test -count=1 -timeout 30m -run 'TestOverlayInk|TestAnswerCardInk' .
+	run env VOXTMINI_SNAPSHOTS="$out/main" go test -count=1 -timeout 30m -run 'TestSnapshots' "$pkg"
+	run env VOXTMINI_SNAPSHOTS="$out/min" VOXTMINI_SNAPSHOTS_SIZE=min go test -count=1 -timeout 30m -run 'TestSnapshots' "$pkg"
+	run env VOXTMINI_HOME_SHOTS="$out/home" go test -count=1 -timeout 30m -run 'TestHomeSnapshots' "$pkg"
+	run env VOXTMINI_OVERLAY_SHOTS="$out/overlay" go test -count=1 -timeout 30m -run 'TestOverlayShots' "$pkg"
+	run env VOXTMINI_INK="$out/ink" go test -count=1 -timeout 30m -run 'TestOverlayInk|TestAnswerCardInk' "$pkg"
 	echo "$(find "$out" -type f | wc -l) files" >&2
 }
 

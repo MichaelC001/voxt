@@ -120,3 +120,13 @@ func goFiles(t *testing.T) []goFile {
 	}
 	return files
 }
+
+// TestNoGoAtRoot: the module's root holds no Go file; the app (package
+// main) is in app/ (mygo.json "main"), the rest under internal/.
+func TestNoGoAtRoot(t *testing.T) {
+	for _, f := range goFiles(t) {
+		if f.dir() == "." {
+			t.Errorf("%s is at the module's root: move it to app/ (package main) or into internal/", f.path)
+		}
+	}
+}

@@ -38,7 +38,8 @@ import (
 )
 
 // The test binary is also the fake helper (helpertest) and the fake
-// Omni server (omnitest).
+// Omni server (omnitest). The tests run from the module's root
+// (chdirModuleRoot).
 func TestMain(m *testing.M) {
 	if helpertest.Enabled() {
 		helpertest.Main()
@@ -49,6 +50,7 @@ func TestMain(m *testing.M) {
 	if llmrttest.Enabled() {
 		llmrttest.Main()
 	}
+	chdirModuleRoot() // not in the fakes' processes: they run elsewhere
 	os.Exit(runIsolated(m))
 }
 

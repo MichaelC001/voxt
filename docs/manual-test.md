@@ -865,7 +865,7 @@ MAC_DIR=code/VoxtMini-mt scripts/mac.sh scripts/mac-e2e.sh        # 辅助进程
 MAC_DIR=code/VoxtMini-xyz scripts/mac.sh scripts/mac-regress.sh   # 真实模型的回归（10.6），约 5 分钟
 ```
 
-单独跑某一项：`VOXTMINI_MAC_E2E=1 VOXTMINI_HELPER=<辅助进程路径> go test -run 'TestMacHelperReadOnly' -v .`（在 Mac 上执行；辅助进程用 `scripts/build-helper.sh --out DIR` 编译）。真实模型上的单项（`TestMacE2EOmni`、`TestLLM*`、`TestEval*`）的命令见 `mac_e2e_omni_test.go`、`llm_e2e_test.go` 的文件头和 [eval.md](eval.md)。
+单独跑某一项：`VOXTMINI_MAC_E2E=1 VOXTMINI_HELPER=<辅助进程路径> go test -run 'TestMacHelperReadOnly' -v ./app`（在 Mac 上执行；辅助进程用 `scripts/build-helper.sh --out DIR` 编译）。真实模型上的单项（`TestMacE2EOmni`、`TestLLM*`、`TestEval*`）的命令见 `mac_e2e_omni_test.go`、`llm_e2e_test.go` 的文件头和 [eval.md](eval.md)。
 
 **10.2 `mac-e2e.sh` 覆盖了什么**（`mac_e2e_test.go`、`helper/Tests/VoxtMiniHelperKitTests/CaptureFileTests.swift`）
 
