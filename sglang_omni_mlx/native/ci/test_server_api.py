@@ -11,6 +11,7 @@ import http.client
 import io
 import json
 import os
+import secrets
 import subprocess
 import time
 import uuid
@@ -48,7 +49,9 @@ class Server:
         binary: str = "qwen3_asr_server",
         model_kind: str = "qwen3_asr",
         directory: Path | None = None,
+        token: str | None = None,
     ) -> None:
+        self.token = token
         self.process = subprocess.Popen(
             [
                 str(Path(RUNTIME_BIN) / binary),
@@ -57,12 +60,18 @@ class Server:
                 model_kind,
                 "--model-directory",
                 str(directory or model_directory()),
-            ],  # fmt: skip
+            ]
+            + (["--auth-token-fd", "0"] if token else []),  # fmt: skip
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
         )
+        if token:
+            self.process.stdin.write(token + "\n")
+            self.process.stdin.flush()
+        else:
+            pass
         self.ready = json.loads(self.process.stdout.readline())
         self.port = self.ready.get("port")
 
@@ -70,7 +79,12 @@ class Server:
         self, method: str, path: str, body: bytes = b"", headers: dict | None = None
     ):
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=120)
-        connection.request(method, path, body=body, headers=headers or {})
+        headers = dict(headers or {})
+        if self.token:
+            headers.setdefault("Authorization", f"Bearer {self.token}")
+        else:
+            pass
+        connection.request(method, path, body=body, headers=headers)
         response = connection.getresponse()
         return response.status, response.read()
 
@@ -345,6 +359,7 @@ def test_unknown_model_kinds_are_rejected() -> None:
         ("--decode-interval-ms", "0"),
         ("--first-decode-ms", "-1"),
         ("--cache-limit-mb", "-2"),
+        ("--auth-token-fd", "-1"),
     ],
 )
 def test_invalid_realtime_settings_fail_at_startup(flag: str, value: str) -> None:
@@ -362,3 +377,34 @@ def test_invalid_realtime_settings_fail_at_startup(flag: str, value: str) -> Non
     )
     assert completed.returncode == 2
     assert flag in completed.stderr
+
+
+def test_a_token_guards_every_request() -> None:
+    token = secrets.token_hex(32)
+    running = Server(token=token)
+    try:
+        assert running.request("GET", "/health")[0] == 200
+        assert running.request("GET", "/health", headers={"Authorization": ""})[0] == 401
+        assert (
+            running.request(
+                "GET", "/health", headers={"Authorization": f"Bearer {token[:-1]}0"}
+            )[0]
+            == 401
+        )
+        assert running.request("GET", "/health", headers={"Origin": "null"})[0] == 403
+        with pytest.raises(Exception):
+            connect(f"ws://127.0.0.1:{running.port}/v1/realtime").close()
+        with connect(
+            f"ws://127.0.0.1:{running.port}/v1/realtime",
+            additional_headers={"Authorization": f"Bearer {token}"},
+        ) as socket:
+            socket.send(json.dumps({"type": "transcription.done"}))
+            assert json.loads(socket.recv())["type"] == "transcription.completed"
+    finally:
+        running.stop()
+
+
+def test_web_pages_are_refused_without_a_token(server: Server) -> None:
+    assert server.request("GET", "/health", headers={"Origin": "https://a.example"})[0] == 403
+    with pytest.raises(Exception):
+        connect(f"ws://127.0.0.1:{server.port}/v1/realtime", origin="https://a.example").close()

@@ -3,6 +3,8 @@
 
 #include <cstring>
 
+#include "common/guard.h"
+
 namespace omni_server {
 
 void WriteResponse(mg_connection *connection, int status,
@@ -33,7 +35,10 @@ std::string ReadBody(mg_connection *connection) {
   std::string body;
   char buffer[65536];
   int read = 0;
-  while ((read = mg_read(connection, buffer, sizeof(buffer))) > 0) {
+  // Note (VoxtMini): BeginRequest refused larger bodies already; a body that
+  // still grows past the cap stops there, and its truncated form is refused.
+  while (body.size() <= static_cast<size_t>(kMaxBodyBytes) &&
+         (read = mg_read(connection, buffer, sizeof(buffer))) > 0) {
     body.append(buffer, static_cast<size_t>(read));
   }
   return body;

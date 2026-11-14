@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to VoxtMini. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/). Each version's section is what the update window and actnow.dev show: English first, then the same in Chinese under `### 中文`, with `####` headings below it (docs/release.md §2.1).
+All notable changes to VoxtMini. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/). Each version's section is what the update window and actnow.dev show: English first, then the same in Chinese under `### 中文`, with `####` headings below it (docs/release.md, "Publishing a version"; `scripts/actnow-publish.sh` splits the notes at the first Chinese heading).
 
 ## [Unreleased]
 
@@ -68,16 +68,6 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [0.1.0-beta.2] - 2026-10-27
 
-### Changed
-
-- VoxtMini now has a standalone public repository with its pinned Omni MLX runtime source included. Existing VoxtNew installs keep their app identity, ActNow registration, and update feed.
-
-### 中文
-
-#### 变更
-
-- VoxtMini 现在有独立的公开仓库，并附带固定版本的 Omni MLX 运行时源码。已安装的 VoxtNew 保留原有 app 身份、ActNow 注册和更新源。
-
 ### Added
 
 - History entries have a context menu: right-click (or Control-click) one to copy its result or its recognised text, show its details, show its recording in Finder, or delete it. Home's recent results have the same menu. In History a selected entry also takes ⌘C (copy) and Delete.
@@ -92,6 +82,7 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ### Changed
 
+- VoxtMini now has a standalone public repository with its pinned Omni MLX runtime source included. Existing VoxtNew installs keep their app identity, ActNow registration, and update feed.
 - **Models are kept in ~/Library/Application Support/ActNow/models**, shared with the other ActNow apps, instead of the Hugging Face cache (~/.cache/huggingface), which cleaning tools treat as a cache. Models already there are brought over at the first start without downloading them again (hard links: the cache stays as it is). Time Machine leaves models out; Settings → Storage → "Back up models with Time Machine" turns it on for all ActNow apps.
 - The note of which output device VoxtMini muted is kept in Application Support instead of ~/Library/Caches, so that a cache cleaner run after a crash cannot leave your speakers muted.
 - With a dictionary of more than 30 terms, clean-up, translation and rewriting answer sooner: the first words come 1.4–1.9 s sooner on the balanced language model and 0.7 s on the fast one. The terms that a dictation mentions now go with the dictation instead of changing the model's instructions each time.
@@ -122,6 +113,7 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 #### 变更
 
+- VoxtMini 现在有独立的公开仓库，并附带固定版本的 Omni MLX 运行时源码。已安装的 VoxtNew 保留原有 app 身份、ActNow 注册和更新源。
 - **模型放在 ~/Library/Application Support/ActNow/models**，与其他 ActNow app 共用，不再放在会被清理工具当成缓存的 Hugging Face 缓存（~/.cache/huggingface）里。那里已有的模型在首次启动时直接拿过来（硬链接，原缓存不动），不用重新下载。Time Machine 默认不备份模型，可在 设置 → 存储 →“用 Time Machine 备份模型”中为所有 ActNow app 打开。
 - VoxtMini 静音了哪个输出设备的记录改放在 Application Support，不再放在 ~/Library/Caches，崩溃后即使清理了缓存，扬声器也不会一直静音。
 - 词典超过 30 条时，整理、翻译和转写更快开始输出：均衡语言模型快 1.4–1.9 秒，快速模型约快 0.7 秒。口述里提到的词条现在随口述一起发给模型，不再每次改动模型的指令。

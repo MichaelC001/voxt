@@ -113,9 +113,10 @@ The Omni native runtime (VoxtMini.app/Contents/Resources/omni)
   beside it:
   - MLX 0.32.3 (libmlx.dylib, libjaccl.dylib, mlx.metallib), Copyright
     2023 Apple Inc., MIT (LICENSES/omni/mlx.LICENSE.txt)
-  - CivetWeb 1.16, Copyright 2013-2021 the CivetWeb developers, 2004-2013
-    Sergey Lyubka, MIT (LICENSES/omni/civetweb.LICENSE.md; only its own
-    licence applies: none of the optional parts it lists is built)
+  - CivetWeb 1.16 + 270 commits (master d110e87), Copyright 2013-2025
+    the CivetWeb developers, 2004-2013 Sergey Lyubka, MIT
+    (LICENSES/omni/civetweb.LICENSE.md; only its own licence applies:
+    none of the optional parts it lists is built)
   - JSON for Modern C++ 3.11.3, Copyright 2013-2022 Niels Lohmann, MIT
     (LICENSES/omni/nlohmann_json.LICENSE.txt)
   - PCRE2 10.44, Copyright University of Cambridge and the PCRE2

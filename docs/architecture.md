@@ -82,7 +82,9 @@ github.com/hehehai/VoxtMini
 │   │                     omni and llmrt report them, the app writes the family's runtime file
 │   ├── omni/             the Omni native MLX servers (M1): Runtime (one server per model: qwen3_asr_server,
 │   │                     whisper_server; a binary per family, Spec.Server, servers.go; ErrNoServer;
-│   │                     ready line, start timeout, idle unload (SetIdleTimeout), Unload, restart after death,
+│   │                     ready line, a token per launch on stdin (--auth-token-fd 0, Authorization: Bearer;
+│   │                     the native guard also refuses Origin and oversized bodies: native/LOCAL_CHANGES.md),
+│   │                     start timeout, idle unload (SetIdleTimeout), Unload, restart after death,
 │   │                     stall kill, Close; OnModel, BeforeLoad), ASR (asr.FileTranscriber + asr.Streamer: Voxt's
 │   │                     Qwen3-ASR Final policy, the /v1/realtime preview; file-only servers without it:
 │   │                     Caps.Stream false, Whisper's policy in models_whisper.go; WithVAD), VAD
@@ -387,7 +389,7 @@ Not taken: jobs, hub (downloads), catalog, licence, engine's MLX side, services,
 | Swift helper | `scripts/mac.sh 'cd helper && swift test'` | the wire types against helper/Fixtures (the same lines the Go tests decode), the hotkey recognizer, the PCM framer; `scripts/mac-regress.sh` runs it on mac-air (CI is Linux only) |
 | Mac checks | `scripts/mac.sh 'VOXTMINI_MAC=1 go test -run "TestNative|TestActivate|TestPlay|TestSystemProxies" -v ./internal/permission ./internal/macx'` | the permission calls, activation, the recording's sounds, the system's proxies (as `scutil --proxy` shows them) |
 | System proxy (M4) | `scripts/mac.sh 'env -u https_proxy -u http_proxy -u HTTPS_PROXY -u HTTP_PROXY -u ALL_PROXY -u all_proxy VOXTMINI_MODELS_REAL=1 go test -count=1 -v -run TestRealSystemProxy .'` | the VAD from huggingface.co alone, every request through the system's proxy (mac-air: 127.0.0.1:7897) |
-| Packaged app | `scripts/mac.sh 'scripts/build-helper.sh && scripts/build-llm.sh && go tool mygo build'` | the helper and voxtmini-llm (mygo.json's `helperEntitlements` name it), then the app; signing during development: README |
+| Packaged app | `scripts/mac.sh 'scripts/build-helper.sh && scripts/build-llm.sh && go tool mygo build'` | the helper and voxtmini-llm (mygo.json's `helperEntitlements` name it), then the app; signing during development: [development.md](development.md#signing-during-development) |
 | Release build | `scripts/mac.sh 'scripts/release.sh --runtimes $HOME/voxtmini-runtime'`; `scripts/mac-sign-e2e.sh` | the helper, the Omni runtime and voxtmini-llm inside the app, checked by `release-verify.sh` (every nested binary signed, the runtimes start from the bundle); signed with a throwaway identity: the hardened runtime and timestamps everywhere ([release.md](release.md)) |
 | CI | `.github/workflows/ci.yml` | on pushes to main and pull requests, on Linux: MyGo vet, the update-check build's vet, `vendor-mygo.sh --check`, `scripts/lint.sh`, the Go tests (the root package through `scripts/test-main.sh`). The release build is `release.yml` (a tag, on macOS) |
 | Dead code | `scripts/lint.sh` | staticcheck's U1000 and `deadcode -test` (pinned, `go run`) must print nothing: delete what nothing uses; code only tests need goes in `_test.go` files |

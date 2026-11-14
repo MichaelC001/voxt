@@ -18,6 +18,7 @@
 
 #include "civetweb.h"
 #include "common/audio.h"
+#include "common/guard.h"
 #include "common/http.h"
 #include "nlohmann/json.hpp"
 #include "qwen3_asr/worker.h"
@@ -210,6 +211,10 @@ int SocketData(mg_connection *connection, int bits, char *data, size_t length,
     return 1;
   } else {
   }
+  if (!omni_server::FitsSocketMessage(socket->fragments.size(), length)) {
+    return 0;
+  } else {
+  }
   socket->fragments.append(data, length);
   if ((bits & 0x80) == 0) {
     return 1;
@@ -270,6 +275,7 @@ struct Arguments {
   std::string host = "127.0.0.1";
   int port = 0;
   bool supervised = false;
+  std::string token; // --auth-token-fd's; empty: none required
 };
 
 // The kind the last --model-kind names, the first by default; nullptr for
@@ -298,6 +304,17 @@ const ServedKind *NamedKind(int argc, char **argv,
     }
   }
   return nullptr;
+}
+
+// --auth-token-fd's descriptor; -1 (which ReadToken refuses) for a value
+// that is not one.
+int Descriptor(const std::string &text) {
+  if (text.empty() || text.size() > 4 ||
+      text.find_first_not_of("0123456789") != std::string::npos) {
+    return -1;
+  } else {
+  }
+  return std::stoi(text);
 }
 
 std::string KindNames(const std::vector<ServedKind> &kinds) {
@@ -343,6 +360,8 @@ Arguments ParseArguments(int argc, char **argv,
       arguments.port = std::stoi(value());
     } else if (flag == "--supervised") {
       arguments.supervised = true;
+    } else if (flag == "--auth-token-fd") {
+      arguments.token = omni_server::ReadToken(Descriptor(value()));
     } else if (flag == "--model-kind") {
       value(); // Note (khazic): NamedKind already read it.
     } else if (flag == "--startup-timeout-s") {
@@ -539,7 +558,11 @@ int Serve(int argc, char **argv, const std::vector<ServedKind> &kinds) {
                            "websocket_timeout_ms",
                            "3600000",
                            nullptr};
+  // Note (VoxtMini): the guard checks every request, WebSocket upgrades
+  // included, before a handler sees it.
+  omni_server::SetToken(arguments.token);
   mg_callbacks callbacks{};
+  callbacks.begin_request = omni_server::BeginRequest;
   mg_context *context = mg_start(&callbacks, &state, options);
   if (context == nullptr) {
     if (arguments.supervised) {

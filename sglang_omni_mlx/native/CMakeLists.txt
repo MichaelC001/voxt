@@ -42,7 +42,10 @@ set(CIVETWEB_INSTALL_EXECUTABLE OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
   civetweb
   GIT_REPOSITORY https://github.com/civetweb/civetweb.git
-  GIT_TAG d7ba35bbb649209c66e582d5a0244ba988a15159 # v1.16
+  # Note (VoxtMini): master past v1.16 (no release since): it fixes
+  # CVE-2025-55763 (the URI redirect's heap overflow, PR #1347) and the
+  # WebSocket payload's allocation (d110e87). LOCAL_CHANGES.md.
+  GIT_TAG d110e8731c6aa0fcd04504deb449bdb773cfb9da # v1.16-270
   EXCLUDE_FROM_ALL)
 set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(nlohmann_json pcre2 civetweb)
@@ -87,7 +90,7 @@ target_include_directories(sortformer PUBLIC src)
 target_link_libraries(sortformer PUBLIC qwen3_asr)
 target_compile_options(sortformer PUBLIC ${MLX_CXX_FLAGS} PRIVATE -Wall -Wextra)
 
-add_library(asr_service STATIC src/qwen3_asr/asr_service.cpp src/common/http.cpp)
+add_library(asr_service STATIC src/qwen3_asr/asr_service.cpp src/common/http.cpp src/common/guard.cpp)
 target_link_libraries(asr_service PUBLIC qwen3_asr civetweb-c-library)
 target_compile_options(asr_service PRIVATE -Wall -Wextra)
 

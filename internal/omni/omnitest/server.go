@@ -3,6 +3,7 @@ package omnitest
 import (
 	"bufio"
 	"context"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -44,6 +45,26 @@ func Main() {
 			os.Exit(2)
 		}
 	}
+	fd := arg(args, "--auth-token-fd")
+	if fd != "" && (o.Older || o.NoToken) {
+		fmt.Fprintln(os.Stderr, "unknown argument --auth-token-fd")
+		os.Exit(2)
+	}
+	if fd != "" && fd != "0" {
+		fmt.Fprintln(os.Stderr, "--auth-token-fd must be an open file descriptor: Bad file descriptor")
+		os.Exit(2)
+	}
+	stdin := bufio.NewScanner(os.Stdin)
+	token := ""
+	if fd != "" {
+		if stdin.Scan() {
+			token = stdin.Text()
+		}
+		if len(token) < 32 {
+			fmt.Fprintln(os.Stderr, "--auth-token-fd must give a token of 32 to 512 characters")
+			os.Exit(2)
+		}
+	}
 	// A file-only server (whisper_server and its siblings) serves one kind
 	// and refuses the live preview's flags, as the real ones do.
 	bin := filepath.Base(os.Args[0])
@@ -56,7 +77,7 @@ func Main() {
 		for i := 0; i < len(args); i++ {
 			switch args[i] {
 			case "--supervised":
-			case "--model-kind", "--model-directory", "--model-path", "--host", "--port", "--startup-timeout-s", "--model-name":
+			case "--model-kind", "--model-directory", "--model-path", "--host", "--port", "--startup-timeout-s", "--model-name", "--auth-token-fd":
 				i++
 			default:
 				fmt.Fprintf(os.Stderr, "%s: unknown argument %s\n", bin, args[i])
@@ -101,18 +122,33 @@ func Main() {
 			mux.HandleFunc("/v1/realtime", func(w http.ResponseWriter, r *http.Request) { realtime(o, w, r) })
 		}
 	}
-	go func() { _ = http.Serve(ln, mux) }()
+	go func() { _ = http.Serve(ln, guard(token, mux)) }()
 	emit(map[string]any{"event": "ready", "host": "127.0.0.1", "port": ln.Addr().(*net.TCPAddr).Port,
 		"model_name": "fake-" + kind, "server_pid": os.Getpid(), "startup_s": 0.01})
-	sc := bufio.NewScanner(os.Stdin)
-	for sc.Scan() {
-		if strings.Contains(sc.Text(), `"shutdown"`) {
+	for stdin.Scan() {
+		if strings.Contains(stdin.Text(), `"shutdown"`) {
 			record(o, Record{Event: "shutdown"})
 			emit(map[string]any{"event": "stopped"})
 			os.Exit(0)
 		}
 	}
 	os.Exit(0) // stdin closed: the owner is gone
+}
+
+// guard refuses what the real server's guard refuses: an Origin header
+// (403) and, with a token, a request without "Bearer <token>" (401).
+func guard(token string, next http.Handler) http.Handler {
+	want := []byte("Bearer " + token)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Header.Get("Origin") != "":
+			http.Error(w, "Requests from web pages are refused.", http.StatusForbidden)
+		case token != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), want) != 1:
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+		default:
+			next.ServeHTTP(w, r)
+		}
+	})
 }
 
 // finals counts the Finals this server answered.

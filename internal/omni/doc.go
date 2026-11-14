@@ -34,6 +34,11 @@
 // server starts on first use: qwen3_asr_server --supervised on 127.0.0.1
 // port 0, which prints {"event":"ready","port":…} on stdout once its model
 // is loaded; a server that says nothing within StartTimeout is killed.
+// Each launch gets a random token as its first stdin line (--auth-token-fd
+// 0, never an argument), which every request and socket then carries
+// (Authorization: Bearer); the server refuses requests without it or with
+// an Origin (a web page). A runtime from before the flag runs without one
+// (knowsToken, a warning).
 // Uses hold a lease; a server with no lease for IdleTimeout stops (idle
 // unload; SetIdleTimeout changes it while servers run; Unload stops a
 // model's server, before its files are deleted).

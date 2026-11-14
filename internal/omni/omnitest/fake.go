@@ -18,7 +18,9 @@
 // /v1/audio/transcriptions (SSE, with heartbeats), /v1/realtime (a
 // partial per second of audio, the final segment on commit),
 // /v1/vad/speech_timestamps and /v1/vad/stream (speech is audio louder
-// than -34 dBFS). Every launch and request is appended to Opts.Log as a
+// than -34 dBFS). As the real server's guard does, it takes a token on
+// stdin (--auth-token-fd 0) and then refuses requests without it (401),
+// and refuses requests with an Origin header (403). Every launch and request is appended to Opts.Log as a
 // JSON line (Record), for the tests to check what was sent.
 package omnitest
 
@@ -72,8 +74,13 @@ type Opts struct {
 	// Qwen3-ASR echoes its context on silence ("text。A，B。").
 	Echo bool
 	// Older is a server from before --cache-limit-mb: it refuses the flag
-	// as an unknown argument (a newer one only refuses a value below -1).
+	// as an unknown argument (a newer one only refuses a value below -1),
+	// and --auth-token-fd too.
 	Older bool
+	// NoToken is a server from before --auth-token-fd (it knows
+	// --cache-limit-mb): it refuses the flag as an unknown argument and
+	// serves requests without a token.
+	NoToken bool
 }
 
 // Env is the environment that makes a test binary a fake with o.
@@ -86,6 +93,7 @@ func Env(o Opts) []string {
 	v.Set("load", o.Load.String())
 	v.Set("failfrom", strconv.Itoa(o.FailFrom))
 	v.Set("older", strconv.FormatBool(o.Older))
+	v.Set("notoken", strconv.FormatBool(o.NoToken))
 	v.Set("echo", strconv.FormatBool(o.Echo))
 	return []string{EnvFake + "=" + v.Encode()}
 }
@@ -100,6 +108,7 @@ func opts() Opts {
 	o.Load, _ = time.ParseDuration(v.Get("load"))
 	o.FailFrom, _ = strconv.Atoi(v.Get("failfrom"))
 	o.Older, _ = strconv.ParseBool(v.Get("older"))
+	o.NoToken, _ = strconv.ParseBool(v.Get("notoken"))
 	o.Echo, _ = strconv.ParseBool(v.Get("echo"))
 	if o.Text == "" {
 		o.Text = "fake transcript"

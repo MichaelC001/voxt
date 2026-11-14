@@ -3,10 +3,13 @@ package omni
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -22,9 +25,29 @@ type endpoint struct {
 	port  int
 	model string // the model name requests carry
 	pid   int
+	// token is the launch's secret every request carries ("" for an older
+	// runtime that takes none: knowsToken).
+	token string
 }
 
 func (e endpoint) base() string { return fmt.Sprintf("http://%s:%d", e.host, e.port) }
+
+// header is what every request and WebSocket handshake carries: the
+// token. Never an Origin: the server refuses requests that have one.
+func (e endpoint) header() http.Header {
+	h := http.Header{}
+	if e.token != "" {
+		h.Set("Authorization", "Bearer "+e.token)
+	}
+	return h
+}
+
+// newToken is a launch's secret: 32 random bytes in hex.
+func newToken() string {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b) // never fails (crypto/rand)
+	return hex.EncodeToString(b)
+}
 
 // process is one server process.
 type process struct {
@@ -34,6 +57,7 @@ type process struct {
 	exited chan struct{} // closed when it exited (exitErr set)
 	// exitErr is the process's end (cmd.Wait), set before exited closes.
 	exitErr error
+	token   string // the launch's (endpoint.token)
 	tail    *tail
 	halting atomic.Bool // stop or kill asked for it: its exit is expected
 	once    sync.Once
@@ -52,13 +76,20 @@ type readyEvent struct {
 // spawn starts the server for spec's model in dir; the channel gets its
 // first event (or closes when stdout ends without one).
 // bin is spec's server (Runtime.binary); cacheLimit: pass spec's
-// --cache-limit-mb (the binary knows it).
-func spawn(cfg Config, bin string, spec Spec, dir string, cacheLimit bool) (*process, <-chan readyEvent, error) {
+// --cache-limit-mb (the binary knows it); auth: give the server a new token
+// (--auth-token-fd 0: the first line on its stdin, never in its arguments,
+// which ps shows to every user).
+func spawn(cfg Config, bin string, spec Spec, dir string, cacheLimit, auth bool) (*process, <-chan readyEvent, error) {
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
 		return nil, nil, fmt.Errorf("no model directory %s", dir)
 	}
 	args := []string{"--supervised", "--host", "127.0.0.1", "--port", "0",
 		"--model-directory", dir, "--startup-timeout-s", ftoa(cfg.StartTimeout.Seconds())}
+	token := ""
+	if auth {
+		token = newToken()
+		args = append(args, "--auth-token-fd", "0")
+	}
 	cmd := exec.Command(bin, append(args, spec.launchArgs(cacheLimit)...)...)
 	cmd.Env = append(serverEnv(os.Environ()), cfg.Env...)
 	stdin, err := cmd.StdinPipe()
@@ -76,7 +107,12 @@ func spawn(cfg Config, bin string, spec Spec, dir string, cacheLimit bool) (*pro
 	if err := cmd.Start(); err != nil {
 		return nil, nil, err
 	}
-	p := &process{cmd: cmd, stdin: stdin, exited: make(chan struct{}), tail: &tail{limit: 2048}}
+	p := &process{cmd: cmd, stdin: stdin, token: token, exited: make(chan struct{}), tail: &tail{limit: 2048}}
+	if token != "" {
+		// The pipe holds the line until the server reads it; a server that
+		// died already shows in its exit.
+		_, _ = io.WriteString(stdin, token+"\n")
+	}
 	ready := make(chan readyEvent, 1)
 	var pipes sync.WaitGroup
 	pipes.Go(func() {
@@ -126,7 +162,7 @@ func (p *process) waitReady(ready <-chan readyEvent, timeout time.Duration) erro
 			<-p.exited
 			return fmt.Errorf("it exited before it was ready (%v): %s", p.exitErr, p.tail.String())
 		case ev.Event == "ready" && ev.Port > 0:
-			p.ep = endpoint{host: ev.Host, port: ev.Port, model: ev.Model, pid: ev.PID}
+			p.ep = endpoint{host: ev.Host, port: ev.Port, model: ev.Model, pid: ev.PID, token: p.token}
 			if p.ep.host == "" {
 				p.ep.host = "127.0.0.1"
 			}
@@ -212,20 +248,27 @@ func serverEnv(env []string) []string {
 	return out
 }
 
-// knowsCacheLimit runs cfg.Binary with an invalid --cache-limit-mb: a
-// server that knows the flag refuses its value ("--cache-limit-mb must
-// …"), an older one the flag itself ("unknown argument"), both before
-// loading anything. Anything else (no answer in 10 s, a binary that does
-// not run) counts as not knowing it: the launch says what is wrong.
-func knowsCacheLimit(cfg Config) bool {
+// knowsFlag runs cfg.Binary with flag set to an invalid value: a server
+// that knows the flag refuses its value ("<flag> must …"), an older one
+// the flag itself ("unknown argument"), both before loading anything.
+// Anything else (no answer in 10 s, a binary that does not run) counts as
+// not knowing it: the launch says what is wrong.
+func knowsFlag(cfg Config, flag, invalid string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, cfg.Binary, "--model-kind", kindQwen3ASR,
-		"--model-directory", os.DevNull, "--cache-limit-mb", "-2")
+		"--model-directory", os.DevNull, flag, invalid)
 	cmd.Env = append(serverEnv(os.Environ()), cfg.Env...)
 	out, _ := cmd.CombinedOutput()
-	return strings.Contains(string(out), "--cache-limit-mb must")
+	return strings.Contains(string(out), flag+" must")
 }
+
+// knowsCacheLimit: the binary takes --cache-limit-mb.
+func knowsCacheLimit(cfg Config) bool { return knowsFlag(cfg, "--cache-limit-mb", "-2") }
+
+// knowsToken: the binary takes --auth-token-fd (descriptor -1 is never
+// open).
+func knowsToken(cfg Config) bool { return knowsFlag(cfg, "--auth-token-fd", "-1") }
 
 // tail keeps the last lines a process wrote on stderr, to say why it
 // failed.

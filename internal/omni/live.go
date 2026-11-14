@@ -69,7 +69,7 @@ func openLive(ctx context.Context, a *ASR, l *lease, req asr.StreamRequest) (*li
 		RawQuery: url.Values{"intent": {"transcription"}, "model": {ep.model}}.Encode()}
 	dctx, dcancel := context.WithTimeout(ctx, asr.ConnectTimeout)
 	defer dcancel()
-	conn, _, err := websocket.Dial(dctx, u.String(), &websocket.DialOptions{HTTPClient: loopback})
+	conn, _, err := websocket.Dial(dctx, u.String(), &websocket.DialOptions{HTTPClient: loopback, HTTPHeader: ep.header()})
 	if err != nil {
 		return nil, asr.NetError(dctx, Provider, err)
 	}

@@ -12,7 +12,7 @@
 #
 # It is signed with helper/Support/helper.entitlements and the hardened
 # runtime, ad hoc unless VOXTMINI_SIGN_IDENTITY names an identity (see
-# "Signing during development" in README.md: an ad hoc rebuild of the app
+# "Signing during development" in docs/development.md: an ad hoc rebuild of the app
 # makes macOS forget its permissions). mygo build keeps a valid signature.
 set -euo pipefail
 

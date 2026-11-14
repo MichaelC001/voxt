@@ -117,6 +117,8 @@ type Runtime struct {
 
 	cacheLimitOnce  sync.Once
 	cacheLimitKnown bool // the binary knows --cache-limit-mb (knowsCacheLimit)
+	tokenOnce       sync.Once
+	tokenKnown      bool // the binary knows --auth-token-fd (knowsToken)
 }
 
 // NewRuntime is a runtime that starts no server until one is used.
@@ -151,6 +153,19 @@ func (rt *Runtime) cacheLimit(spec Spec) bool {
 		}
 	})
 	return rt.cacheLimitKnown
+}
+
+// auth reports whether the servers get a token: the binary is asked once.
+// An older runtime without --auth-token-fd still runs, unguarded, with a
+// warning (docs/behavior.md 3.5b).
+func (rt *Runtime) auth() bool {
+	rt.tokenOnce.Do(func() {
+		rt.tokenKnown = knowsToken(rt.cfg)
+		if !rt.tokenKnown {
+			rt.logf("warning", "%s does not know --auth-token-fd (an older runtime): its servers take requests without a token", rt.cfg.Binary)
+		}
+	})
+	return rt.tokenKnown
 }
 
 // IdleTimeout is how long an unused server stays (< 0: until Close).

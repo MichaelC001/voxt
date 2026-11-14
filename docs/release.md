@@ -25,7 +25,7 @@ For local releases, `scripts/release.sh --notarize <profile> --publish` uses the
 ## Publishing a version
 
 1. Set the same version in `mygo.json`, `helper/Support/Info.plist` and `llm/Support/Info.plist`. The first standalone release continues the existing sequence at `0.1.0-beta.2`.
-2. Run `scripts/vulncheck.sh` (govulncheck on the darwin/arm64 build, needs the network): it must report no vulnerabilities. A Go standard library one is fixed by raising `go.mod`'s Go version (and the version in `AGENTS.md`, `README*.md`, `CONTRIBUTING.md`); a module's by upgrading the module.
+2. Run `scripts/vulncheck.sh` (govulncheck on the darwin/arm64 build, needs the network): it must report no vulnerabilities. A Go standard library one is fixed by raising `go.mod`'s Go version (and the version in `AGENTS.md`, `docs/development.md`, `CONTRIBUTING.md`); a module's by upgrading the module.
 3. Move the release notes from `Unreleased` into a versioned section in `CHANGELOG.md`. Keep the English notes first and the Chinese notes under `### 中文`.
 4. Commit and push the version, then create and push the matching tag, for example `v0.1.0-beta.2`.
 5. The tag workflow builds the app, signs it with Developer ID, notarizes and staples the app and DMG, verifies the bundle, publishes the update to ActNow, then creates a **draft GitHub release** with the DMG attached (`scripts/release-github.sh`, below).
@@ -38,5 +38,5 @@ A manual run from **Actions → Release → Run workflow** makes an artifact for
 ## Distribution paths
 
 - **GitHub install:** users download the DMG from GitHub Releases and install VoxtMini.
-- **ActNow install:** the existing VoxtNew product page and download link remain available during this repository transition.
+- **ActNow install:** users download from [actnow.dev/voxtmini](https://actnow.dev/voxtmini).
 - **In-app update:** every installed copy keeps reading the existing ActNow feed. GitHub release publication does not change the update source.

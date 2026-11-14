@@ -78,6 +78,11 @@ void AddRealtimeHandler(mg_context *context, const RealtimeFactory &factory);
 //
 //   BINARY --model-path DIR [--model-name NAME] [--host H] [--port P]
 //   BINARY --supervised --model-kind KIND --model-directory DIR
+//
+// --auth-token-fd FD reads a token from descriptor FD (0: the first line of
+// stdin, before the control lines) at startup; every request must then carry
+// "Authorization: Bearer <token>". Requests with an Origin header, chunked
+// bodies and oversized ones are refused with or without it (common/guard.h).
 int Serve(int argc, char **argv, const std::vector<ServedKind> &kinds);
 inline int Serve(int argc, char **argv, const ServedKind &kind) {
   return Serve(argc, argv, std::vector<ServedKind>{kind});

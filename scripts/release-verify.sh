@@ -93,6 +93,7 @@ if ((want_runtimes)); then
   check "voxtmini-llm is inside" test -x "$llm" -a -f "$res/llm/mlx.metallib" -a -d "$res/llm/llama.framework"
   check "the Omni server starts from the app (its libraries load)" bash -c "'$server' --model-kind none 2>&1 | grep -q -- '--model-kind must be'"
   check "whisper_server starts from the app" bash -c "'$res/omni/bin/whisper_server' --model-kind none 2>&1 | grep -q -- 'only --model-kind whisper'"
+  check "the Omni servers take a token (--auth-token-fd)" bash -c "'$server' --model-kind qwen3_asr --model-directory /dev/null --auth-token-fd -1 2>&1 | grep -q -- '--auth-token-fd must' && '$res/omni/bin/whisper_server' --model-kind whisper --model-directory /dev/null --auth-token-fd -1 2>&1 | grep -q -- '--auth-token-fd must'"
   check "voxtmini-llm starts from the app (llm.hello)" bash -c "printf '%s\\n' '{\"id\":\"1\",\"method\":\"llm.hello\",\"params\":{\"protocol\":1,\"app\":\"release-verify\"}}' | '$llm' 2>/dev/null | grep -q '\"protocol\":1'"
 fi
 for c in "${code[@]:1}"; do

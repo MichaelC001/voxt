@@ -68,6 +68,7 @@ func (v *VAD) Speech(ctx context.Context, pcm []byte, rate int) ([]vad.Segment, 
 	if err != nil {
 		return nil, err
 	}
+	req.Header = l.endpoint().header()
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	resp, err := loopback.Do(req)
 	if err != nil {
@@ -111,7 +112,7 @@ func (v *VAD) Open(ctx context.Context) (vad.ModelStream, error) {
 		return nil, err
 	}
 	ep := l.endpoint()
-	conn, _, err := websocket.Dial(dctx, fmt.Sprintf("ws://%s:%d/v1/vad/stream", ep.host, ep.port), &websocket.DialOptions{HTTPClient: loopback})
+	conn, _, err := websocket.Dial(dctx, fmt.Sprintf("ws://%s:%d/v1/vad/stream", ep.host, ep.port), &websocket.DialOptions{HTTPClient: loopback, HTTPHeader: ep.header()})
 	if err != nil {
 		l.release()
 		return nil, asr.NetError(dctx, Provider, err)

@@ -84,6 +84,13 @@ for s in "${SERVERS[@]}"; do
     echo "the staged $s does not start: $probe" >&2
     exit 1
   fi
+  # It takes the launch's token (internal/omni's probe: descriptor -1).
+  kind=qwen3_asr; [[ $s == whisper_server ]] && kind=whisper
+  probe="$("$OUT/bin/$s" --model-kind $kind --model-directory /dev/null --auth-token-fd -1 2>&1 || true)"
+  if [[ "$probe" != *"--auth-token-fd must"* ]]; then
+    echo "the staged $s takes no token (--auth-token-fd): $probe" >&2
+    exit 1
+  fi
   du -h "$OUT/bin/$s" | sed "s|^|  |"
 done
 du -sh "$OUT/bin" | sed "s|^|staged |"

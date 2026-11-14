@@ -7,7 +7,7 @@ VoxtMini lives in the [hehehai/VoxtMini](https://github.com/hehehai/VoxtMini) re
 - **Bugs**: Settings → About → Report a problem opens a GitHub issue with the diagnostics filled in. Or open an [issue](https://github.com/hehehai/VoxtMini/issues) by hand: what happened, what you expected, the steps.
 - **Changes**: VoxtMini does Transcribe, Translate and Rewrite, with App enhancement and the dictionary, on local models first (remote services only where the user chooses one); meetings, notes and file transcription are out of its scope. For anything larger than a fix, open an issue first.
 - **Voxt**: this repository was Voxt's (its history ends at the tag `voxt-final`). Voxt itself continues as [SGLang Omni Voxt](https://github.com/sgl-project/sglang-omni/tree/main/Voxt): report Voxt's bugs there.
-- Read [AGENTS.md](AGENTS.md) (the rules for changes) and [docs/architecture.md](docs/architecture.md) before changing code.
+- Read [AGENTS.md](AGENTS.md) (the rules for changes) and [docs/architecture.md](docs/architecture.md) before changing code; [docs/development.md](docs/development.md) says how to build, and [docs/README.md](docs/README.md) lists every document.
 
 ## Pull requests
 
@@ -42,5 +42,5 @@ VoxtMini 在 [hehehai/VoxtMini](https://github.com/hehehai/VoxtMini) 仓库里�
 - **报告问题**：设置 → 诊断与关于 → 反馈问题，会打开一个已填好诊断信息的 GitHub issue；也可以手动开 [issue](https://github.com/hehehai/VoxtMini/issues)，写清发生了什么、你期望什么、复现步骤。
 - **改动**：VoxtMini 只做转录、翻译、转写，加上应用增强和词典，以本地模型为主（用户选了才用远程服务）；会议、笔记、文件转录不在范围内。比修 bug 更大的改动，先开 issue 讨论。
 - **Voxt**：这个仓库原来是 Voxt 的（它的历史到标签 `voxt-final` 为止）。Voxt 本身在 [SGLang Omni Voxt](https://github.com/sgl-project/sglang-omni/tree/main/Voxt) 继续开发，Voxt 的问题请提到那里。
-- 改代码前先读 [AGENTS.md](AGENTS.md)（改动规则）和 [docs/architecture.md](docs/architecture.md)。
+- 改代码前先读 [AGENTS.md](AGENTS.md)（改动规则）和 [docs/architecture.md](docs/architecture.md)；怎么构建见 [docs/development.md](docs/development.md)，全部文档见 [docs/README.md](docs/README.md)。
 - PR：一个 PR 一件事，带测试；提交信息和代码注释用英文；界面文字都经过 `i18n.T`，并在 `internal/i18n/locales/zh-Hans.json` 补中文；用户能察觉的改动在 [CHANGELOG.md](CHANGELOG.md) 的 `Unreleased` 里中英文各写一行；跑一遍上面的检查。

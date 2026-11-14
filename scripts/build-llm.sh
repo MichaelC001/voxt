@@ -20,7 +20,7 @@
 # few minutes). The tests build with SwiftPM, the Kit alone (llm/.build).
 #
 # Everything is signed, the binary with llm/Support/llm.entitlements, ad
-# hoc unless VOXTMINI_SIGN_IDENTITY names an identity (README.md, "Signing
+# hoc unless VOXTMINI_SIGN_IDENTITY names an identity (docs/development.md, "Signing
 # during development"), and then with the hardened runtime; mygo build
 # keeps an ad hoc signature, and signs the app's nested code again with a
 # real identity (keeping the entitlements).

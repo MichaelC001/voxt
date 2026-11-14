@@ -19,6 +19,7 @@ void WriteResponse(mg_connection *connection, int status,
                    const std::string &body);
 int WriteJson(mg_connection *connection, int status, const Json &body);
 int BadRequest(mg_connection *connection, const std::string &detail);
+// The request body, at most kMaxBodyBytes and a read more (common/guard.h).
 std::string ReadBody(mg_connection *connection);
 bool IsPost(mg_connection *connection);
 std::optional<std::string>

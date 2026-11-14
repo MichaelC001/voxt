@@ -70,6 +70,7 @@ func transcribe(ctx context.Context, l *lease, r finalRequest, stall time.Durati
 	if err != nil {
 		return finalResult{}, &asr.Error{Kind: asr.KindProtocol, Provider: Provider, Err: err}
 	}
+	req.Header = l.endpoint().header()
 	req.Header.Set("Content-Type", ctype)
 	var stalled atomic.Bool
 	watch := time.AfterFunc(stall, func() { stalled.Store(true); cancel() })
