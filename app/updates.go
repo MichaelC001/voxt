@@ -4,7 +4,7 @@ package main
 // checks actnow.dev once a day. What a daily check finds shows quietly, as
 // a card at the foot of the sidebar ("Update available", Install), not as
 // a window popping up over the app the user dictates into (MyGo patch
-// 0011, updateFound); Install, or Check for Updates, opens the plugin's
+// 0010, updateFound); Install, or Check for Updates, opens the plugin's
 // window with the version's notes, in the language VoxtMini shows, which
 // installs it (a delta when there is one) on the user's word, then offers
 // to restart. Its
@@ -298,7 +298,7 @@ func (a *app) updateSettingsSection(c *ui.Context) {
 			}
 		})
 	}
-	desc, tip := "", i18n.T("New versions come from actnow.dev, with their notes.")
+	var desc, tip string
 	switch {
 	case !a.updKnown:
 	case !p.Enabled:
@@ -317,25 +317,22 @@ func (a *app) updateSettingsSection(c *ui.Context) {
 	if !a.updKnown || !p.Enabled {
 		return
 	}
-	settingRow(c, "about-update-auto", i18n.T("Check automatically"), i18n.T("Once a day, in the background. A new version shows at the foot of the sidebar; it installs when you say so."), func() {
+	settingRow(c, "about-update-auto", i18n.T("Check automatically"), i18n.T("Once a day. A new version installs only when you say so."), func() {
 		if ui.Switch(c.Key("about-update-auto-switch"), &a.updPrefs.AutoCheck).Label(i18n.T("Check for updates automatically")).Changed() {
 			a.setAutoCheck(a.updPrefs.AutoCheck)
 		}
 	})
 	beta := a.betaOn()
-	note := i18n.T("Releases only. Turning it on offers betas too: new features sooner, and more bugs.")
-	switch {
-	case beta:
-		note = i18n.T("Betas and releases, whichever is newer. Betas bring new features sooner, and more bugs.")
-	case strings.Contains(a.version, "-"):
-		note = i18n.T("Releases only. This beta stays until a release newer than it comes out: VoxtMini never goes back to an older version.")
+	note := i18n.T("Betas bring new features sooner, and more bugs.")
+	if !beta && strings.Contains(a.version, "-") {
+		note = i18n.T("This beta stays until a newer release comes out.")
 	}
 	settingRow(c, "about-update-beta", i18n.T("Beta updates"), note, func() {
 		if ui.Switch(c.Key("about-update-beta-switch"), &beta).Label(i18n.T("Get beta versions")).Changed() {
 			a.setBeta(beta)
 		}
 	})
-	settingRow(c, "about-update-install", i18n.T("Install updates automatically"), i18n.T("Updates found in the background download and install without asking; VoxtMini then asks to restart. Off by default."), func() {
+	settingRow(c, "about-update-install", i18n.T("Install updates automatically"), i18n.T("VoxtMini then asks to restart."), func() {
 		if ui.Switch(c.Key("about-update-install-switch"), &a.updPrefs.AutoInstall).Label(i18n.T("Install updates without asking")).Disabled(!a.updPrefs.AutoCheck).Changed() {
 			a.setAutoInstall(a.updPrefs.AutoInstall)
 		}

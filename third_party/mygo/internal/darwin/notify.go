@@ -97,27 +97,6 @@ type waitingNotification struct {
 	done func(error)
 }
 
-// NotificationStatus reads the app's notification settings
-// (getNotificationSettingsWithCompletionHandler:).
-func (b *Backend) NotificationStatus(done func(platform.NotificationStatus)) {
-	if !b.NotificationsSupported() {
-		done(platform.NotificationStatus{})
-		return
-	}
-	withPool(func() {
-		blk := newBlock(func(_ objc.Block, s id) {
-			// UNAuthorizationStatus: 0 not determined, 1 denied, 2 authorized,
-			// 3 provisional, 4 ephemeral; UNAlertStyle: 0 none, 1 banner, 2 alert.
-			auth := int(uintptr(send(s, "authorizationStatus")))
-			st := platform.NotificationStatus{Known: true, Asked: auth != 0, Allowed: auth >= 2, Denied: auth == 1,
-				Style: int(uintptr(send(s, "alertStyle")))}
-			b.runOnMain(func() { done(st) })
-		})
-		send(notificationCenter(), "getNotificationSettingsWithCompletionHandler:", uintptr(blk))
-		blk.Release()
-	})
-}
-
 // notifyOptions are the permissions asked for: badge, sound and alert.
 const notifyOptions = 1<<0 | 1<<1 | 1<<2
 

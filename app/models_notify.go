@@ -20,18 +20,14 @@ import (
 )
 
 // sysNote is a macOS notification: its id (one per model, so a newer
-// replaces an older), title and text, and the page a click shows ("":
-// the Local models page).
-type sysNote struct{ ID, Title, Body, Path string }
+// replaces an older), title and text.
+type sysNote struct{ ID, Title, Body string }
 
 // sysNoteState holds the seams of the notifications: tests record what
 // would show and say whether the window is in front.
 type sysNoteState struct {
 	sysNotify func(sysNote)
 	winFront  func() bool
-	// sysNoteStatus reads whether macOS allows the notifications (tests:
-	// a fixed answer; nil: MyGo's, packaged apps only).
-	sysNoteStatus func(func(mygo.NotificationStatus))
 }
 
 // downloadNotes are the notifications for the downloads that ended
@@ -92,43 +88,14 @@ func (a *app) showSysNote(n sysNote) {
 			return
 		}
 		note := mygo.NewNotification(mygo.NotificationOptions{ID: n.ID, Title: n.Title, Body: n.Body})
-		path := n.Path
-		if path == "" {
-			path = modelsPath
-		}
 		note.OnClick(func() {
 			a.post(func() {
 				a.showMainWindow()
-				a.navigate(path)
+				a.navigate(modelsPath)
 			})
 		})
 		if err := note.Show(); err != nil && !errors.Is(err, mygo.ErrNotificationsDenied) {
 			a.logs.Append(core.LogEntry{Time: time.Now(), Level: core.SeverityWarning, Source: omniSource, Message: "notification not shown: " + err.Error()})
 		}
-		a.post(a.readNoteStatus) // the first one asked: Settings → Permissions shows the answer
 	})
-}
-
-// readNoteStatus asks macOS whether VoxtMini may notify (Settings →
-// Permissions); the answer comes back on the main thread. Only a
-// packaged app can tell: elsewhere the status stays not Known.
-func (a *app) readNoteStatus() {
-	read := a.sysNoteStatus
-	if read == nil {
-		if !a.hasMenu {
-			return
-		}
-		read = func(fn func(mygo.NotificationStatus)) {
-			if mygo.NotificationsSupported() {
-				mygo.App.NotificationStatus(fn)
-			}
-		}
-	}
-	read(func(st mygo.NotificationStatus) { a.post(func() { a.perms.notify = st }) })
-}
-
-// testNotification shows a notification now, even with the window in
-// front (Settings → Permissions): macOS asks first when it never has.
-func (a *app) testNotification() {
-	a.showSysNote(sysNote{ID: "test", Title: "VoxtMini", Body: i18n.T("This is how VoxtMini's notifications look."), Path: permissionsPath})
 }

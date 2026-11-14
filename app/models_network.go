@@ -211,9 +211,8 @@ func isNetworkKey(key string) bool { return key == actnow.KeyProxy || key == act
 // the choice below it does.
 func netHeading(c *ui.Context, title, tip string) {
 	t := c.Theme()
-	ui.Row(c.Key("net-h-" + title)).Gap(px(t, 6)).AlignItems(ui.Center).Children(func() {
-		ui.Text(c, title).FontWeight(600)
-		infoTip(c, tip)
+	ui.Row(c.Key("net-h-" + title)).Gap(px(t, 6)).AlignItems(ui.Start).Children(func() {
+		labelTip(c, ui.Text(c, title).FontWeight(600), title, t.FontSize, 600, tip)
 	})
 }
 
@@ -225,9 +224,9 @@ func (a *app) networkDialog(c *ui.Context) {
 	f := &a.netForm
 	open := true
 	dialogFrame(c, "net-dlg", &open, i18n.T("Network"), i18n.T("How model downloads reach Hugging Face"), 540, func() {
-		proxyTip := i18n.T("The proxy in the Mac's network settings, or the one the environment names.")
+		proxyTip := i18n.T("Automatic: the proxy in the Mac's network settings.")
 		if f.proxyMode == proxyNone {
-			proxyTip = i18n.T("Downloads connect to the server directly.")
+			proxyTip = ""
 		}
 		netHeading(c, i18n.T("Proxy"), proxyTip)
 		segmentedFit(c.Key("net-proxy"), &f.proxyMode, i18n.T("Automatic"), i18n.T("No proxy"), i18n.T("Custom")).Label(i18n.T("Proxy"))
@@ -240,9 +239,9 @@ func (a *app) networkDialog(c *ui.Context) {
 		a.familyLine(c, actnow.KeyProxy, i18n.T("Other ActNow apps use a different proxy."), a.followNetwork, nil)
 
 		ui.Box(c).Height(px(t, sp2)).Shrink(0)
-		sourceTip := i18n.T("Hugging Face and its mirror hf-mirror.com, whichever answers first. Every file is checked, so either is safe.")
+		sourceTip := i18n.T("Automatic: Hugging Face or hf-mirror.com, whichever answers first. Every file is checked.")
 		if f.source > 0 && f.source < len(networkSources) {
-			sourceTip = i18n.T("Only this server: when it cannot be reached, downloads fail.")
+			sourceTip = ""
 		}
 		netHeading(c, i18n.T("Download source"), sourceTip)
 		labels := []string{i18n.T("Automatic"), i18n.T("Hugging Face only"), i18n.T("hf-mirror.com only")}

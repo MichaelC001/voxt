@@ -36,7 +36,7 @@ func TestNetworkDialog(t *testing.T) {
 	if a.currentPage() != "models" || !a.netOpen || !has(tt, "How model downloads reach Hugging Face") {
 		t.Fatalf("deep link: page %q open %v %q", a.currentPage(), a.netOpen, tt.Texts())
 	}
-	if !has(tt, "Applies to all ActNow apps") || !has(tt, "The proxy in the Mac's network settings, or the one the environment names.") {
+	if !has(tt, "Applies to all ActNow apps") || !has(tt, "Automatic: the proxy in the Mac's network settings.") {
 		t.Fatalf("defaults: %q", tt.Texts())
 	}
 

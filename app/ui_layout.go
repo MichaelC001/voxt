@@ -26,11 +26,17 @@ func pageHeader(c *ui.Context, title string, trailing func()) { pageHeaderTip(c,
 func pageHeaderTip(c *ui.Context, title, tip string, trailing func()) {
 	t := c.Theme()
 	ui.Row(c).Height(titleBarHeight).Shrink(0).AlignItems(ui.Center).Padding(0, px(t, sp4), 0, px(t, sp6)+headerInset).Gap(px(t, sp2)).DragWindow().Children(func() {
-		tx := ui.Text(c, title).FontSize(px(t, fsTitle)).FontWeight(600).SingleLine().Ellipsis("…").MinWidth(0)
+		heading := func() ui.Element {
+			return ui.Text(c, title).FontSize(px(t, fsTitle)).FontWeight(600).SingleLine().Ellipsis("…").MinWidth(0)
+		}
 		if tip == "" {
-			tx.Grow(1)
+			heading().Grow(1)
 		} else {
-			infoTip(c.Key("page-tip"), tip).Shrink(0)
+			ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Start).MinWidth(0).Children(func() {
+				tm, im := tipMargins(t, title, px(t, fsTitle), 600)
+				heading().Margin(tm, 0, 0, 0)
+				infoTip(c.Key("page-tip"), tip).Shrink(0).Margin(im, 0, 0, 0)
+			})
 			ui.Box(c).Grow(1)
 		}
 		if trailing != nil {
@@ -149,11 +155,8 @@ func formRow(c *ui.Context, key, title, info string, control func()) {
 	t := c.Theme()
 	// The control goes under the name when both do not fit on a line.
 	ui.Row(c.Key(key)).Wrap().GapX(px(t, sp4)).GapY(px(t, 6)).AlignItems(ui.Center).MinHeight(px(t, 32)).Children(func() {
-		ui.Row(c).Grow(1).Basis(px(t, 160)).MinWidth(px(t, 120)).Gap(px(t, 6)).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, title).MinWidth(0)
-			if info != "" {
-				infoTip(c, info)
-			}
+		ui.Row(c).Grow(1).Basis(px(t, 160)).MinWidth(px(t, 120)).Gap(px(t, 6)).AlignItems(ui.Start).Children(func() {
+			labelTip(c, ui.Text(c, title).MinWidth(0), title, t.FontSize, 400, info)
 		})
 		ui.Row(c).Wrap().Gap(px(t, sp2)).AlignItems(ui.Center).Shrink(1).MinWidth(0).Children(control)
 	})
@@ -163,11 +166,8 @@ func formRow(c *ui.Context, key, title, info string, control func()) {
 func fieldInfo(c *ui.Context, label, info string, control func()) {
 	t := c.Theme()
 	ui.Column(c).Gap(px(t, 6)).Children(func() {
-		ui.Row(c).Gap(px(t, 6)).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, label).MinWidth(0)
-			if info != "" {
-				infoTip(c, info)
-			}
+		ui.Row(c).Gap(px(t, 6)).AlignItems(ui.Start).Children(func() {
+			labelTip(c, ui.Text(c, label).MinWidth(0), label, t.FontSize, 400, info)
 		})
 		control()
 	})

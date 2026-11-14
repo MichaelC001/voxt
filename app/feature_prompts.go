@@ -44,7 +44,7 @@ func (a *app) translateSettings(c *ui.Context) {
 	}
 	u.lang = cur // the settings say; a choice saves at once
 	settingRow(c, "tl-target", i18n.T("Translate into"),
-		i18n.T("Automatic is English, or Chinese when your main language is English (Settings → General). The answer card can translate the same text into another language."), func() {
+		i18n.T("Automatic: English, or Chinese when your main language is English."), func() {
 			if ui.Select(c.Key("tl-target-sel"), &u.lang, opts).Label(i18n.T("Target language")).Width(px(t, 260)).Shrink(1).MinWidth(px(t, 160)).Changed() {
 				code := ""
 				if j := slices.Index(opts, u.lang); j > 0 && j <= len(compose.TargetLanguages) {
@@ -54,14 +54,14 @@ func (a *app) translateSettings(c *ui.Context) {
 			}
 		})
 	settingRow(c, "tl-cleanup", i18n.T("Basic clean-up"),
-		i18n.T("Cleans up what you say before translating it: fillers, false starts and corrections go, spoken punctuation becomes marks. Selected text is translated as it is."), func() {
+		i18n.T("Cleans up speech before translating. Selected text is translated as it is."), func() {
 			if ui.Switch(c.Key("tl-cleanup-switch"), &f.Cleanup).Label(i18n.T("Basic clean-up")).Changed() {
 				on := f.Cleanup
 				a.updateSettings(func(s *settings.Settings) { s.Features.Translate.Cleanup = on })
 			}
 		})
 	settingRow(c, "tl-card", i18n.T("Show the result in a card"),
-		i18n.T("Shows the translation in the answer card, to read, copy or insert, instead of typing it (or replacing the selection). Selected text that cannot be edited, such as a web page, always goes to the card."), func() {
+		i18n.T("Text selected where it cannot be edited, such as a web page, always shows in the card."), func() {
 			if ui.Switch(c.Key("tl-card-switch"), &f.ShowCard).Label(i18n.T("Show the result in a card")).Changed() {
 				on := f.ShowCard
 				a.updateSettings(func(s *settings.Settings) { s.Features.Translate.ShowCard = on })
@@ -74,7 +74,7 @@ func (a *app) translateSettings(c *ui.Context) {
 func (a *app) rewriteSettings(c *ui.Context) {
 	f := &a.prefs.Features.Rewrite
 	settingRow(c, "rw-cleanup", i18n.T("Clean up the instruction"),
-		i18n.T("Reads past fillers, false starts and corrections in what you say (\"shorter, no, more formal\"). It never changes the selected text by itself."), func() {
+		i18n.T("Only your spoken instruction; the selected text is never cleaned up."), func() {
 			if ui.Switch(c.Key("rw-cleanup-switch"), &f.Cleanup).Label(i18n.T("Clean up the instruction")).Changed() {
 				on := f.Cleanup
 				a.updateSettings(func(s *settings.Settings) { s.Features.Rewrite.Cleanup = on })
@@ -200,7 +200,7 @@ func (a *app) featurePrompt(c *ui.Context, feature string) {
 	p := uitext.FeaturePrefix(feature)
 	u := a.fui(feature)
 	a.promptSync(feature)
-	sectionTitleTip(c, i18n.T("Prompt"), i18n.T("Tells the model what to do. VoxtMini adds the rest itself: what the input is, your dictionary, App enhancement's scene and the output format."))
+	sectionTitleTip(c, i18n.T("Prompt"), i18n.T("VoxtMini adds the input, your dictionary and App enhancement's scene itself."))
 	in := ui.TextArea(c.Key(p+"-prompt"), &u.prompt).Label(i18n.T("Prompt for %s", uitext.FeatureTitle(feature))).MinHeight(px(t, 200))
 	if in.Focused() {
 		s, e := in.TextSelection()

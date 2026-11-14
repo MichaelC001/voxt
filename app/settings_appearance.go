@@ -29,7 +29,7 @@ func sidebarLabels() []string {
 
 func (a *app) sidebarRow(c *ui.Context) {
 	f := &a.settingsForm
-	settingRow(c, "sidebar-style", i18n.T("Sidebar"), i18n.T("Icons only leaves more room for the pages; their names show when the pointer rests on them. Automatic shows icons only while the window is narrow."), func() {
+	settingRow(c, "sidebar-style", i18n.T("Sidebar"), i18n.T("Automatic: icons only while the window is narrow."), func() {
 		if ui.Segmented(c.Key("sidebar-seg"), &f.sidebar, sidebarLabels()...).Label(i18n.T("Sidebar")).Changed() {
 			if f.sidebar == 0 {
 				a.updateSettings(func(s *settings.Settings) { s.Appearance.Rail, s.Appearance.RailChosen = false, false })
@@ -47,7 +47,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 			a.updateSettings(func(s *settings.Settings) { s.Appearance.Theme = theme })
 		}
 	})
-	settingRow(c, "scale", i18n.T("Interface size"), i18n.T("Scales text and spacing."), func() {
+	settingRow(c, "scale", i18n.T("Interface size"), "", func() {
 		if ui.Segmented(c.Key("scale-seg"), &a.scale, scaleLabels...).Label(i18n.T("Interface size")).Changed() {
 			scale := settings.Scales[a.scale]
 			a.updateSettings(func(s *settings.Settings) { s.Appearance.Scale = scale })
@@ -58,7 +58,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 	sum := summary(i18n.T("%s: %s", i18n.T("Sidebar"), sidebarLabels()[min(max(f.sidebar, 0), 2)]), onOff(i18n.T("Reduce motion"), a.reduceMotion))
 	advanced(c.Key("appearance-advanced"), &f.appearanceAdvanced, sum, func() {
 		a.sidebarRow(c) // settings_appearance.go
-		settingRow(c, "motion", i18n.T("Reduce motion"), i18n.T("Pages and panels change without animating. The system's setting is followed too."), func() {
+		settingRow(c, "motion", i18n.T("Reduce motion"), i18n.T("Also on while the system's Reduce motion is on."), func() {
 			if ui.Switch(c.Key("motion-switch"), &a.reduceMotion).Label(i18n.T("Reduce motion")).Changed() {
 				on := a.reduceMotion
 				a.updateSettings(func(s *settings.Settings) { s.Appearance.ReduceMotion = on })

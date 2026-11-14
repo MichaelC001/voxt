@@ -124,8 +124,6 @@ type Backend interface {
 	UnregisterHotkey(id int)
 
 	NotificationsSupported() bool
-	// NotificationStatus (optional: NotificationStatusReader) tells whether
-	// the user allows the app's notifications, and their style.
 	// ShowNotification shows n; done runs on the main thread once the
 	// system has it, or with why it could not.
 	ShowNotification(n *Notification, done func(error))
@@ -991,23 +989,4 @@ type Notification struct {
 	// Group gathers the notifications that share it (threadIdentifier on
 	// macOS).
 	Group string
-}
-
-// NotificationStatus is whether the user allows an app's notifications
-// (System Settings › Notifications) and how they show.
-type NotificationStatus struct {
-	// Known: the backend could tell (false: it cannot, the rest is zero).
-	Known bool
-	// Asked: the user has answered; Allowed: they may show (also when
-	// only quietly, provisionally); Denied: they may not.
-	Asked, Allowed, Denied bool
-	// Style is how they show: 0 none (in Notification Center only), 1 a
-	// banner that goes away, 2 an alert that stays.
-	Style int
-}
-
-// NotificationStatusReader is a backend that can read NotificationStatus;
-// done runs on the main thread.
-type NotificationStatusReader interface {
-	NotificationStatus(done func(NotificationStatus))
 }

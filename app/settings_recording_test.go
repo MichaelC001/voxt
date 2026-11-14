@@ -49,17 +49,6 @@ func TestRecordingSwitches(t *testing.T) {
 	if !a.hotkeyPlan().Configure(true).PassEscape {
 		t.Error("Escape still cancels")
 	}
-	// The feature pages' tip no longer says so.
-	a.navigate("/transcribe")
-	frames(tt)
-	if _, ok := tt.Find("Press a shortcut anywhere and speak: the text is typed at your cursor. Esc cancels a recording."); ok {
-		t.Error("the page's tip still says Esc cancels")
-	}
-	if _, ok := tt.Find("Press a shortcut anywhere and speak: the text is typed at your cursor."); !ok {
-		t.Error("no page tip")
-	}
-	a.navigate("/settings/shortcuts")
-	frames(tt)
 	clickDialogSwitch(t, tt, "Voice end command", func() bool { return a.settings.Get().Features.EndCommand.On })
 	frames(tt)
 	if !has(tt, "End word") || a.settingsForm.endChoice != "over" {

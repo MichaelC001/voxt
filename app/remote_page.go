@@ -137,7 +137,7 @@ func (a *app) providerCards(c *ui.Context, kind providers.Kind, mine, rest []pro
 			}
 		})
 	}
-	tip := i18n.T("A service set up here can be chosen on a feature's page instead of a local model; only then does it get your recordings or text. Keys stay in the Keychain.")
+	tip := i18n.T("A service gets your recordings or text only when a feature uses it.")
 	if len(mine) > 0 {
 		sectionTitleTip(c, i18n.T("Remote services you set up"), tip)
 		grid("rm-mine-"+string(kind), mine)

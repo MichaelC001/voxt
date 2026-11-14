@@ -105,28 +105,28 @@ func (a *app) overlaySettings(c *ui.Context) {
 			ui.Text(c, text).FontSize(px(t, fsCaption)).TextColor(tok(t).Text2).Font("monospace").Width(px(t, 40)).Shrink(0).SingleLine()
 		})
 	}
-	settingRow(c, "ov-position", i18n.T("Position"), i18n.T("On the display under the pointer, centred."), func() {
+	settingRow(c, "ov-position", i18n.T("Position"), i18n.T("On the display under the pointer."), func() {
 		if ui.Segmented(c.Key("ov-position-seg"), &f.position, i18n.T("Bottom centre"), i18n.T("Top centre")).Label(i18n.T("Position")).Changed() {
 			a.overlayEdited()
 		}
 	})
-	settingRow(c, "ov-time", i18n.T("Show the recording time"), i18n.T("Off, the overlay shows only the feature's icon and the waveform."), func() {
+	settingRow(c, "ov-time", i18n.T("Show the recording time"), "", func() {
 		if ui.Switch(c.Key("ov-time-switch"), &f.showTime).Label(i18n.T("Show the recording time")).Changed() {
 			a.overlayEdited()
 		}
 	})
-	settingRow(c, "ov-live", i18n.T("Show live text"), i18n.T("What you say, as it is recognised, and the answer as it is written. The answer card is not affected."), func() {
+	settingRow(c, "ov-live", i18n.T("Show live text"), "", func() {
 		if ui.Switch(c.Key("ov-live-switch"), &f.liveText).Label(i18n.T("Show live text")).Changed() {
 			a.overlayEdited()
 		}
 	})
-	settingRow(c, "ov-margin", i18n.T("Distance from the edge"), i18n.T("From the bottom or the top of the screen, above the Dock and below the menu bar."), func() {
+	settingRow(c, "ov-margin", i18n.T("Distance from the edge"), "", func() {
 		slider("ov-margin-slider", i18n.T("Distance from the edge"), &f.margin, 0, ovMaxMargin, 4, fmt.Sprintf("%.0f", f.margin))
 	})
-	settingRow(c, "ov-opacity", i18n.T("Opacity"), i18n.T("Of the dark face over the blurred desktop: lower lets more of what is behind show through."), func() {
+	settingRow(c, "ov-opacity", i18n.T("Opacity"), "", func() {
 		slider("ov-opacity-slider", i18n.T("Opacity"), &f.opacity, 0.5, 1, 0.05, fmt.Sprintf("%.0f%%", f.opacity*100))
 	})
-	settingRow(c, "ov-radius", i18n.T("Corner radius"), i18n.T("The answer card takes the same corners."), func() {
+	settingRow(c, "ov-radius", i18n.T("Corner radius"), "", func() {
 		slider("ov-radius-slider", i18n.T("Corner radius"), &f.radius, 0, ovMaxRadius, 1, fmt.Sprintf("%.0f", f.radius))
 	})
 }

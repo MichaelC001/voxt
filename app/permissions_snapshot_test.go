@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/egoist/mygo"
 	"github.com/hehehai/VoxtMini/internal/apple"
 	"github.com/hehehai/VoxtMini/internal/helper/helpertest"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
@@ -67,17 +66,6 @@ func snapshotsPermissions(t *testing.T, out string) {
 		// Nothing downloaded: Automatic is Apple Speech.
 		shot("apple-auto", func(a *app, sim *helpertest.AppleSim) {
 			sim.SpeechPerm = proto.PermNotDetermined
-		})
-		// Notifications: refused, and allowed without banners.
-		shot("notify-denied", func(a *app, sim *helpertest.AppleSim) {
-			a.sysNoteStatus = func(fn func(mygo.NotificationStatus)) {
-				fn(mygo.NotificationStatus{Known: true, Asked: true, Denied: true})
-			}
-		})
-		shot("notify-allowed", func(a *app, sim *helpertest.AppleSim) {
-			a.sysNoteStatus = func(fn func(mygo.NotificationStatus)) {
-				fn(mygo.NotificationStatus{Known: true, Asked: true, Allowed: true, Style: 1})
-			}
 		})
 		// Transcribe picks Apple Speech, which macOS refused.
 		shot("apple-denied", func(a *app, sim *helpertest.AppleSim) {

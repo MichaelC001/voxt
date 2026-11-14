@@ -117,7 +117,7 @@ func (a *app) listModels() modelsList {
 
 func (a *app) modelsPage(c *ui.Context) {
 	t := c.Theme()
-	pageHeaderTip(c, i18n.T("Models"), i18n.T("Local models run on this Mac. A remote service gets your audio or text only when you choose it for a feature; its key stays in the Keychain."), func() {
+	pageHeaderTip(c, i18n.T("Models"), i18n.T("Local models run on this Mac. A remote service gets your audio or text only for a feature you choose it for."), func() {
 		if ghostButton(c.Key("models-network"), i18n.T("Network")).Tooltip(i18n.T("How model downloads and remote services reach the internet")).Clicked() {
 			a.openNetwork()
 		}
@@ -137,13 +137,13 @@ func (a *app) modelsPage(c *ui.Context) {
 				}
 			}
 			if len(l.apples) > 0 {
-				sectionTitleTip(c, i18n.T("Built into macOS"), i18n.T("Apple's own models: macOS provides them, so there is nothing to download from VoxtMini, and they run on this Mac."))
+				sectionTitleTip(c, i18n.T("Built into macOS"), i18n.T("Nothing to download; they run on this Mac."))
 				for _, id := range l.apples {
 					a.appleCard(c, id) // models_apple.go
 				}
 			}
 			if len(l.more) > 0 {
-				sectionTitleTip(c, i18n.T("More models"), i18n.T("More local models. Experimental ones are not yet checked on a Mac."))
+				sectionTitleTip(c, i18n.T("More models"), i18n.T("Experimental ones are not yet checked on a Mac."))
 				for _, m := range l.more {
 					a.modelCard(c, m)
 				}
@@ -165,9 +165,9 @@ func (a *app) modelsPage(c *ui.Context) {
 // modelsTip is the ⓘ of the Recommended section: what the tab's models do.
 func (a *app) modelsTip() string {
 	if a.mdTab == 1 {
-		return i18n.T("Cleans up, translates and rewrites the text. Without one, Transcribe types the text as recognised.")
+		return i18n.T("Without one, Transcribe types the text as recognised.")
 	}
-	return i18n.T("Turns what you say into text. Every feature needs one to work by voice.")
+	return i18n.T("Every feature needs one to work by voice.")
 }
 
 // modelsToolbar is the page's one toolbar row: the speech / language

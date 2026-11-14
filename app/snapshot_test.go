@@ -237,11 +237,17 @@ func scrollToText(tt *ui.Tester, s string) {
 }
 
 // snapshotSize is the window's size for snapshots: its default size, or
-// its smallest with VOXTMINI_SNAPSHOTS_SIZE=680x440 (or "min").
+// its smallest with VOXTMINI_SNAPSHOTS_SIZE=680x440 (or "min"), or any
+// other WxH.
 func snapshotSize() (w, h int) {
-	switch os.Getenv("VOXTMINI_SNAPSHOTS_SIZE") {
+	switch v := os.Getenv("VOXTMINI_SNAPSHOTS_SIZE"); v {
+	case "":
 	case "min", fmt.Sprintf("%dx%d", windowMinWidth, windowMinHeight):
 		return windowMinWidth, windowMinHeight
+	default: // any WxH: a tall window shows a whole settings section
+		if _, err := fmt.Sscanf(v, "%dx%d", &w, &h); err == nil && w > 0 && h > 0 {
+			return w, h
+		}
 	}
 	return windowWidth, windowHeight
 }

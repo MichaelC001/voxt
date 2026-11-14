@@ -148,12 +148,12 @@ func TestBetaUpdates(t *testing.T) {
 	}
 	a.navigate("/settings/about")
 	see(t, tt, "Get beta versions")
-	if !has(tt, "Beta updates") || !hasPrefix(tt, "Betas and releases, whichever is newer.") {
+	if !has(tt, "Beta updates") || !hasPrefix(tt, "Betas bring new features sooner") {
 		t.Fatalf("about: %q", firstTexts(tt))
 	}
 	click(t, tt, "Get beta versions")
 	frames(tt)
-	if !hasPrefix(tt, "Releases only. This beta stays until a release newer than it comes out") {
+	if !hasPrefix(tt, "This beta stays until a newer release comes out") {
 		t.Errorf("off in a beta: %q", firstTexts(tt))
 	}
 	if f.prereleases() || a.prefs.Updates.Beta == nil || *a.prefs.Updates.Beta {
@@ -179,7 +179,7 @@ func TestBetaUpdates(t *testing.T) {
 	}
 	c.navigate("/settings/about")
 	see(t, tt3, "Get beta versions")
-	if !hasPrefix(tt3, "Releases only. Turning it on offers betas too") {
+	if !hasPrefix(tt3, "Betas bring new features sooner") {
 		t.Errorf("off in a release: %q", firstTexts(tt3))
 	}
 	click(t, tt3, "Get beta versions")

@@ -184,9 +184,9 @@ func knobInfo(f knobs.Field) string {
 	rng := fmt.Sprintf("%s–%s", strconv.FormatFloat(f.Min, 'f', -1, 64), strconv.FormatFloat(f.Max, 'f', -1, 64))
 	switch f.Knob {
 	case knobs.Thinking:
-		return i18n.T("Thinks before it answers: slower, so VoxtMini waits three times as long for it. Off by default.")
+		return i18n.T("Slower answers. Off by default.")
 	case knobs.MainLanguage:
-		return i18n.T("On: the model is told your main language (Whisper only when you speak no other one). Off: it detects the language.")
+		return i18n.T("Off: the model detects the language.")
 	case knobs.Temperature:
 		return i18n.T("%s: higher writes more freely. Automatic: %s.", rng, autoText(f))
 	case knobs.TopP:

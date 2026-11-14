@@ -118,7 +118,7 @@ func (a *app) appEnhancementPage(c *ui.Context) {
 	t := c.Theme()
 	p := &a.aePage
 	inline, shown := p.list.layout(a, c, px(t, aeListW), px(t, aeMainMinW))
-	pageHeaderTip(c, i18n.T("App enhancement"), i18n.T("Rules for the app or website in front: each group's scene prompt is added to the features' rules while you dictate there."), func() {
+	pageHeaderTip(c, i18n.T("App enhancement"), i18n.T("A group's scene prompt applies while you dictate in its apps or websites."), func() {
 		if !inline {
 			p.list.toggle(c.Key("ae-list-toggle"), icons.SidebarMinimalistic, shown, i18n.T("Show the groups"), i18n.T("Hide the groups"))
 		}

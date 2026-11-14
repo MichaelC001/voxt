@@ -29,7 +29,7 @@ func (a *app) privacySettings(c *ui.Context) {
 	})
 
 	sectionTitle(c, i18n.T("Kept on this Mac"))
-	settingRow(c, "priv-history", i18n.T("Keep a history"), i18n.T("Each transcription, translation and rewrite is saved with its source text, so you can find, copy or redo it."), func() {
+	settingRow(c, "priv-history", i18n.T("Keep a history"), "", func() {
 		if ui.Switch(c.Key("priv-history"), &a.settingsForm.keepHistory).Label(i18n.T("Save each result")).Changed() {
 			on := a.settingsForm.keepHistory
 			a.updateSettings(func(s *settings.Settings) {
@@ -40,25 +40,25 @@ func (a *app) privacySettings(c *ui.Context) {
 			})
 		}
 	})
-	settingRow(c, "priv-audio", i18n.T("Keep the recordings"), i18n.T("Saves the audio with each entry, to listen again or recognise it once more. Off, only a recording that failed is kept, for 7 days, to retry."), func() {
+	settingRow(c, "priv-audio", i18n.T("Keep the recordings"), i18n.T("Off: only failed recordings are kept, for 7 days, to retry."), func() {
 		if ui.Switch(c.Key("priv-audio"), &a.settingsForm.keepAudio).Label(i18n.T("Save each recording")).Disabled(!a.prefs.Privacy.KeepHistory).Changed() {
 			on := a.settingsForm.keepAudio
 			a.updateSettings(func(s *settings.Settings) { s.Privacy.KeepAudio = on })
 		}
 	})
-	settingRow(c, "priv-hist-settings", i18n.T("History settings"), i18n.T("Where the recordings are kept, exporting them, and the automatic clean-up of old entries."), func() {
+	settingRow(c, "priv-hist-settings", i18n.T("History settings"), "", func() {
 		if ui.Button(c.Key("priv-hist-settings"), i18n.T("Open")).Clicked() {
 			a.showHistorySettings()
 		}
 	})
-	settingRow(c, "priv-clear", i18n.T("Clear the history"), i18n.T("Deletes every entry and its recording. Your dictionary and settings stay."), func() {
+	settingRow(c, "priv-clear", i18n.T("Clear the history"), i18n.T("Recordings too. The dictionary and settings stay."), func() {
 		if ui.Button(c.Key("priv-clear"), i18n.T("Clear")).Clicked() {
 			a.clearHistoryAsk = true
 		}
 	})
 
 	sectionTitle(c, i18n.T("Logs"))
-	settingRow(c, "priv-log-text", i18n.T("Write text to the log"), i18n.T("Off, the log records only lengths and timings of what you said and got back, never the text. Turn it on to report a problem, then off again."), func() {
+	settingRow(c, "priv-log-text", i18n.T("Write text to the log"), i18n.T("Your words go into the log. Turn it on only to report a problem."), func() {
 		if ui.Switch(c.Key("priv-log-text"), &a.settingsForm.logText).Label(i18n.T("Log what was said")).Changed() {
 			on := a.settingsForm.logText
 			a.updateSettings(func(s *settings.Settings) { s.Privacy.LogText = on })

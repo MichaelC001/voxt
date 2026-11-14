@@ -93,9 +93,9 @@ func (a *app) cleanOrphans() {
 // orphans not empty).
 func (a *app) orphanRow(c *ui.Context, r *storageReport) {
 	t := c.Theme()
-	ui.Row(c.Key("st-orphans-title")).Gap(px(t, 6)).AlignItems(ui.Center).Children(func() {
-		ui.Text(c, i18n.T("Left by uninstalled apps"))
-		infoTip(c, i18n.T("Models only apps that are no longer installed used. Neither VoxtMini nor an installed ActNow app needs them."))
+	ui.Row(c.Key("st-orphans-title")).Gap(px(t, 6)).AlignItems(ui.Start).Children(func() {
+		label := i18n.T("Left by uninstalled apps")
+		labelTip(c, ui.Text(c, label), label, t.FontSize, 400, i18n.T("No installed ActNow app uses them."))
 	})
 	ui.Text(c, uitext.HumanBytes(orphanBytes(r.orphans))).TextColor(c.Theme().TextMuted).TextAlign(ui.End)
 	ui.Row(c.Key("st-orphans-act")).Children(func() {

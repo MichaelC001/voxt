@@ -371,7 +371,7 @@ func (a *app) trPasteRow(c *ui.Context) {
 	cur := a.prefs.Features.PasteLast.Keys
 	problems := uitext.HotkeyProblems(a.prefs.Features, hotkey.PasteLast)[0]
 	ui.Column(c.Key("tr-paste")).Gap(px(t, 6)).Children(func() {
-		settingRow(c, "tr-paste-row", i18n.T("Paste the last result"), i18n.T("Pastes the latest result again where you type, whichever feature made it."), func() {
+		settingRow(c, "tr-paste-row", i18n.T("Paste the last result"), "", func() {
 			opts, byLabel := keyOptions(cur, true)
 			if !slices.Contains(opts, r.sel) {
 				r.sel = chordLabel(cur)

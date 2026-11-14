@@ -132,7 +132,7 @@ func (a *app) dictionaryPage(c *ui.Context) {
 	if !d.read && !d.loading {
 		a.loadDict()
 	}
-	pageHeaderTip(c, i18n.T("Dictionary"), i18n.T("Names and terms you use: speech recognition expects them, and clean-up writes them as you spell them here."), func() {
+	pageHeaderTip(c, i18n.T("Dictionary"), i18n.T("Recognition and clean-up write these as spelled here."), func() {
 		if d.total > 0 {
 			caption(c, i18n.N(d.total, "%d term", "%d terms", d.total)).SingleLine()
 		}

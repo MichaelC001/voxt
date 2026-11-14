@@ -17,7 +17,7 @@ import (
 func infoTip(c *ui.Context, text string) ui.Element {
 	t := c.Theme()
 	k := tok(t)
-	b := ui.ButtonBase(c).Size(px(t, 18), px(t, 18)).Center().Radius(px(t, radiusPill)).Label(text).Tooltip(text)
+	b := ui.ButtonBase(c).Size(px(t, infoTipBox), px(t, infoTipBox)).Center().Radius(px(t, radiusPill)).Label(text).Tooltip(text)
 	b.Children(func() {
 		col := k.Text3
 		if b.Hovered() {

@@ -38,13 +38,13 @@ func (a *app) recordingSettings(c *ui.Context) {
 	t := c.Theme()
 	f := &a.settingsForm
 	sectionTitle(c, i18n.T("While recording"))
-	settingRow(c, "esc-cancels", i18n.T("Escape cancels"), i18n.T("Escape cancels a recording and closes the answer card. Off, Escape goes to the app you are in."), func() {
+	settingRow(c, "esc-cancels", i18n.T("Escape cancels"), "", func() {
 		if ui.Switch(c.Key("esc-cancels-switch"), &f.escCancels).Label(i18n.T("Escape cancels")).Changed() {
 			off := !f.escCancels
 			a.updateSettings(func(s *settings.Settings) { s.Features.EscapeOff = off })
 		}
 	})
-	settingRow(c, "end-command", i18n.T("Voice end command"), i18n.T("Say the end word, then pause: the recording stops by itself and the word is left out of the result. It stops by itself only with a speech model that shows text as you speak (not Whisper); with any model, the word at the end is left out."), func() {
+	settingRow(c, "end-command", i18n.T("Voice end command"), i18n.T("Say it, then pause: the recording stops and the word is left out. Stopping by itself needs a speech model with live text (not Whisper)."), func() {
 		if ui.Switch(c.Key("end-command-switch"), &f.endCommand).Label(i18n.T("Voice end command")).Changed() {
 			on := f.endCommand
 			a.updateSettings(func(s *settings.Settings) { s.Features.EndCommand.On = on })

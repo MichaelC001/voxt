@@ -48,7 +48,7 @@ func (a *app) sharedKeyNotes(c *ui.Context, mask string) {
 	}
 	ui.Row(c.Key("rm-share")).Gap(px(t, 6)).AlignItems(ui.Center).Children(func() {
 		ui.Checkbox(c.Key("rm-share-box"), &f.share, i18n.T("Let other ActNow apps on this Mac use this key")).Shrink(1)
-		infoTip(c, i18n.T("Saved once in the login Keychain for the ActNow apps: changing it changes it in each app that uses it.")).Shrink(0)
+		infoTip(c, i18n.T("Changing it here changes it in every ActNow app that uses it.")).Shrink(0)
 	})
 	if f.share && f.ref != "" && strings.TrimSpace(d.key) != "" && len(f.others) > 0 {
 		caption(c, i18n.T("Also updates it in %s.", strings.Join(f.others, ", ")))

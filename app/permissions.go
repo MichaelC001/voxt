@@ -32,11 +32,7 @@ const (
 	privacyMicrophone    = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
 	privacyAccessibility = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 	privacySpeech        = "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition"
-	notificationSettings = "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=" + selfBundleID
 )
-
-// permissionsPath is the Permissions section.
-const permissionsPath = "/settings/permissions"
 
 // permissionsState is what the section last read.
 type permissionsState struct {
@@ -50,9 +46,6 @@ type permissionsState struct {
 		// speech is Speech Recognition (Apple Speech's), as the helper
 		// reports it; Unknown from a helper without it.
 		speech permission.State
-		// notify is whether macOS lets VoxtMini notify (models_notify.go;
-		// not Known: it cannot tell, and the row hides).
-		notify mygo.NotificationStatus
 	}
 }
 
@@ -99,7 +92,6 @@ func (a *app) openPermissions() {
 // the helper sees them when it can say (what showed stays until it
 // answers), else here at once.
 func (a *app) recheckPermissions() {
-	a.readNoteStatus() // models_notify.go
 	if !a.hstatus.Has(proto.MethodPermissionsStatus) {
 		a.localPerms()
 		return
@@ -169,7 +161,7 @@ func (a *app) permissionsSettings(c *ui.Context) {
 	}
 
 	micText, micOK := uitext.PermissionText(a.perms.mic)
-	settingRow(c, "perm-mic", i18n.T("Microphone"), i18n.T("Transcribe, translate and rewrite by voice record while you hold or tap their shortcut."), func() {
+	settingRow(c, "perm-mic", i18n.T("Microphone"), "", func() {
 		badge(micText, micOK)
 		if a.perms.mic == permission.NotDetermined {
 			if ghostButton(c.Key("perm-mic-ask"), i18n.T("Ask")).Clicked() {
@@ -186,7 +178,7 @@ func (a *app) permissionsSettings(c *ui.Context) {
 	if accOK {
 		accText = i18n.T("Allowed")
 	}
-	settingRow(c, "perm-access", i18n.T("Accessibility"), i18n.T("Types results at your cursor, reads the selected text and the browser tab's address, and allows single-key shortcuts like Right ⌥. Without it, results are copied for you to paste."), func() {
+	settingRow(c, "perm-access", i18n.T("Accessibility"), i18n.T("Needed to type at your cursor, read the selection and use single-key shortcuts. Without it, results are only copied."), func() {
 		badge(accText, accOK)
 		if !accOK {
 			if ghostButton(c.Key("perm-access-ask"), i18n.T("Ask")).Tooltip(i18n.T("Adds VoxtMini to the list in System Settings")).Clicked() {
@@ -199,7 +191,7 @@ func (a *app) permissionsSettings(c *ui.Context) {
 	})
 	if a.perms.speech != permission.Unknown && a.appleSpeechInUse() {
 		spText, spOK := uitext.PermissionText(a.perms.speech)
-		settingRow(c, "perm-speech", i18n.T("Speech Recognition"), i18n.T("Only Apple Speech needs it: macOS recognises your speech on this Mac. The other speech models do not."), func() {
+		settingRow(c, "perm-speech", i18n.T("Speech Recognition"), i18n.T("Only Apple Speech needs it."), func() {
 			badge(spText, spOK)
 			if a.perms.speech == permission.NotDetermined {
 				if ghostButton(c.Key("perm-speech-ask"), i18n.T("Ask")).Clicked() {
@@ -213,45 +205,10 @@ func (a *app) permissionsSettings(c *ui.Context) {
 			}
 		})
 	}
-	a.notificationRow(c, badge)
 	ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Margin(px(t, sp2), 0, 0, 0).Children(func() {
 		if secondaryIconButton(c.Key("perm-recheck"), icons.Refresh, i18n.T("Check again")).Label(i18n.T("Check again")).Clicked() {
 			a.recheckPermissions()
 		}
-		infoTip(c.Key("perm-note"), i18n.T("After you change a permission, macOS may ask to quit and reopen VoxtMini. Updating an ad hoc signed build can make macOS forget Accessibility: turn it off and on again."))
-	})
-}
-
-// notificationRow is the Notifications row, once macOS said: allowed,
-// in Notification Center only (no banners), not allowed, or not asked
-// yet (the first download notification asks; so does the test).
-func (a *app) notificationRow(c *ui.Context, badge func(string, bool)) {
-	st := a.perms.notify
-	if !st.Known {
-		return
-	}
-	text, ok, open := i18n.T("Allowed"), true, false
-	switch {
-	case st.Denied:
-		text, ok, open = i18n.T("Not allowed"), false, true
-	case !st.Asked:
-		text = i18n.T("Not asked yet")
-	case st.Style == 0:
-		text, ok, open = i18n.T("No banners"), false, true
-	}
-	settingRow(c, "perm-notify", i18n.T("Notifications"), i18n.T("Tells you when a model's download finishes or fails while VoxtMini is in the background."), func() {
-		if st.Asked {
-			badge(text, ok)
-		} else {
-			caption(c, text)
-		}
-		if ghostButton(c.Key("perm-notify-test"), i18n.T("Test")).Tooltip(i18n.T("Send a test notification")).Clicked() {
-			a.testNotification()
-		}
-		if open {
-			if ghostIconButton(c.Key("perm-notify-open"), icons.SquareArrowRightUp, i18n.T("Open System Settings")).Label(i18n.T("Open System Settings")).Clicked() {
-				a.openPrivacy(c, notificationSettings)
-			}
-		}
+		infoTip(c.Key("perm-note"), i18n.T("macOS may ask to reopen VoxtMini after a change. If Accessibility stops working after an update, turn it off and on again."))
 	})
 }

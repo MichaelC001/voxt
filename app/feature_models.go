@@ -36,7 +36,7 @@ func (a *app) featureModels(c *ui.Context, feature string) {
 		u.svcSeen = seen
 		u.asr, u.llm = modelLabel(readyA, f.ASR, autoA), modelLabel(readyL, f.LLM, autoL)
 	}
-	sectionTitleTip(c, i18n.T("Models"), i18n.T("Automatic picks the best installed local model. A remote service is used only if you choose it here."))
+	sectionTitleTip(c, i18n.T("Models"), i18n.T("Automatic: the best installed local model. A remote service is used only if you choose it."))
 	opened := false // one "Open Models" per page
 	openModels := func() {
 		if opened {
@@ -67,19 +67,16 @@ func (a *app) featureModels(c *ui.Context, feature string) {
 			notice(c, p+"-no-llm", noticeWarn, i18n.T("No language model installed."), "", openModels, nil)
 		}
 	}
-	var asrDesc, asrLabel, llmDesc, llmLabel string
+	var asrLabel, llmLabel string
 	switch feature {
 	case hotkey.Translate:
-		asrDesc, asrLabel = i18n.T("Turns what you say into text, when nothing is selected."), i18n.T("Speech model for Translate")
-		llmDesc, llmLabel = i18n.T("Translates the text."), i18n.T("Language model for Translate")
+		asrLabel, llmLabel = i18n.T("Speech model for Translate"), i18n.T("Language model for Translate")
 	case hotkey.Rewrite:
-		asrDesc, asrLabel = i18n.T("Turns your spoken instruction into text."), i18n.T("Speech model for Rewrite")
-		llmDesc, llmLabel = i18n.T("Rewrites the selection, or writes what you ask for."), i18n.T("Language model for Rewrite")
+		asrLabel, llmLabel = i18n.T("Speech model for Rewrite"), i18n.T("Language model for Rewrite")
 	default:
-		asrDesc, asrLabel = i18n.T("Turns your recording into text."), i18n.T("Speech model for Transcribe")
-		llmDesc, llmLabel = i18n.T("Cleans up the recognised text when \"Clean up with a language model\" is on."), i18n.T("Language model for Transcribe")
+		asrLabel, llmLabel = i18n.T("Speech model for Transcribe"), i18n.T("Language model for Transcribe")
 	}
-	settingRow(c, p+"-asr", i18n.T("Speech recognition"), asrDesc, func() {
+	settingRow(c, p+"-asr", i18n.T("Speech recognition"), "", func() {
 		sel := ui.Select(c.Key(p+"-asr-sel"), &u.asr, optsA).Label(asrLabel).Width(px(t, 260)).Shrink(1).MinWidth(px(t, 160)).Disabled(len(allA) == 0)
 		if sel.Changed() {
 			id := modelID(optsA, readyA, u.asr)
@@ -89,7 +86,7 @@ func (a *app) featureModels(c *ui.Context, feature string) {
 	if okA && mA.Remote {
 		notice(c, p+"-remote-asr", noticeInfo, i18n.T("Your recordings are sent to %s to be recognised.", modelChoice(mA)), "", nil, nil)
 	}
-	settingRow(c, p+"-llm", i18n.T("Language model"), llmDesc, func() {
+	settingRow(c, p+"-llm", i18n.T("Language model"), "", func() {
 		sel := ui.Select(c.Key(p+"-llm-sel"), &u.llm, optsL).Label(llmLabel).Width(px(t, 260)).Shrink(1).MinWidth(px(t, 160)).
 			Disabled(len(allL) == 0 || !enhance)
 		if sel.Changed() {
@@ -154,21 +151,21 @@ func (a *app) trEnhance(c *ui.Context) {
 	sectionTitle(c, i18n.T("Clean-up"))
 	f := &a.prefs.Features.Transcribe
 	settingRow(c, "tr-enhance", i18n.T("Clean up with a language model"),
-		i18n.T("Sends the recognised text to the language model with the prompt below, and types its answer. Off, the text is typed as recognised. If the model fails or is slow, the recognised text is typed."), func() {
+		i18n.T("If the model fails or is slow, the recognised text is typed."), func() {
 			if ui.Switch(c.Key("tr-enhance-switch"), &f.Enhance).Label(i18n.T("Clean up with a language model")).Changed() {
 				on := f.Enhance
 				a.updateSettings(func(s *settings.Settings) { s.Features.Transcribe.Enhance = on })
 			}
 		})
 	settingRow(c, "tr-cleanup", i18n.T("Basic clean-up"),
-		i18n.T("Removes fillers and false starts, keeps your corrections, fixes punctuation and capitals, and turns spoken punctuation (\"comma\", \"new line\") into marks."), func() {
+		i18n.T("Removes fillers, fixes punctuation, turns spoken \"comma\" or \"new line\" into marks."), func() {
 			if ui.Switch(c.Key("tr-cleanup-switch"), &f.Cleanup).Label(i18n.T("Basic clean-up")).Disabled(!f.Enhance).Changed() {
 				on := f.Cleanup
 				a.updateSettings(func(s *settings.Settings) { s.Features.Transcribe.Cleanup = on })
 			}
 		})
 	settingRow(c, "tr-structure", i18n.T("Structure"),
-		i18n.T("Makes a list when you clearly say steps or several items, and splits a long text into paragraphs. Off, the text keeps the form you said it in."), func() {
+		i18n.T("Lists for steps or items, paragraphs for a long text."), func() {
 			if ui.Switch(c.Key("tr-structure-switch"), &f.Structure).Label(i18n.T("Structure")).Disabled(!f.Enhance).Changed() {
 				on := f.Structure
 				a.updateSettings(func(s *settings.Settings) { s.Features.Transcribe.Structure = on })

@@ -101,20 +101,14 @@ func (a *app) rewritePage(c *ui.Context) { a.featurePage(c, hotkey.Rewrite) }
 // own: its first card is the shortcuts, whose triggers tell their own
 // tooltips).
 func (a *app) featureTip(feature string) string {
-	var tip string
 	switch feature {
 	case hotkey.Translate:
-		tip = i18n.T("Select text and press the shortcut to translate it in place. With nothing selected, speak: the translation is typed at your cursor.")
+		return i18n.T("Select text to translate it in place; with nothing selected, speak.")
 	case hotkey.Rewrite:
-		tip = i18n.T("Select text and say how to change it (\"shorter\", \"more formal\"), or with nothing selected say what to write. The answer is typed at your cursor.") +
-			" " + i18n.T("While the answer card shows an answer, the shortcut records a follow-up that changes it (\"shorter\", \"in English\").")
-	default:
-		tip = i18n.T("Press a shortcut anywhere and speak: the text is typed at your cursor.")
+		return i18n.T("Select text and say how to change it, or say what to write.") +
+			" " + i18n.T("While the answer card shows, the shortcut asks a follow-up.")
 	}
-	if !a.prefs.Features.EscapeOff { // Settings → Shortcuts → Escape cancels (settings_recording.go)
-		tip += " " + i18n.T("Esc cancels a recording.")
-	}
-	return tip
+	return "" // Transcribe: press and speak, nothing to explain
 }
 
 // featurePage builds a feature's page.

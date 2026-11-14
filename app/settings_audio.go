@@ -178,8 +178,12 @@ func (a *app) audioSettings(c *ui.Context) {
 	}
 
 	ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Margin(px(t, sp2), 0, 0, 0).Children(func() {
-		sectionTitleText(c, i18n.T("Microphones"))
-		infoTip(c.Key("audio-mics-info"), i18n.T("VoxtMini records from the first microphone of the list that is connected. When none of them is, or the list is empty, it records from the system's default input."))
+		ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Start).Children(func() {
+			label := i18n.T("Microphones")
+			tm, im := tipMargins(t, label, px(t, fsCaption), 600)
+			sectionTitleText(c, label).Margin(tm, 0, 0, 0)
+			infoTip(c.Key("audio-mics-info"), i18n.T("Records from the first connected one; when none is, from the system's default input.")).Margin(im, 0, 0, 0)
+		})
 		ui.Spacer(c)
 		if iconButton(c.Key("audio-refresh"), icons.Refresh, i18n.T("Refresh the microphones")).Disabled(!a.helperReady() || a.audio.loading).Clicked() {
 			a.loadDevices()
@@ -282,19 +286,19 @@ func (a *app) audioSettings(c *ui.Context) {
 	f := &a.settingsForm
 	sum := summary(onOff(i18n.T("Skip silence"), f.skipSilence), onOff(i18n.T("Optimize sound"), f.cleanSound), onOff(i18n.T("Mute while recording"), f.muteOutput))
 	advanced(c.Key("audio-advanced"), &f.audioAdvanced, sum, func() {
-		settingRow(c, "audio-silence", i18n.T("Skip silence"), i18n.T("Trims silence and long pauses before recognition; sends nothing when no one spoke. The history keeps the whole recording."), func() {
+		settingRow(c, "audio-silence", i18n.T("Skip silence"), i18n.T("Recognition skips pauses; the history keeps the whole recording."), func() {
 			if ui.Switch(c.Key("audio-silence-switch"), &f.skipSilence).Label(i18n.T("Skip silence")).Changed() {
 				off := !f.skipSilence
 				a.updateSettings(func(s *settings.Settings) { s.Audio.VAD.Off = off })
 			}
 		})
-		settingRow(c, "audio-clean", i18n.T("Optimize sound"), i18n.T("Filters out low hum (air conditioning, fans) and evens out the volume before recognition. The history keeps the original recording."), func() {
+		settingRow(c, "audio-clean", i18n.T("Optimize sound"), i18n.T("Filters hum and evens the volume for recognition; the history keeps the original."), func() {
 			if ui.Switch(c.Key("audio-clean-switch"), &f.cleanSound).Label(i18n.T("Optimize sound")).Changed() {
 				off := !f.cleanSound
 				a.updateSettings(func(s *settings.Settings) { s.Audio.Clean.Off = off })
 			}
 		})
-		settingRow(c, "audio-mute", i18n.T("Mute system audio while recording"), i18n.T("Mutes the output device while you speak, so videos, music or calls are not recorded; the sound comes back when recording stops. Some devices cannot be muted by software."), func() {
+		settingRow(c, "audio-mute", i18n.T("Mute system audio while recording"), i18n.T("Some devices cannot be muted by software."), func() {
 			if ui.Switch(c.Key("audio-mute-switch"), &f.muteOutput).Label(i18n.T("Mute system audio while recording")).Changed() {
 				on := f.muteOutput
 				a.updateSettings(func(s *settings.Settings) { s.Audio.MuteOutput = &on })

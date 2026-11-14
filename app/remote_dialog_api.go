@@ -22,7 +22,7 @@ func (a *app) chatAPI(c *ui.Context, pr providers.Preset) {
 		if d.api == llm.APIResponses {
 			sel = labels[1]
 		}
-		fieldInfo(c, i18n.T("API"), i18n.T("Responses is OpenAI's newer API. Some services search the web only through it."), func() {
+		fieldInfo(c, i18n.T("API"), i18n.T("Some services search the web only through Responses."), func() {
 			if ui.Select(c.Key("rm-api"), &sel, labels).Label(i18n.T("API")).Width(px(t, 320)).Changed() {
 				d.api = ""
 				if sel == labels[1] {
@@ -35,7 +35,7 @@ func (a *app) chatAPI(c *ui.Context, pr providers.Preset) {
 		return
 	}
 	settingRow(c, "rm-search", i18n.T("Search the web when rewriting"),
-		i18n.T("Rewrite may look up current facts on the web: slower, and it may cost more. Transcribe and Translate never search."), func() {
+		i18n.T("Slower, and it may cost more. Transcribe and Translate never search."), func() {
 			ui.Switch(c.Key("rm-search-switch"), &d.search).Label(i18n.T("Search the web when rewriting"))
 		})
 }

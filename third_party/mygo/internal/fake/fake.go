@@ -110,8 +110,6 @@ type Backend struct {
 	// NotificationError, when set, is what showing a notification fails
 	// with.
 	NotificationError error
-	// Status is what NotificationStatus reports (Known false: unset).
-	Status platform.NotificationStatus
 	// NoWebView makes WebViewAvailable report no system webview, as a
 	// machine without one does.
 	NoWebView bool
@@ -1338,11 +1336,3 @@ func (b *Backend) SetSecretError(err error) {
 
 // SetVibrancyStyle does nothing: the fake shows no material.
 func (w *Window) SetVibrancyStyle(platform.VibrancyStyle) {}
-
-// NotificationStatus reports Status.
-func (b *Backend) NotificationStatus(done func(platform.NotificationStatus)) {
-	b.mu.Lock()
-	st := b.Status
-	b.mu.Unlock()
-	done(st)
-}

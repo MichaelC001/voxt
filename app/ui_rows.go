@@ -30,9 +30,8 @@ func settingRowNoteTip(c *ui.Context, key, title, tip, note string, control func
 			if tip == "" {
 				ui.Text(c, title)
 			} else {
-				ui.Row(c).Gap(px(t, 6)).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, title).MinWidth(0)
-					infoTip(c, tip)
+				ui.Row(c).Gap(px(t, 6)).AlignItems(ui.Start).Children(func() {
+					labelTip(c, ui.Text(c, title).MinWidth(0), title, t.FontSize, 400, tip)
 				})
 			}
 			if note != "" {
@@ -58,9 +57,8 @@ func sectionTitleText(c *ui.Context, title string) ui.Element {
 // the row, so the title and the ⓘ share one centre line.
 func sectionTitleTip(c *ui.Context, title, tip string) {
 	t := c.Theme()
-	ui.Row(c).Gap(px(t, 6)).AlignItems(ui.Center).Margin(px(t, sp2), 0, 0, 0).Children(func() {
-		sectionTitleText(c, title)
-		infoTip(c, tip)
+	ui.Row(c).Gap(px(t, 6)).AlignItems(ui.Start).Margin(px(t, sp2), 0, 0, 0).Children(func() {
+		labelTip(c, sectionTitleText(c, title), title, px(t, fsCaption), 600, tip)
 	})
 }
 
@@ -77,8 +75,9 @@ func sectionTitleAdd(c *ui.Context, key, title, tip, add string) bool {
 	t := c.Theme()
 	clicked := false
 	ui.Row(c).Gap(px(t, 6)).AlignItems(ui.Center).Margin(px(t, sp2), 0, 0, 0).Children(func() {
-		sectionTitleText(c, title).SingleLine().Shrink(0)
-		infoTip(c, tip).Shrink(0)
+		ui.Row(c).Gap(px(t, 6)).AlignItems(ui.Start).Shrink(0).Children(func() {
+			labelTip(c, sectionTitleText(c, title).SingleLine().Shrink(0), title, px(t, fsCaption), 600, tip).Shrink(0)
+		})
 		ui.Spacer(c)
 		b := quietButton(c.Key(key), icons.Add, add).Margin(px(t, -3.5), -titleAddHang(t), px(t, -3.5), 0)
 		clicked = b.Clicked()

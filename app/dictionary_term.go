@@ -80,7 +80,7 @@ func (a *app) termDialog(c *ui.Context) {
 		title = i18n.T("Edit term")
 	}
 	dialogFrame(c, "term-dlg", &d.editOpen, title, "", 460, func() {
-		fieldInfo(c, i18n.T("Term"), i18n.T("As it must be written: VoxtMini, Kubernetes, 豆包."), func() {
+		fieldInfo(c, i18n.T("Term"), "", func() {
 			in := ui.TextInput(c.Key("term-term"), &e.term).Label(i18n.T("Term as written")).Placeholder("VoxtMini").AutoFocus()
 			if in.Changed() {
 				e.err = ""
@@ -89,7 +89,7 @@ func (a *app) termDialog(c *ui.Context) {
 				a.submitTerm()
 			}
 		})
-		fieldInfo(c, i18n.T("Aliases"), i18n.T("What speech recognition writes instead, separated by commas: Vox Tunew, 沃克斯牛. VoxtMini puts the term in their place, also without a language model."), func() {
+		fieldInfo(c, i18n.T("Aliases"), i18n.T("Misrecognitions to replace, separated by commas: Vox Tunew, 沃克斯牛."), func() {
 			ui.TextInput(c.Key("term-aliases"), &e.aliases).Label(i18n.T("Aliases of the term")).Placeholder(i18n.T("Vox Tunew, 沃克斯牛"))
 		})
 		fieldInfo(c, i18n.T("Note"), i18n.T("For you only: it is sent nowhere."), func() {
@@ -109,7 +109,7 @@ func (a *app) termDialog(c *ui.Context) {
 			for _, g := range groups {
 				ch.add(g.ID, g.Name)
 			}
-			fieldInfo(c, i18n.T("Used in"), i18n.T("A term for one App enhancement group is used only when that group matches the app you speak in."), func() {
+			fieldInfo(c, i18n.T("Used in"), i18n.T("A group's term applies only in that group's apps."), func() {
 				ch.pick(c, "term-group", i18n.T("Where the term is used"), &e.group)
 			})
 		}

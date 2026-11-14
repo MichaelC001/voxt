@@ -153,7 +153,7 @@ func (a *app) presetRow(c *ui.Context, key string) {
 	t := c.Theme()
 	opts, ids := presetOptions(hotkey.PresetOf(a.prefs.Features))
 	a.presetSel = uitext.PresetText(hotkey.PresetOf(a.prefs.Features))
-	help := i18n.T("Sets the shortcuts of Transcribe, Translate and Rewrite at once; Paste the last result stays. Mouse middle: click to transcribe, double-click to rewrite.")
+	help := i18n.T("Replaces the three features' shortcuts. Mouse middle: click to transcribe, double-click to rewrite.")
 	settingRow(c, key, i18n.T("Preset"), help, func() {
 		if ui.Select(c.Key(key+"-sel"), &a.presetSel, opts).Label(i18n.T("Shortcut preset")).Width(px(t, 180)).Changed() {
 			if i := slices.Index(opts, a.presetSel); i >= 0 {

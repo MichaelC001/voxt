@@ -306,7 +306,7 @@ func (a *app) storageSettings(c *ui.Context) {
 	}
 
 	sectionTitle(c, i18n.T("Data folder"))
-	settingRow(c, "st-data", uitext.ShortPath(a.dataDir()), i18n.T("Your history and its recordings, your dictionary and the database."), func() {
+	settingRow(c, "st-data", uitext.ShortPath(a.dataDir()), "", func() {
 		open("st-open-data", a.dataDir())
 		if ui.Button(c.Key("st-move"), i18n.T("Move")).Disabled(a.moving).Clicked() {
 			chooseMoveDir(a, a.startMove)
@@ -363,7 +363,7 @@ func (a *app) storageSettings(c *ui.Context) {
 			a.resetLook()
 		}
 	})
-	settingRow(c, "st-reset-settings", i18n.T("Reset all settings"), i18n.T("Every setting goes back to its default. Your history and dictionary stay."), func() {
+	settingRow(c, "st-reset-settings", i18n.T("Reset all settings"), i18n.T("Your history and dictionary stay."), func() {
 		if ui.Button(c.Key("st-reset-settings"), i18n.T("Reset")).Clicked() {
 			a.resetAsk = "settings"
 		}
@@ -382,7 +382,7 @@ func (a *app) storageDialogs(c *ui.Context) {
 	open := a.resetAsk == "settings"
 	modal(c.Key("st-ask-settings"), &open, func() {
 		ui.Text(c, i18n.T("Reset all settings?")).Bold()
-		ui.Text(c, i18n.T("Every setting goes back to its default. Your history and dictionary stay.")).Width(px(t, 380))
+		ui.Text(c, i18n.T("Your history and dictionary stay.")).Width(px(t, 380))
 		ui.Row(c).Gap(px(t, sp2)).Justify(ui.End).Children(func() {
 			if ui.Button(c.Key("st-ask-cancel"), i18n.T("Cancel")).AutoFocus().Clicked() {
 				a.resetAsk = ""

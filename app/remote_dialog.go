@@ -184,7 +184,7 @@ func (a *app) providerDialogView(c *ui.Context) {
 				ui.Link(c.Key("rm-keyurl"), i18n.T("Get a key"), pr.KeyURL).FontSize(px(t, fsCaption))
 			}
 		})
-		settingRow(c, "rm-enabled", i18n.T("Use this service"), i18n.T("Off, the features cannot choose it, but it keeps its setup and key."), func() {
+		settingRow(c, "rm-enabled", i18n.T("Use this service"), i18n.T("Off keeps its setup and key."), func() {
 			ui.Switch(c.Key("rm-enabled-switch"), &d.enabled).Label(i18n.T("Use this service"))
 		})
 		if pr.Custom {
@@ -267,16 +267,16 @@ func (a *app) speechAdvanced(c *ui.Context, pr providers.Preset) {
 		d.language = ""
 	}
 	sel := labels[slices.Index(codes, d.language)]
-	fieldInfo(c, i18n.T("Language"), i18n.T("The language hint sent with each recording."), func() {
+	fieldInfo(c, i18n.T("Language"), "", func() {
 		if ui.Select(c.Key("rm-lang"), &sel, labels).Label(i18n.T("Language")).Width(px(t, 320)).Changed() {
 			d.language = codes[slices.Index(labels, sel)]
 		}
 	})
-	settingRow(c, "rm-hints", i18n.T("Send the dictionary"), i18n.T("Sends your dictionary's terms with each recording, as hot words or in the prompt, so that they are recognised as written."), func() {
+	settingRow(c, "rm-hints", i18n.T("Send the dictionary"), i18n.T("Your dictionary's terms go to the service with each recording."), func() {
 		ui.Switch(c.Key("rm-hints-switch"), &d.hints).Label(i18n.T("Send the dictionary"))
 	})
 	if pr.Prompt {
-		fieldInfo(c, i18n.T("Recognition prompt"), i18n.T("Words about what you say (topics, names, how to spell them) that help recognition. Your dictionary's terms are added to it."), func() {
+		fieldInfo(c, i18n.T("Recognition prompt"), i18n.T("Topics and names that help recognition. Your dictionary's terms are added."), func() {
 			ui.TextArea(c.Key("rm-prompt"), &d.prompt).Placeholder(i18n.T("Optional")).Label(i18n.T("Recognition prompt")).MinHeight(px(t, 64))
 		})
 	}
@@ -293,7 +293,7 @@ func (a *app) chatAdvanced(c *ui.Context, pr providers.Preset) {
 			key, label, info string
 			v                *string
 		}{
-			{"rm-temp", i18n.T("Temperature"), i18n.T("0–2. Default: VoxtMini's for each task (low for clean-up and translation)."), &d.temp},
+			{"rm-temp", i18n.T("Temperature"), i18n.T("0–2. Default: VoxtMini's, low for clean-up and translation."), &d.temp},
 			{"rm-topp", i18n.T("Top-p"), i18n.T("0–1. Default: the service's."), &d.topP},
 			{"rm-maxtok", i18n.T("Max output tokens"), i18n.T("Default: the service's."), &d.maxTok},
 		} {
@@ -431,9 +431,9 @@ func (a *app) saveProviderDialog() {
 func (a *app) keyField(c *ui.Context, name, mask string, optional bool) {
 	t := c.Theme()
 	d := &a.rmDlg
-	info := i18n.T("Saved in this Mac's Keychain, never in VoxtMini's settings or logs.")
+	info := i18n.T("Saved only in this Mac's Keychain.")
 	if optional {
-		info = i18n.T("Optional for this service. Saved in this Mac's Keychain, never in VoxtMini's settings or logs.")
+		info = i18n.T("Optional. Saved only in this Mac's Keychain.")
 	}
 	fieldInfo(c, uitext.KeyLabel(d.kind, d.id), info, func() {
 		ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Children(func() {

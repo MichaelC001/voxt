@@ -19,7 +19,7 @@ import (
 func (a *app) generalSettings(c *ui.Context) {
 	t := c.Theme()
 	sectionTitle(c, i18n.T("Languages"))
-	settingRow(c, "language", i18n.T("App language"), i18n.T("The language of VoxtMini's own text. Following the system uses English unless the system's language is supported."), func() {
+	settingRow(c, "language", i18n.T("App language"), i18n.T("Follow the system: English when the system's language is not supported."), func() {
 		opts := languageOptions()
 		if ui.Select(c.Key("language-select"), &a.settingsForm.language, opts).Label(i18n.T("App language")).Width(px(t, 220)).Changed() {
 			tag := ""
@@ -30,7 +30,7 @@ func (a *app) generalSettings(c *ui.Context) {
 		}
 	})
 	a.languageFamilyLine(c) // family_shared_view.go
-	settingRow(c, "main-language", i18n.T("Main language"), i18n.T("The language you mostly speak and write. Clean-up keeps your text in it; Translate writes in English, or in Chinese when this is English, unless the Translate page says otherwise."), func() {
+	settingRow(c, "main-language", i18n.T("Main language"), i18n.T("Clean-up keeps your text in it. Translate turns it into English, or Chinese when this is English."), func() {
 		opts := mainLanguageOptions()
 		if ui.Select(c.Key("main-language-select"), &a.settingsForm.mainLanguage, opts).Label(i18n.T("Main language")).Width(px(t, 220)).Changed() {
 			code := ""
@@ -43,7 +43,7 @@ func (a *app) generalSettings(c *ui.Context) {
 	a.otherLanguagesRow(c)
 
 	sectionTitle(c, i18n.T("Output"))
-	settingRow(c, "keep-result", i18n.T("Keep the result on the clipboard"), i18n.T("After a result is pasted, it stays on the clipboard. Off, the clipboard gets back what it held before."), func() {
+	settingRow(c, "keep-result", i18n.T("Keep the result on the clipboard"), i18n.T("Off: the clipboard gets back what it held before."), func() {
 		if ui.Switch(c.Key("keep-result-switch"), &a.settingsForm.keepResult).Label(i18n.T("Keep the result on the clipboard")).Changed() {
 			on := a.settingsForm.keepResult
 			a.updateSettings(func(s *settings.Settings) { s.General.RestoreClipboard = !on })
@@ -61,20 +61,20 @@ func (a *app) generalSettings(c *ui.Context) {
 	if !g.MenuBar {
 		dockNote = i18n.T("Required while the menu bar icon is off.")
 	}
-	settingRowNoteTip(c, "menu-bar", i18n.T("Show in the menu bar"), i18n.T("An icon in the menu bar to start a transcription, see the last result and open VoxtMini."), menuNote, func() {
+	settingRowNote(c, "menu-bar", i18n.T("Show in the menu bar"), menuNote, func() {
 		if ui.Switch(c.Key("menu-bar-switch"), &a.settingsForm.menuBar).Label(i18n.T("Show in the menu bar")).Disabled(!g.ShowInDock).Changed() {
 			on := a.settingsForm.menuBar
 			a.updateSettings(func(s *settings.Settings) { s.General.MenuBar = on })
 		}
 	})
-	settingRow(c, "close-to-tray", i18n.T("Keep running when the window closes"), i18n.T("Closing the window leaves VoxtMini in the menu bar or the Dock, so its shortcuts keep working. Quit from the menu bar icon, the Dock or with ⌘Q."), func() {
+	settingRow(c, "close-to-tray", i18n.T("Keep running when the window closes"), "", func() {
 		sw := ui.Switch(c.Key("close-to-tray-switch"), &a.settingsForm.closeToTray).Label(i18n.T("Keep running when the window closes")).Disabled(!g.MenuBar && !g.ShowInDock)
 		if sw.Changed() {
 			on := a.settingsForm.closeToTray
 			a.updateSettings(func(s *settings.Settings) { s.General.CloseToTray = on })
 		}
 	})
-	settingRowNoteTip(c, "show-in-dock", i18n.T("Show icon in Dock"), i18n.T("Always keep VoxtMini's icon in the Dock and in the app switcher (⌘Tab). Off, the icon shows only while the window is open; once the window closes, VoxtMini stays in the menu bar."), dockNote, func() {
+	settingRowNoteTip(c, "show-in-dock", i18n.T("Show icon in Dock"), i18n.T("Off: the icon shows only while the window is open."), dockNote, func() {
 		if ui.Switch(c.Key("show-in-dock-switch"), &a.settingsForm.showInDock).Label(i18n.T("Show icon in Dock")).Disabled(!g.MenuBar).Changed() {
 			on := a.settingsForm.showInDock
 			a.updateSettings(func(s *settings.Settings) { s.General.ShowInDock = on })
@@ -107,7 +107,7 @@ func (a *app) otherLanguagesRow(c *ui.Context) {
 	k := tok(t)
 	main := lang.Canonical(session.MainLanguage(a.prefs, i18n.Locale()))
 	others := withoutLanguage(a.prefs.General.OtherLanguages, main)
-	settingRow(c, "other-languages", i18n.T("Other languages"), i18n.T("Languages you mix into what you say and write. Clean-up keeps them as they are instead of translating them into your main language."), func() {
+	settingRow(c, "other-languages", i18n.T("Other languages"), i18n.T("Clean-up leaves words in these languages as they are."), func() {
 		for _, code := range others {
 			label := uitext.LangLabel(code)
 			ui.Row(c.Key("other-lang-"+code)).Gap(px(t, 2)).AlignItems(ui.Center).Padding(px(t, 2), px(t, 2), px(t, 2), px(t, 10)).

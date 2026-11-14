@@ -133,7 +133,7 @@ func (a *app) histRecordingsSection(c *ui.Context) {
 	h := a.lib.store.History()
 	busy := hs.busy != ""
 	sectionTitleText(c, i18n.T("Recordings"))
-	settingRow(c, "hist-set-audio", i18n.T("Keep the recordings"), i18n.T("Saves the audio with each entry, to listen again or recognise it once more. Off, only a recording that failed is kept, for 7 days, to retry."), func() {
+	settingRow(c, "hist-set-audio", i18n.T("Keep the recordings"), i18n.T("Off: only failed recordings are kept, for 7 days, to retry."), func() {
 		if ui.Switch(c.Key("hist-set-audio"), &a.settingsForm.keepAudio).Label(i18n.T("Save each recording")).Disabled(!a.prefs.Privacy.KeepHistory).Changed() {
 			on := a.settingsForm.keepAudio
 			a.updateSettings(func(s *settings.Settings) { s.Privacy.KeepAudio = on })
@@ -144,7 +144,7 @@ func (a *app) histRecordingsSection(c *ui.Context) {
 	if shown == "" {
 		shown = h.DefaultAudioDir()
 	}
-	move := i18n.T("Choosing another folder moves the recordings there: each one is copied and checked before the original is deleted.")
+	move := i18n.T("Choosing another folder moves the recordings there.")
 	settingRowNoteTip(c, "hist-set-dir", i18n.T("Storage location"), move, uitext.ShortPath(shown), func() {
 		if ui.Button(c.Key("hist-set-choose"), i18n.T("Choose")).Disabled(busy).Clicked() {
 			chooseFolder(a, i18n.T("Move the recordings"), i18n.T("Move here"), a.moveRecordings)
@@ -172,7 +172,7 @@ func (a *app) histRecordingsSection(c *ui.Context) {
 			hs.delAudioAsk = true
 		}
 	})
-	settingRow(c, "hist-set-export", i18n.T("Export recordings"), i18n.T("Copies the recordings into a folder you choose: a folder for each feature, each file named by its date and first words."), func() {
+	settingRow(c, "hist-set-export", i18n.T("Export recordings"), "", func() {
 		opts := []string{i18n.T("All recordings"), a.shownLabel()}
 		if !slices.Contains(opts, hs.exportSel) {
 			hs.exportSel = opts[0]
@@ -234,7 +234,7 @@ func (a *app) histCleanupSection(c *ui.Context) {
 		hs.formFor = "asking"
 		a.askCleanup(next)
 	}
-	settingRow(c, "hist-set-clean", i18n.T("Clean up automatically"), i18n.T("Deletes old entries with their recordings: when VoxtMini starts, after each new entry, and when you change these settings."), func() {
+	settingRow(c, "hist-set-clean", i18n.T("Clean up automatically"), i18n.T("Deletes old entries and their recordings."), func() {
 		if ui.Switch(c.Key("hist-set-clean"), &hs.cleanOn).Label(i18n.T("Clean up the history")).Changed() {
 			next := a.prefs.History
 			next.CleanupOff = !hs.cleanOn
@@ -257,7 +257,7 @@ func (a *app) histCleanupSection(c *ui.Context) {
 			ask(next)
 		}
 	})
-	settingRow(c, "hist-set-count", i18n.T("Keep at most"), i18n.T("The newest entries of each feature: Transcribe, Translate and Rewrite each keep this many."), func() {
+	settingRow(c, "hist-set-count", i18n.T("Keep at most"), i18n.T("For each feature."), func() {
 		opts := keepCountLabels()
 		if ui.Select(c.Key("hist-set-count"), &hs.countSel, opts).Label(i18n.T("Keep at most")).Width(px(t, 160)).Changed() {
 			next := a.prefs.History

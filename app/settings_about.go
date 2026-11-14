@@ -342,7 +342,7 @@ func (a *app) aboutSettings(c *ui.Context) {
 	a.updateSettingsSection(c) // updates.go
 
 	sectionTitle(c, i18n.T("Self-check"))
-	settingRow(c, "about-check", i18n.T("Check VoxtMini"), i18n.T("The library, the helper, the models and their disk, the network, the Keychain, the data folder and the permissions."), func() {
+	settingRow(c, "about-check", i18n.T("Check VoxtMini"), "", func() {
 		if a.selfChecking {
 			ui.Spinner(c)
 		}
@@ -366,18 +366,18 @@ func (a *app) aboutSettings(c *ui.Context) {
 	}
 
 	sectionTitle(c, i18n.T("Report a problem"))
-	settingRow(c, "about-copy", i18n.T("Copy diagnostics"), i18n.T("Versions, the machine, the models, folders and the self-check: no text or audio."), func() {
+	settingRow(c, "about-copy", i18n.T("Copy diagnostics"), i18n.T("No text or audio."), func() {
 		if ui.Button(c.Key("about-copy"), i18n.T("Copy")).Clicked() {
 			c.WriteClipboard(a.diagnosticsText())
 			a.toast(i18n.T("Diagnostics copied"))
 		}
 	})
-	settingRow(c, "about-bundle", i18n.T("Save a diagnostic bundle"), i18n.T("A ZIP of the diagnostics, the logs and the settings, to attach to a report."), func() {
+	settingRow(c, "about-bundle", i18n.T("Save a diagnostic bundle"), i18n.T("Includes the logs and settings."), func() {
 		if ui.Button(c.Key("about-bundle"), i18n.T("Save")).Clicked() {
 			a.saveBundle(nil)
 		}
 	})
-	settingRow(c, "about-bug", i18n.T("Report a bug"), i18n.T("Opens a new issue on GitHub in your browser, with the diagnostics filled in. Nothing is sent until you submit it."), func() {
+	settingRow(c, "about-bug", i18n.T("Report a bug"), i18n.T("Opens GitHub with the diagnostics filled in. Nothing is sent until you submit it."), func() {
 		if ui.Button(c.Key("about-bug"), i18n.T("Report")).Clicked() {
 			u := a.bugReportURL()
 			if a.win == nil {

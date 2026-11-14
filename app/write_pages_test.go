@@ -92,7 +92,7 @@ func TestRewritePage(t *testing.T) {
 		}
 	}
 	// The page's ⓘ tells the follow-up (the shortcuts have no tip of their own).
-	if tip := a.featureTip(hotkey.Rewrite); !strings.Contains(tip, "While the answer card shows an answer, the shortcut records a follow-up") {
+	if tip := a.featureTip(hotkey.Rewrite); !strings.Contains(tip, "While the answer card shows, the shortcut asks a follow-up") {
 		t.Errorf("tip %q", tip)
 	} else if _, ok := tt.Find(tip); !ok {
 		t.Error("no page tip")

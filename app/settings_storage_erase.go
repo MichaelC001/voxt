@@ -45,9 +45,9 @@ func (a *app) modelFolderRows(c *ui.Context, r *storageReport, open func(key, di
 		// Time Machine (family spec §7.12): the family's models.backup,
 		// off by default.
 		on := fam.Backup()
-		hint := i18n.T("Models can be downloaded again, so Time Machine leaves them out.")
+		hint := ""
 		if others {
-			hint = i18n.T("Models can be downloaded again, so Time Machine leaves them out. Applies to all ActNow apps.")
+			hint = i18n.T("Applies to all ActNow apps.")
 		}
 		settingRow(c, "st-models-backup", i18n.T("Back up models with Time Machine"), hint, func() {
 			if ui.Switch(c.Key("st-models-backup-switch"), &on).Changed() {

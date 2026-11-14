@@ -15,7 +15,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/uitext"
 )
 
-const speechTip = "Only Apple Speech needs it: macOS recognises your speech on this Mac. The other speech models do not."
+const speechTip = "Only Apple Speech needs it."
 
 // permsWithApple is an app whose helper has Apple Speech, refused or
 // not asked yet (perm).
