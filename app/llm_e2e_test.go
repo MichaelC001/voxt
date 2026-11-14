@@ -60,6 +60,14 @@ func (l *llmSetup) lines(sub string) []string {
 // process and $VOXTMINI_DEV_LLM's models.
 func llmServices(t *testing.T, tr *fakeTranscriptions, reply string, fake ...string) (local.Services, *llmSetup) {
 	t.Helper()
+	return llmServicesWith(t, tr, reply, "", fake...)
+}
+
+// llmServicesWith is llmServices with more options for the fake runtime
+// (llmrttest's, comma-separated, e.g. "piece-ms=20"); the real one ignores
+// them.
+func llmServicesWith(t *testing.T, tr *fakeTranscriptions, reply, opts string, fake ...string) (local.Services, *llmSetup) {
+	t.Helper()
 	l := &llmSetup{real: os.Getenv("VOXTMINI_LLM_REAL") == "1"}
 	cfg := llmrt.Config{AppVersion: "test", LogDir: t.TempDir(), IdleTimeout: -1, Log: func(e core.LogEntry) {
 		l.mu.Lock()
@@ -91,7 +99,11 @@ func llmServices(t *testing.T, tr *fakeTranscriptions, reply string, fake ...str
 		t.Setenv(llmrt.DevEnv, "") // the app's own hook (withDevLLM) stays out
 	} else {
 		cfg.Bin, _ = os.Executable()
-		cfg.Env = llmrttest.Env(llmrttest.Opt("reply", reply))
+		env := llmrttest.Opt("reply", reply)
+		if opts != "" {
+			env += "," + opts
+		}
+		cfg.Env = llmrttest.Env(env)
 		for _, id := range fake {
 			dir := t.TempDir()
 			os.WriteFile(filepath.Join(dir, "config.json"), []byte("{}"), 0o644)
