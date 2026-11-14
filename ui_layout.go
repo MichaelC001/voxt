@@ -1,10 +1,11 @@
 package main
 
 // The kit's layout (ui_kit.go): the page header, cards, collapsible
-// sections, form rows, search fields, empty states.
+// sections, the Advanced fold, form rows, search fields, empty states.
 
 import (
 	"github.com/egoist/mygo/ui"
+	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
 )
 
@@ -81,6 +82,65 @@ func collapsible(c *ui.Context, title string, open *bool, trailing, fn func()) u
 		}
 	})
 	return root
+}
+
+// advanced is the fold a page keeps its less used settings in (Inboxly's
+// kit.Advanced): titled Advanced, closed until opened (*open, kept for the
+// run only); while closed its header says in a quiet line what the
+// settings in it are now (summary, "" for nothing), cut when short.
+func advanced(c *ui.Context, open *bool, summary string, body func()) ui.Element {
+	t := c.Theme()
+	k := tok(t)
+	title := i18n.T("Advanced")
+	root := ui.Column(c).Shrink(0)
+	root.Children(func() {
+		parts := ui.CollapsibleBase(c, open)
+		tr := parts.Trigger.Gap(px(t, sp2)).AlignItems(ui.Center).Padding(px(t, 6), px(t, 4)).Radius(px(t, radiusControl)).Label(title)
+		if tr.Hovered() {
+			tr.Background(k.Hover)
+		}
+		closed := !*open
+		tr.Children(func() {
+			ui.Icon(c, icons.AltArrowRight.Linear).Size(px(t, 14), px(t, 14)).TextColor(k.Text2).Rotate(90 * parts.Progress())
+			// The title keeps its room; the summary is cut first.
+			ui.Text(c, title).FontWeight(600).SingleLine().Shrink(0)
+			if closed && summary != "" {
+				truncText(c, summary).FontSize(px(t, fsCaption)).TextColor(k.Text3).Shrink(1).Grow(1)
+			} else {
+				ui.Box(c).Grow(1)
+			}
+		})
+		tr.Changed() // as collapsible: the click applies in this pass
+		if p := parts.Panel(body); p.Valid() {
+			p.Gap(px(t, sp3)).Padding(px(t, sp2), px(t, 4), px(t, 4))
+		}
+	})
+	return root
+}
+
+// summary joins an Advanced summary's parts with " · ", leaving out the
+// empty ones.
+func summary(parts ...string) string {
+	out := ""
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		if out != "" {
+			out += " · "
+		}
+		out += p
+	}
+	return out
+}
+
+// onOff is a switch in a summary: its name and its state.
+func onOff(name string, on bool) string {
+	v := i18n.T("Off")
+	if on {
+		v = i18n.T("On")
+	}
+	return i18n.T("%s: %s", name, v)
 }
 
 // formRow is a setting: its name, a ⓘ with what it does (info, "" for

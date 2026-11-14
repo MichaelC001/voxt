@@ -17,7 +17,6 @@ import (
 	"context"
 	"io"
 	"log"
-	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -25,6 +24,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/hehehai/VoxtMini/internal/core"
+	"github.com/hehehai/VoxtMini/internal/crashlog"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/logs"
 	"github.com/hehehai/VoxtMini/internal/notify"
@@ -159,12 +159,12 @@ func (a *app) openShell(lib *library) {
 // connectShell adds what only the real app has: log files in logDir (the
 // Go log package writes there too), the app's version, the system
 // language and deep links. main calls it before App.Run.
-func (a *app) connectShell(logDir string) {
+func (a *app) connectShell(logDir string, crash *crashlog.Run) {
 	a.logDir = logDir // Settings → Storage, Diagnostics
 	if logDir != "" {
 		a.logs.Close()
 		a.logs = logs.New(logs.Options{Dir: logDir, Bus: a.bus})
-		log.SetOutput(io.MultiWriter(os.Stderr, a.logs.Writer("app")))
+		log.SetOutput(io.MultiWriter(consoleOut(crash), a.logs.Writer("app"))) // crash_report.go
 	}
 	mygo.App.OnOpenURL(func(u string) { a.post(func() { a.openURL(u) }) })
 }

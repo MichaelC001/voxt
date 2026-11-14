@@ -121,6 +121,10 @@ func (a *app) runSelfCheck() {
 	a.recheckPermissions()
 	perms := a.perms
 	mods := a.modelCheckInput() // settings_about_models.go
+	probe, hub := a.savedNetProbe(), ""
+	if a.models != nil {
+		hub = a.models.Hub()
+	}
 	a.async(func() {
 		var out []selfCheck
 		add := func(id, title, status, detail string) {
@@ -154,8 +158,13 @@ func (a *app) runSelfCheck() {
 				add("data", i18n.T("Data folder"), "pass", i18n.T("Writable · %s free", uitext.HumanBytes(free)))
 			}
 		}
-		// The models and their runtimes.
+		// The models, their runtimes and their disk.
 		modelChecks(mods, add)
+		modelsDiskCheck(hub, add)
+		// The network, through the proxy, and the Keychain
+		// (settings_about_net.go).
+		netChecks(probe.run(), add)
+		keychainCheck(add)
 		// Permissions.
 		if t, ok := uitext.PermissionText(perms.mic); ok {
 			add("microphone", i18n.T("Microphone"), "pass", t)
@@ -230,8 +239,13 @@ func writeBundle(path, diag string, prefs settings.Settings, logDir string) erro
 // bundleDir is where tests save the bundle (no dialog).
 var bundleDir string
 
-// saveBundle asks where, then writes the diagnostic bundle.
-func (a *app) saveBundle() {
+// saveBundle asks where, then writes the diagnostic bundle; then (nil:
+// nothing) runs on the main thread once it is written or the user did
+// not choose a place.
+func (a *app) saveBundle(then func()) {
+	if then == nil {
+		then = func() {}
+	}
 	diag, prefs, logs := a.diagnosticsText(), a.prefs, a.logDir
 	name := "VoxtMini diagnostics " + time.Now().Format("2006-01-02 1504") + ".zip"
 	write := func(dst string) {
@@ -240,15 +254,18 @@ func (a *app) saveBundle() {
 			a.post(func() {
 				if err != nil {
 					a.toast(i18n.T("Could not save the bundle: %v", err))
-					return
+				} else {
+					a.toast(i18n.T("Saved %s", filepath.Base(dst)))
 				}
-				a.toast(i18n.T("Saved %s", filepath.Base(dst)))
+				then()
 			})
 		})
 	}
 	if a.win == nil {
 		if bundleDir != "" {
 			write(filepath.Join(bundleDir, name))
+		} else {
+			then()
 		}
 		return
 	}
@@ -256,6 +273,7 @@ func (a *app) saveBundle() {
 		dst, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: a.win, Title: i18n.T("Save a diagnostic bundle"), DefaultPath: name,
 			Filters: []mygo.FileFilter{{Name: "ZIP", Extensions: []string{"zip"}}}})
 		if err != nil || dst == "" {
+			a.post(then)
 			return
 		}
 		a.post(func() { write(dst) })
@@ -324,7 +342,7 @@ func (a *app) aboutSettings(c *ui.Context) {
 	a.updateSettingsSection(c) // updates.go
 
 	sectionTitle(c, i18n.T("Self-check"))
-	settingRow(c, "about-check", i18n.T("Check VoxtMini"), i18n.T("The library, the helper, the models, the data folder and the permissions."), func() {
+	settingRow(c, "about-check", i18n.T("Check VoxtMini"), i18n.T("The library, the helper, the models and their disk, the network, the Keychain, the data folder and the permissions."), func() {
 		if a.selfChecking {
 			ui.Spinner(c)
 		}
@@ -356,7 +374,7 @@ func (a *app) aboutSettings(c *ui.Context) {
 	})
 	settingRow(c, "about-bundle", i18n.T("Save a diagnostic bundle"), i18n.T("A ZIP of the diagnostics, the logs and the settings, to attach to a report."), func() {
 		if ui.Button(c.Key("about-bundle"), i18n.T("Save")).Clicked() {
-			a.saveBundle()
+			a.saveBundle(nil)
 		}
 	})
 	settingRow(c, "about-bug", i18n.T("Report a bug"), i18n.T("Opens a new issue on GitHub in your browser, with the diagnostics filled in. Nothing is sent until you submit it."), func() {

@@ -40,6 +40,7 @@ if [ ! -f "$src/catalog.json" ]; then
 	fi
 fi
 # The cues of a recording: taps, selections, toggles, feedback, system
-# and media sounds, and every sound meant to start or stop something.
+# and media sounds, every sound meant to start or stop something, and
+# Shrug, the cue of a session that fails.
 go run github.com/hehehai/actnowkit/cmd/actnow-sounds subset -from "$src" -to resources/sounds \
-	-groups tap,select,toggle,feedback,system,media -uses record.start,record.stop,start,stop
+	-groups tap,select,toggle,feedback,system,media -uses record.start,record.stop,start,stop -ids shrug

@@ -302,3 +302,36 @@ func TestBundleWatch(t *testing.T) {
 		t.Errorf("the card outlived the restart: %+v", b.notices)
 	}
 }
+
+// TestUpdateFound: what a daily check finds is a quiet card at the foot of
+// the sidebar; its Install opens the update window (a user's check) and
+// takes the card away; an update installed already keeps its own card.
+func TestUpdateFound(t *testing.T) {
+	a, _, tt := newTestApp(t)
+	fu := a.upd.(*fakeUpdates)
+	if !a.updateFound("9.9.9") { // the plugin's goroutine; post runs at once in tests
+		t.Fatal("the window would pop up")
+	}
+	a.navigate("/home")
+	see(t, tt, "Update available")
+	see(t, tt, "Version 9.9.9")
+	if fu.checks != 0 {
+		t.Fatalf("checked %d", fu.checks)
+	}
+	if cardActionLabel(linkInstallUpdate) != "Install" {
+		t.Error("card action label")
+	}
+	click(t, tt, "Install")
+	if fu.checks != 1 || has(tt, "Update available") {
+		t.Fatalf("checks %d, %q", fu.checks, firstTexts(tt))
+	}
+	// Found again later, the card comes back; once installed, the
+	// restart's card replaces it and a later find leaves that alone.
+	a.updateFound("9.9.9")
+	see(t, tt, "Update available")
+	a.appUpdated()
+	a.updateFound("9.9.10")
+	if has(tt, "Update available") || !has(tt, "Update installed") {
+		t.Fatalf("cards: %q", firstTexts(tt))
+	}
+}

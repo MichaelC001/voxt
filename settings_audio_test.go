@@ -24,9 +24,6 @@ func TestAudioSettingsDevices(t *testing.T) {
 	if !has(tt, "None chosen: the system's default input is used.") || !has(tt, "MacBook Air Microphone") {
 		t.Fatalf("empty list: %q", firstTexts(tt))
 	}
-	if !has(tt, "Skip silence") || !has(tt, "Optimize sound") {
-		t.Errorf("no recognition switches: %q", firstTexts(tt))
-	}
 	click(t, tt, "Add AirPods Pro")
 	click(t, tt, "Add MacBook Air Microphone")
 	got := a.settings.Get().Audio
@@ -120,6 +117,9 @@ func TestDeviceInUse(t *testing.T) {
 
 func TestRecordingCues(t *testing.T) {
 	snap := func(id string, st session.State) session.Snapshot { return session.Snapshot{ID: id, State: st} }
+	noSpeech := func(id string) session.Snapshot {
+		return session.Snapshot{ID: id, State: session.Done, Problem: &session.Problem{Code: session.ProblemNoSpeech}}
+	}
 	for _, tc := range []struct {
 		name   string
 		was, s session.Snapshot
@@ -132,7 +132,13 @@ func TestRecordingCues(t *testing.T) {
 		{"stop", snap("a", session.Recording), snap("a", session.Recognizing), stopCue},
 		{"stop to compose", snap("a", session.Recording), snap("a", session.Composing), stopCue},
 		{"cancelled", snap("a", session.Recording), snap("a", session.Cancelled), noCue},
-		{"failed", snap("a", session.Recording), snap("a", session.Failed), noCue},
+		{"failed while recording", snap("a", session.Recording), snap("a", session.Failed), failCue},
+		{"failed", snap("a", session.Recognizing), snap("a", session.Failed), failCue},
+		{"nothing heard", snap("a", session.Recognizing), noSpeech("a"), failCue},
+		{"done", snap("a", session.Composing), snap("a", session.Done), noCue},
+		{"degraded", snap("a", session.Composing), session.Snapshot{ID: "a", State: session.Done, Problem: &session.Problem{Code: session.ProblemASR, Degraded: true}}, noCue},
+		{"failed again", snap("a", session.Failed), snap("a", session.Failed), noCue},
+		{"too short", snap("a", session.Recording), session.Snapshot{ID: "a", State: session.Cancelled, Problem: &session.Problem{Code: session.ProblemTooShort}}, noCue},
 		{"reading a selection", snap("a", session.Reading), snap("a", session.Composing), noCue},
 		{"recognized", snap("a", session.Recognizing), snap("a", session.Composing), noCue},
 	} {
@@ -193,13 +199,31 @@ func TestSessionSounds(t *testing.T) {
 	if want := []string{"Frog", "chime"}; !slices.Equal(cues, want) {
 		t.Fatalf("frog: cues %q", cues)
 	}
+	// A session without a result: the failure's cue, after the output is
+	// back; a cancel (above) has none.
+	a.updateSettings(func(s *settings.Settings) { s.Audio.StartSound, s.Audio.StopSound = "", "" })
+	cues = nil
+	mu.Unlock()
+	feed("s5", session.Recording)
+	feed("s5", session.Recognizing)
+	a.mute.Wait() // the stop cue, before the failure's
+	rev++
+	a.sessionChanged(session.Snapshot{Rev: rev, ID: "s5", Kind: store.KindTranscribe, State: session.Done, Try: true, Problem: &session.Problem{Code: session.ProblemNoSpeech}})
+	a.mute.Wait()
+	feed("s6", session.Recording)
+	feed("s6", session.Failed)
+	a.mute.Wait()
+	mu.Lock()
+	if want := []string{"tally", "wrap", "shrug", "tally", "shrug"}; !slices.Equal(cues, want) {
+		t.Fatalf("failures: cues %q, want %q", cues, want)
+	}
 	// Off in Settings → Audio: silence.
 	a.navigate("/settings/audio")
 	a.updateSettings(func(s *settings.Settings) { s.Audio.Sounds = false })
 	cues = nil
 	mu.Unlock()
 	feed("s3", session.Recording)
-	feed("s3", session.Recognizing)
+	feed("s3", session.Failed)
 	a.mute.Wait()
 	mu.Lock()
 	if len(cues) != 0 {

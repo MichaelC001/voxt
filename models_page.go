@@ -66,6 +66,9 @@ type modelsState struct {
 	// (models_network.go).
 	netOpen bool
 	netForm networkForm
+	// netProbeSeq numbers the Network dialog's connection tests: a
+	// result of an older one is dropped.
+	netProbeSeq int
 	// modelAdvanced: the Advanced section is open; modelKeepSel is its
 	// select's label, modelKeepFor the setting and language it shows
 	// (models_keep.go).

@@ -6,7 +6,8 @@ package main
 // recording is left out before the speech model gets it (Audio.VAD.Off,
 // internal/vad) and whether its sound is cleaned up (Audio.Clean.Off,
 // internal/dsp), and the sounds a recording makes when it starts and
-// stops (their presets and previews: settings_sounds.go). The helper
+// stops (their presets and previews: settings_sounds.go); the silence,
+// the cleaning and the mute below wait in the Advanced fold. The helper
 // lists the inputs
 // (capture.devices) when the section opens, when the helper becomes
 // ready while it shows, and with Refresh. The system's output is muted
@@ -273,28 +274,33 @@ func (a *app) audioSettings(c *ui.Context) {
 		})
 	}
 
-	sectionTitle(c, i18n.T("Recognition"))
-	settingRow(c, "audio-silence", i18n.T("Skip silence"), i18n.T("Trims silence and long pauses before recognition; sends nothing when no one spoke. The history keeps the whole recording."), func() {
-		if ui.Switch(c.Key("audio-silence-switch"), &a.settingsForm.skipSilence).Label(i18n.T("Skip silence")).Changed() {
-			off := !a.settingsForm.skipSilence
-			a.updateSettings(func(s *settings.Settings) { s.Audio.VAD.Off = off })
-		}
-	})
-	settingRow(c, "audio-clean", i18n.T("Optimize sound"), i18n.T("Filters out low hum (air conditioning, fans) and evens out the volume before recognition. The history keeps the original recording."), func() {
-		if ui.Switch(c.Key("audio-clean-switch"), &a.settingsForm.cleanSound).Label(i18n.T("Optimize sound")).Changed() {
-			off := !a.settingsForm.cleanSound
-			a.updateSettings(func(s *settings.Settings) { s.Audio.Clean.Off = off })
-		}
-	})
-
 	sectionTitle(c, i18n.T("Sounds"))
 	a.soundsRow(c) // settings_sounds.go
-	settingRow(c, "audio-mute", i18n.T("Mute system audio while recording"), i18n.T("Mutes the output device while you speak, so videos, music or calls are not recorded; the sound comes back when recording stops. Some devices cannot be muted by software."), func() {
-		if ui.Switch(c.Key("audio-mute-switch"), &a.settingsForm.muteOutput).Label(i18n.T("Mute system audio while recording")).Changed() {
-			on := a.settingsForm.muteOutput
-			a.updateSettings(func(s *settings.Settings) { s.Audio.MuteOutput = &on })
-			a.muteSettingChanged(on) // mute_link.go: off during a recording gives the output back now
-		}
+
+	// Less used: what happens to the sound before recognition, and the
+	// system's output while recording.
+	f := &a.settingsForm
+	sum := summary(onOff(i18n.T("Skip silence"), f.skipSilence), onOff(i18n.T("Optimize sound"), f.cleanSound), onOff(i18n.T("Mute while recording"), f.muteOutput))
+	advanced(c.Key("audio-advanced"), &f.audioAdvanced, sum, func() {
+		settingRow(c, "audio-silence", i18n.T("Skip silence"), i18n.T("Trims silence and long pauses before recognition; sends nothing when no one spoke. The history keeps the whole recording."), func() {
+			if ui.Switch(c.Key("audio-silence-switch"), &f.skipSilence).Label(i18n.T("Skip silence")).Changed() {
+				off := !f.skipSilence
+				a.updateSettings(func(s *settings.Settings) { s.Audio.VAD.Off = off })
+			}
+		})
+		settingRow(c, "audio-clean", i18n.T("Optimize sound"), i18n.T("Filters out low hum (air conditioning, fans) and evens out the volume before recognition. The history keeps the original recording."), func() {
+			if ui.Switch(c.Key("audio-clean-switch"), &f.cleanSound).Label(i18n.T("Optimize sound")).Changed() {
+				off := !f.cleanSound
+				a.updateSettings(func(s *settings.Settings) { s.Audio.Clean.Off = off })
+			}
+		})
+		settingRow(c, "audio-mute", i18n.T("Mute system audio while recording"), i18n.T("Mutes the output device while you speak, so videos, music or calls are not recorded; the sound comes back when recording stops. Some devices cannot be muted by software."), func() {
+			if ui.Switch(c.Key("audio-mute-switch"), &f.muteOutput).Label(i18n.T("Mute system audio while recording")).Changed() {
+				on := f.muteOutput
+				a.updateSettings(func(s *settings.Settings) { s.Audio.MuteOutput = &on })
+				a.muteSettingChanged(on) // mute_link.go: off during a recording gives the output back now
+			}
+		})
 	})
 }
 
@@ -320,25 +326,38 @@ func deviceName(c *ui.Context, name, notes string, inUse, present bool) {
 	})
 }
 
-// cue is a sound of a recording: its start, or its stop.
+// cue is a sound of a session: its recording starts, it stops, the
+// session failed.
 type cue int
 
 const (
 	noCue cue = iota
 	startCue
 	stopCue
+	failCue
 )
 
 // recordingCue is the cue a change of the session makes: one when it
 // starts recording, another when the recording stops and the text is on
-// its way. A cancelled or failed recording stops silently.
+// its way, a third when the session ends without a result (failed, or
+// nothing was recognised). A cancelled recording (Esc, too short) stops
+// silently, and so does a failed one until it ends: its stop cue is the
+// failure's.
 func recordingCue(was, s session.Snapshot) cue {
 	switch {
 	case s.State == session.Recording && (was.State != session.Recording || was.ID != s.ID):
 		return startCue
+	case sessionFailed(s) && (was.ID != s.ID || !was.State.Ended()):
+		return failCue
 	case was.State == session.Recording && was.ID == s.ID && s.State != session.Recording &&
 		s.State != session.Cancelled && s.State != session.Failed:
 		return stopCue
 	}
 	return noCue
+}
+
+// sessionFailed: s ended without a result — failed, or done with nothing
+// recognised (a degraded result is a result).
+func sessionFailed(s session.Snapshot) bool {
+	return s.State == session.Failed || (s.State == session.Done && s.Problem != nil && s.Problem.Code == session.ProblemNoSpeech)
 }

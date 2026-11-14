@@ -10,6 +10,7 @@ package models
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -82,7 +83,21 @@ func (a *adapter) Download(ctx context.Context, endpoint string, ref fammodels.R
 	return m.Status(ids[0]).Err
 }
 
+// CleanOrphans is Settings → Storage's clean-up with every model the
+// uninstalled app bundleID claimed picked.
 func (a *adapter) CleanOrphans(ctx context.Context, bundleID string) error {
-	_, err := a.fx.Peer(a.bundleID).CleanOrphans(ctx, bundleID)
+	m := Open(Options{Store: a.fx.Peer(a.bundleID), ReserveBytes: -1})
+	defer m.Close()
+	list, err := m.Orphans()
+	if err != nil {
+		return err
+	}
+	var refs []fammodels.Ref
+	for _, o := range list {
+		if slices.Contains(o.BundleIDs, bundleID) {
+			refs = append(refs, o.Ref)
+		}
+	}
+	_, err = m.DeleteOrphans(ctx, refs)
 	return err
 }

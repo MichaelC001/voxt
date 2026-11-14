@@ -162,6 +162,12 @@ func (a *app) cardAction(n core.Notification) {
 	case linkRelaunch:
 		a.relaunch() // updates.go
 		return
+	case linkInstallUpdate:
+		a.installUpdate() // updates.go
+		return
+	case linkCrashReport:
+		a.reportCrash() // crash_report.go
+		return
 	}
 	a.openURL(n.Link)
 }
@@ -314,6 +320,10 @@ func cardActionLabel(link string) string {
 		return i18n.T("Restart the helper")
 	case linkRelaunch:
 		return i18n.T("Restart VoxtMini")
+	case linkInstallUpdate:
+		return i18n.T("Install")
+	case linkCrashReport:
+		return i18n.T("Report")
 	case modelsPath:
 		return i18n.T("Open Models")
 	}

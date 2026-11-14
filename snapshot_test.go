@@ -146,7 +146,9 @@ func snapshotsMain(t *testing.T, out string) {
 				tt.Key(0, ui.KeyEscape)
 				frames(tt)
 			}
-			if s.id == "audio" { // the sounds and the output's mute, under the fold
+			if s.id == "audio" { // the sounds and, opened, the Advanced fold
+				scrollToText(tt, i18n.T("Advanced"))
+				tt.Click(i18n.T("Advanced"))
 				scrollToText(tt, i18n.T("Mute system audio while recording"))
 				save("settings-audio-sounds")
 				tt.Click(i18n.T("Start sound")) // the sound picker's panel (settings_soundpicker.go)

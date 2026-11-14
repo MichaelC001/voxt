@@ -32,7 +32,11 @@ const (
 	privacyMicrophone    = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
 	privacyAccessibility = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 	privacySpeech        = "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition"
+	notificationSettings = "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=" + selfBundleID
 )
+
+// permissionsPath is the Permissions section.
+const permissionsPath = "/settings/permissions"
 
 // permissionsState is what the section last read.
 type permissionsState struct {
@@ -46,6 +50,9 @@ type permissionsState struct {
 		// speech is Speech Recognition (Apple Speech's), as the helper
 		// reports it; Unknown from a helper without it.
 		speech permission.State
+		// notify is whether macOS lets VoxtMini notify (models_notify.go;
+		// not Known: it cannot tell, and the row hides).
+		notify mygo.NotificationStatus
 	}
 }
 
@@ -92,6 +99,7 @@ func (a *app) openPermissions() {
 // the helper sees them when it can say (what showed stays until it
 // answers), else here at once.
 func (a *app) recheckPermissions() {
+	a.readNoteStatus() // models_notify.go
 	if !a.hstatus.Has(proto.MethodPermissionsStatus) {
 		a.localPerms()
 		return
@@ -205,10 +213,45 @@ func (a *app) permissionsSettings(c *ui.Context) {
 			}
 		})
 	}
+	a.notificationRow(c, badge)
 	ui.Row(c).Gap(px(t, sp2)).AlignItems(ui.Center).Margin(px(t, sp2), 0, 0, 0).Children(func() {
 		if secondaryIconButton(c.Key("perm-recheck"), icons.Refresh, i18n.T("Check again")).Label(i18n.T("Check again")).Clicked() {
 			a.recheckPermissions()
 		}
 		infoTip(c.Key("perm-note"), i18n.T("After you change a permission, macOS may ask to quit and reopen VoxtMini. Updating an ad hoc signed build can make macOS forget Accessibility: turn it off and on again."))
+	})
+}
+
+// notificationRow is the Notifications row, once macOS said: allowed,
+// in Notification Center only (no banners), not allowed, or not asked
+// yet (the first download notification asks; so does the test).
+func (a *app) notificationRow(c *ui.Context, badge func(string, bool)) {
+	st := a.perms.notify
+	if !st.Known {
+		return
+	}
+	text, ok, open := i18n.T("Allowed"), true, false
+	switch {
+	case st.Denied:
+		text, ok, open = i18n.T("Not allowed"), false, true
+	case !st.Asked:
+		text = i18n.T("Not asked yet")
+	case st.Style == 0:
+		text, ok, open = i18n.T("No banners"), false, true
+	}
+	settingRow(c, "perm-notify", i18n.T("Notifications"), i18n.T("Tells you when a model's download finishes or fails while VoxtMini is in the background."), func() {
+		if st.Asked {
+			badge(text, ok)
+		} else {
+			caption(c, text)
+		}
+		if ghostButton(c.Key("perm-notify-test"), i18n.T("Test")).Tooltip(i18n.T("Send a test notification")).Clicked() {
+			a.testNotification()
+		}
+		if open {
+			if ghostIconButton(c.Key("perm-notify-open"), icons.SquareArrowRightUp, i18n.T("Open System Settings")).Label(i18n.T("Open System Settings")).Clicked() {
+				a.openPrivacy(c, notificationSettings)
+			}
+		}
 	})
 }

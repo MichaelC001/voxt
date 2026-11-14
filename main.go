@@ -61,12 +61,10 @@ func main() {
 	if !mygo.App.RequestSingleInstanceLock() {
 		return
 	}
-	// Updates (updates.go): the update window in native UI, in the
-	// language VoxtMini shows (App.Locale), checking once a day; it
-	// installs only when the user says so, unless they turn on
-	// Settings → About → Install updates automatically.
-	mygo.Use(native.New(updater.Options{}))
-
+	// A crash's trace to crash.log in the logs folder, before anything
+	// else may crash; the next start offers to report it (crash_report.go).
+	logDir, _ := mygo.App.Path(mygo.PathLogs)
+	crash := startCrashLog(logDir)
 	home, err := mygo.App.Path(mygo.PathUserData)
 	if err != nil {
 		log.Fatal(err)
@@ -79,7 +77,6 @@ func main() {
 		return
 	}
 	resources, _ := mygo.App.Path(mygo.PathResources)
-	logDir, _ := mygo.App.Path(mygo.PathLogs)
 	cacheDir, _ := mygo.App.Path(mygo.PathCache)
 
 	// Wiring: one call per area, each defined in the file of that area.
@@ -93,9 +90,16 @@ func main() {
 	a.dataHome = home                             // settings_storage.go
 	a.openIcons(cacheDir)                         // appicons.go
 	a.muteJournal = outputJournal(home, cacheDir) // mute_link.go
-	a.connectShell(logDir)                        // shell.go
+	a.connectShell(logDir, crash)                 // shell.go
+	a.tellCrash(crash)                            // crash_report.go: the last run crashed
 	logIgnoredOverrides()                         // dev_overrides.go
 	a.connectHelper()                             // helperlink.go
+	// Updates (updates.go): the update window in native UI, in the
+	// language VoxtMini shows (App.Locale), checking once a day; what a
+	// daily check finds shows as a card at the foot of the sidebar
+	// (updateFound), and installs only when the user says so, unless they
+	// turn on Settings → About → Install updates automatically.
+	mygo.Use(native.New(updater.Options{Found: a.updateFound}))
 	a.upd, a.bundleStale = pluginUpdates{}, h.stale
 	a.connectUpdates() // updates.go
 	a.startFamily()    // family.go: the manifest, the other ActNow apps, the first start's migration

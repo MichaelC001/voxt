@@ -33,6 +33,7 @@ func TestAutoRail(t *testing.T) {
 	}
 	// Settings → Appearance: back to automatic.
 	a.navigate("/settings/appearance")
+	clickFold(t, tt) // the sidebar waits in the fold
 	click(t, tt, "Automatic")
 	if ap := a.settings.Get().Appearance; ap.Rail || ap.RailChosen || a.railMode() {
 		t.Fatalf("automatic: %+v", ap)

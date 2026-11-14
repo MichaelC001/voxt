@@ -103,7 +103,7 @@ func TestSoundsChoose(t *testing.T) {
 		}
 	}
 	click(t, r.tt, "Type")
-	if got := r.tt.Menu(); !slices.Equal(got, []string{"All", "Suggested", "-", "Tap", "Media", "Notify", "-", "macOS"}) {
+	if got := r.tt.Menu(); !slices.Equal(got, []string{"All", "Suggested", "-", "Tap", "Media", "Notify", "Feedback", "-", "macOS"}) {
 		t.Errorf("type menu %q", got)
 	}
 	r.tt.CloseMenu()

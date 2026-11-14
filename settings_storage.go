@@ -21,6 +21,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/hehehai/VoxtMini/internal/datadir"
 	"github.com/hehehai/VoxtMini/internal/i18n"
+	"github.com/hehehai/VoxtMini/internal/models"
 	"github.com/hehehai/VoxtMini/internal/recordings"
 	"github.com/hehehai/VoxtMini/internal/settings"
 	"github.com/hehehai/VoxtMini/internal/store/sqlitestore"
@@ -50,6 +51,8 @@ type storageState struct {
 	eraseKept      []string
 	eraseKeptBytes int64
 	erasing        bool
+
+	orphanState // settings_storage_orphans.go
 }
 
 // storageReport is what takes room.
@@ -62,7 +65,14 @@ type storageReport struct {
 	// other ActNow apps (blobs counted once).
 	models                   string
 	modelsMine, modelsShared int64
+	// orphans are the models only uninstalled ActNow apps claimed
+	// (settings_storage_orphans.go).
+	orphans []models.Orphan
 }
+
+// stActionW is the width of the size grids' button column (Open, Clean
+// up): the same in each, so that their sizes line up.
+const stActionW = 110
 
 // storageCat is a category of files.
 type storageCat struct {
@@ -128,6 +138,7 @@ func (a *app) loadStorage() {
 		if u, err := m.Usage(); err == nil {
 			r.modelsMine, r.modelsShared = u.Mine, u.Shared
 		}
+		r.orphans, _ = m.Orphans()
 		rec, _ := datadir.TreeSize(ctx, audio, nil)
 		if audio != hist.DefaultAudioDir() {
 			// A folder the user chose may hold other files: only the
@@ -337,7 +348,7 @@ func (a *app) storageSettings(c *ui.Context) {
 		})
 	} else {
 		muted(i18n.T("Data folder: %s · free on its disk: %s", uitext.HumanBytes(r.data), uitext.HumanBytes(r.free)))
-		ui.Grid(c.Key("st-cats")).ColumnTracks(ui.Fr(1), ui.Fixed(px(t, 90)), ui.Fixed(px(t, 80))).GapX(px(t, sp3)).GapY(px(t, 6)).AlignItems(ui.Center).Children(func() {
+		ui.Grid(c.Key("st-cats")).ColumnTracks(ui.Fr(1), ui.Fixed(px(t, 90)), ui.Fixed(px(t, stActionW))).GapX(px(t, sp3)).GapY(px(t, 6)).AlignItems(ui.Center).Children(func() {
 			for _, cat := range r.cats {
 				ui.Text(c, cat.title)
 				ui.Text(c, uitext.HumanBytes(cat.bytes)).TextColor(t.TextMuted).TextAlign(ui.End)
@@ -385,7 +396,8 @@ func (a *app) storageDialogs(c *ui.Context) {
 	if !open && a.resetAsk == "settings" {
 		a.resetAsk = ""
 	}
-	a.eraseDialog(c) // settings_storage_erase.go
+	a.eraseDialog(c)  // settings_storage_erase.go
+	a.orphanDialog(c) // settings_storage_orphans.go
 	moving := a.moving
 	ui.DialogBase(c.Key("st-moving"), &moving, func(backdrop, panel ui.Element) {
 		backdrop.Background(ui.RGBA(0, 0, 0, 0.3))

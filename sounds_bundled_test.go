@@ -31,6 +31,9 @@ func TestBundledSounds(t *testing.T) {
 			t.Errorf("%s: %d suggested sounds", ev.ID, n)
 		}
 	}
+	if _, ok := cat.Sound(sessionFailEvent.Default); !ok {
+		t.Errorf("%s: no %s", sessionFailEvent.ID, sessionFailEvent.Default)
+	}
 	if cat.Notice == "" {
 		t.Error("no notice")
 	}

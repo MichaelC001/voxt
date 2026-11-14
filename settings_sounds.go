@@ -32,6 +32,12 @@ var (
 		Default: "tally", Fallback: "Pop", Uses: []string{"record.start"}}
 	recordStopEvent = sounds.Event{ID: "record.stop", Name: sounds.Text{En: "Recording stops", Zh: "结束录音"},
 		Default: "wrap", Fallback: "Tink", Uses: []string{"record.stop"}}
+	// sessionFailEvent is the cue of a session that ends without a
+	// result: the family's Shrug (a gentle falling pair), macOS's Basso
+	// without the family's sounds. It follows Play sounds and the cues'
+	// volume; there is no choice of it.
+	sessionFailEvent = sounds.Event{ID: "session.failed", Name: sounds.Text{En: "A session fails", Zh: "会话失败"},
+		Default: "shrug", Fallback: "Basso", Uses: []string{"error"}}
 )
 
 // soundsState is the cues' sounds and the previews of Settings → Audio →
@@ -100,8 +106,11 @@ func (a *app) soundPrefs() sounds.Prefs {
 
 // cueEvent is a cue's event.
 func cueEvent(c cue) sounds.Event {
-	if c == stopCue {
+	switch c {
+	case stopCue:
 		return recordStopEvent
+	case failCue:
+		return sessionFailEvent
 	}
 	return recordStartEvent
 }
@@ -252,7 +261,7 @@ func (a *app) trySound(c cue) {
 // soundsRow is the Play sounds row, and under it while on a line per cue.
 func (a *app) soundsRow(c *ui.Context) {
 	t := c.Theme()
-	settingRow(c, "audio-sounds", i18n.T("Play sounds"), i18n.T("A short sound when recording starts, and another when it stops. Choosing a sound plays it."), func() {
+	settingRow(c, "audio-sounds", i18n.T("Play sounds"), i18n.T("A short sound when recording starts, another when it stops, and a low one when nothing comes out (an error, no speech). Choosing a sound plays it."), func() {
 		if ui.Switch(c.Key("audio-sounds-switch"), &a.settingsForm.sounds).Label(i18n.T("Play sounds")).Changed() {
 			on := a.settingsForm.sounds
 			a.updateSettings(func(s *settings.Settings) { s.Audio.Sounds = on })

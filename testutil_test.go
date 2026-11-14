@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/llmrt/llmrttest"
+	"github.com/hehehai/VoxtMini/internal/netcheck"
 	"github.com/hehehai/VoxtMini/internal/omni/omnitest"
 	"github.com/hehehai/VoxtMini/internal/overlay/layout"
 	"github.com/hehehai/VoxtMini/internal/permission"
@@ -65,6 +67,7 @@ func runIsolated(m *testing.M) int {
 	os.Setenv("HF_HUB_CACHE", filepath.Join(tmp, "hub"))
 	os.Unsetenv("HF_HOME")
 	os.Unsetenv("HF_ENDPOINT")
+	reachHosts, keychainProbe = fakeReach, func() error { return nil } // no network, no Keychain
 	familyConfig = func(a *app) actnow.Config {
 		d := a.dataDir()
 		hub := filepath.Join(d, "hub")
@@ -75,6 +78,17 @@ func runIsolated(m *testing.M) int {
 			BundleID: "dev.hehehai.voxtnew", Version: "0.1.0-test", System: noApps{}}
 	}
 	return m.Run()
+}
+
+// fakeReach answers every host at once, in 120 ms (the tests' network:
+// none; TestSelfCheckNetwork swaps in failures).
+func fakeReach(_ context.Context, _ *http.Client, urls []string) []netcheck.Result {
+	out := make([]netcheck.Result, len(urls))
+	for i, u := range urls {
+		host, _ := strings.CutPrefix(u, "https://")
+		out[i] = netcheck.Result{URL: u, Host: host, OK: true, Latency: 120 * time.Millisecond}
+	}
+	return out
 }
 
 // testHubs are the model libraries of test apps that use another than

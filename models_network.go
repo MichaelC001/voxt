@@ -17,6 +17,8 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/hehehai/VoxtMini/internal/actnow"
 	"github.com/hehehai/VoxtMini/internal/i18n"
+	"github.com/hehehai/VoxtMini/internal/icons"
+	"github.com/hehehai/VoxtMini/internal/netcheck"
 	"github.com/hehehai/VoxtMini/internal/settings"
 	famsettings "github.com/hehehai/actnowkit/settings"
 )
@@ -42,6 +44,11 @@ type networkForm struct {
 	proxyErr  string
 	source    int    // index in networkSources, or len(networkSources): sourceURLs
 	sourceURL string // a list of endpoints another app set ("" none); settings.json does not say which app
+	// testing: a connection test runs; tested are its results, for
+	// testedFor (the proxy and the source tested: a change hides them).
+	testing   bool
+	tested    []netcheck.Result
+	testedFor [2]string
 }
 
 // openNetwork opens the Network dialog with the values VoxtMini uses.
@@ -78,31 +85,104 @@ func (a *app) fillNetwork(key string) {
 	}
 }
 
-// saveNetwork checks the form and makes it VoxtMini's settings (the
-// family's, for the keys VoxtMini follows); it reports whether it did.
-func (a *app) saveNetwork() bool {
-	f := &a.netForm
-	proxy := famsettings.ProxyAuto
+// values are the form's proxy and download source (network.proxy and
+// network.hfEndpoints values); false for a custom proxy that is not one.
+func (f *networkForm) values() (proxy, source string, ok bool) {
+	proxy = famsettings.ProxyAuto
 	switch f.proxyMode {
 	case proxyNone:
 		proxy = famsettings.ProxyDirect
 	case proxyCustom:
 		v, err := famsettings.Normalize(actnow.KeyProxy, f.proxyURL)
 		if err != nil || v == famsettings.ProxyAuto || v == famsettings.ProxyDirect {
-			f.proxyErr = i18n.T("Enter a proxy's address that starts with http://, https:// or socks5://, like http://127.0.0.1:7890.")
-			return false
+			return "", "", false
 		}
 		proxy = v
 	}
-	source := f.sourceURL
+	source = f.sourceURL
 	if f.source < len(networkSources) {
 		source = networkSources[f.source]
+	}
+	return proxy, source, true
+}
+
+// formNetwork is the form's values, showing the proxy's error when it
+// is not one.
+func (a *app) formNetwork() (proxy, source string, ok bool) {
+	proxy, source, ok = a.netForm.values()
+	a.netForm.proxyErr = ""
+	if !ok {
+		a.netForm.proxyErr = i18n.T("Enter a proxy's address that starts with http://, https:// or socks5://, like http://127.0.0.1:7890.")
+	}
+	return proxy, source, ok
+}
+
+// saveNetwork checks the form and makes it VoxtMini's settings (the
+// family's, for the keys VoxtMini follows); it reports whether it did.
+func (a *app) saveNetwork() bool {
+	proxy, source, ok := a.formNetwork()
+	if !ok {
+		return false
 	}
 	a.updateSettings(func(s *settings.Settings) {
 		actnow.SetOwn(s, actnow.KeyProxy, proxy)
 		actnow.SetOwn(s, actnow.KeyHFEndpoints, source)
 	})
 	return true
+}
+
+// testNetwork asks the update server and the form's download source
+// through the form's proxy, before it is saved (settings_about_net.go,
+// as the self-check).
+func (a *app) testNetwork() {
+	proxy, source, ok := a.formNetwork()
+	if !ok || a.netForm.testing {
+		return
+	}
+	a.netProbeSeq++
+	seq, probe := a.netProbeSeq, newNetProbe(proxy, source)
+	a.netForm.testing, a.netForm.tested = true, nil
+	a.async(func() {
+		rs := probe.run()
+		a.post(func() {
+			if seq != a.netProbeSeq || !a.netOpen {
+				return // the dialog closed, or opened again
+			}
+			a.netForm.testing, a.netForm.tested, a.netForm.testedFor = false, rs, [2]string{proxy, source}
+		})
+	})
+}
+
+// netTestRows are the connection test's results while the form is what
+// was tested: a mark, the host, the time or why it did not answer.
+func (a *app) netTestRows(c *ui.Context) {
+	t := c.Theme()
+	f := &a.netForm
+	ui.Row(c.Key("net-test")).Gap(px(t, sp2)).AlignItems(ui.Center).Children(func() {
+		if ui.Button(c.Key("net-test-run"), i18n.T("Test connection")).Disabled(f.testing).Clicked() {
+			a.testNetwork()
+		}
+		if f.testing {
+			ui.Spinner(c)
+		}
+	})
+	if f.testing || len(f.tested) == 0 {
+		return
+	}
+	if proxy, source, ok := f.values(); !ok || [2]string{proxy, source} != f.testedFor {
+		return
+	}
+	for _, r := range f.tested {
+		mark, col, detail := icons.CheckCircle, t.Success, i18n.T("%d ms", r.Latency.Milliseconds())
+		if !r.OK {
+			mark, col, detail = icons.CloseCircle, t.Danger, netReason(r)
+		}
+		ui.Row(c.Key("net-test-" + r.Host)).Gap(px(t, sp2)).AlignItems(ui.Center).Children(func() {
+			ui.Icon(c, mark.Linear).Size(px(t, 14), px(t, 14)).TextColor(col).Shrink(0)
+			ui.Text(c, r.Host).Width(px(t, 160)).SingleLine()
+			caption(c, detail).Grow(1).MinWidth(0)
+		})
+	}
 }
 
 // followNetwork makes VoxtMini follow the family for key (on: "Use
@@ -157,7 +237,7 @@ func (a *app) networkDialog(c *ui.Context) {
 				caption(c, f.proxyErr).TextColor(t.Danger)
 			}
 		}
-		a.networkFamilyLine(c, actnow.KeyProxy, i18n.T("Other ActNow apps use a different proxy."))
+		a.familyLine(c, actnow.KeyProxy, i18n.T("Other ActNow apps use a different proxy."), a.followNetwork, nil)
 
 		ui.Box(c).Height(px(t, sp2)).Shrink(0)
 		sourceTip := i18n.T("Hugging Face and its mirror hf-mirror.com, whichever answers first. Every file is checked, so either is safe.")
@@ -173,7 +253,10 @@ func (a *app) networkDialog(c *ui.Context) {
 		if f.source >= len(networkSources) {
 			caption(c, i18n.T("Custom servers: %s", f.sourceURL))
 		}
-		a.networkFamilyLine(c, actnow.KeyHFEndpoints, i18n.T("Other ActNow apps use a different download source."))
+		a.familyLine(c, actnow.KeyHFEndpoints, i18n.T("Other ActNow apps use a different download source."), a.followNetwork, nil)
+
+		ui.Box(c).Height(px(t, sp2)).Shrink(0)
+		a.netTestRows(c)
 	}, func() {
 		ui.Spacer(c)
 		if ui.Button(c.Key("net-cancel"), i18n.T("Cancel")).Clicked() {
@@ -186,44 +269,6 @@ func (a *app) networkDialog(c *ui.Context) {
 	if !open {
 		a.closeNetwork()
 	}
-}
-
-// networkFamilyLine says under a shared setting whether it applies to
-// every ActNow app, with the link that changes it (spec §9.3), or, once
-// after the first start, that the family uses another value (§9.4). With
-// no other ActNow app installed it says nothing but the conflict (which
-// another app's value implies) or a newer app's read-only directory.
-func (a *app) networkFamilyLine(c *ui.Context, key, other string) {
-	t := c.Theme()
-	follows := a.prefs.Family.Follows(key)
-	if slices.Contains(a.prefs.Family.Conflicts, key) && !follows {
-		notice(c, "net-conflict-"+keySuffix(key), noticeInfo, other, "", func() {
-			if ui.Button(c.Key("theirs"), i18n.T("Use theirs")).Clicked() {
-				a.followNetwork(key, true)
-			}
-		}, nil)
-		return
-	}
-	if !a.familyOthers() && !(follows && a.fam.ReadOnly()) {
-		return
-	}
-	ui.Row(c.Key("net-family-" + keySuffix(key))).Gap(px(t, sp2)).AlignItems(ui.Center).Wrap().Children(func() {
-		if follows && a.fam.ReadOnly() {
-			caption(c, i18n.T("Another ActNow app updated the shared format. Update this app to change these settings."))
-			return
-		}
-		if follows {
-			caption(c, i18n.T("Applies to all ActNow apps"))
-			if ui.Link(c.Key("own"), i18n.T("Use a different setting for this app"), "").FontSize(px(t, fsCaption)).Clicked() {
-				a.followNetwork(key, false)
-			}
-			return
-		}
-		caption(c, i18n.T("Only VoxtMini uses this setting."))
-		if ui.Link(c.Key("follow"), i18n.T("Use the same setting as the other ActNow apps"), "").FontSize(px(t, fsCaption)).Clicked() {
-			a.followNetwork(key, true)
-		}
-	})
 }
 
 // keySuffix is a shared key as a part of an element key.

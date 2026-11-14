@@ -29,6 +29,7 @@ func (a *app) generalSettings(c *ui.Context) {
 			a.updateSettings(func(s *settings.Settings) { s.General.Language = tag })
 		}
 	})
+	a.languageFamilyLine(c) // family_shared_view.go
 	settingRow(c, "main-language", i18n.T("Main language"), i18n.T("The language you mostly speak and write. Clean-up keeps your text in it; Translate writes in English, or in Chinese when this is English, unless the Translate page says otherwise."), func() {
 		opts := mainLanguageOptions()
 		if ui.Select(c.Key("main-language-select"), &a.settingsForm.mainLanguage, opts).Label(i18n.T("Main language")).Width(px(t, 220)).Changed() {

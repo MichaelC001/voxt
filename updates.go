@@ -1,9 +1,13 @@
 package main
 
 // Updates: MyGo's updater plugin in native UI (native.Plugin, main.go)
-// checks actnow.dev once a day, shows a new version's notes in its
-// own window, in the language VoxtMini shows, and installs it (a delta
-// when there is one) on the user's word, then offers to restart. Its
+// checks actnow.dev once a day. What a daily check finds shows quietly, as
+// a card at the foot of the sidebar ("Update available", Install), not as
+// a window popping up over the app the user dictates into (MyGo patch
+// 0011, updateFound); Install, or Check for Updates, opens the plugin's
+// window with the version's notes, in the language VoxtMini shows, which
+// installs it (a delta when there is one) on the user's word, then offers
+// to restart. Its
 // "Check for Updates" is ours, in the app menu, the menu bar icon's menu,
 // the palette and Settings → About, which also shows its two preferences.
 // Release builds only: `updates` is put in mygo.json by the release
@@ -104,11 +108,13 @@ type updateState struct {
 	bundleUpdated bool
 }
 
-// The update's card: its ID, and the link of its action, which restarts
-// VoxtMini (cardAction).
+// The update's card: its ID, and the links of its actions (cardAction),
+// which open the update window (a version found) or restart VoxtMini (an
+// update installed).
 const (
-	problemUpdate = "problem/update"
-	linkRelaunch  = "action:relaunch"
+	problemUpdate     = "problem/update"
+	linkInstallUpdate = "action:install-update"
+	linkRelaunch      = "action:relaunch"
 )
 
 // bundleWatch is how often the running app looks for an update installed
@@ -151,6 +157,31 @@ func (a *app) checkForUpdates() {
 	if a.upd != nil {
 		a.upd.CheckNow()
 	}
+}
+
+// updateFound hears of a version a daily check found (the plugin's
+// goroutine; updater.Options.Found): the card shows it, the window does
+// not pop up.
+func (a *app) updateFound(version string) bool {
+	a.post(func() { a.updateAvailable(version) })
+	return true
+}
+
+// updateAvailable shows the card of a version found, unless an update is
+// installed already (its own card asks to restart).
+func (a *app) updateAvailable(version string) {
+	if a.bundleUpdated {
+		return
+	}
+	a.setProblem(problemUpdate, "available "+version, &core.Notification{Severity: core.SeverityInfo,
+		Title: i18n.T("Update available"), Body: i18n.T("Version %s", version), Link: linkInstallUpdate})
+}
+
+// installUpdate is the card's Install: the card goes, the update window
+// opens with the version's notes and installs it on the user's word.
+func (a *app) installUpdate() {
+	a.setProblem(problemUpdate, "", nil)
+	a.checkForUpdates()
 }
 
 // updateMenuItems is Check for Updates… for a menu (none without the
@@ -272,7 +303,7 @@ func (a *app) updateSettingsSection(c *ui.Context) {
 	if !a.updKnown || !p.Enabled {
 		return
 	}
-	settingRow(c, "about-update-auto", i18n.T("Check automatically"), i18n.T("Once a day, in the background. A new version opens a window with its notes, which asks before installing it."), func() {
+	settingRow(c, "about-update-auto", i18n.T("Check automatically"), i18n.T("Once a day, in the background. A new version shows at the foot of the sidebar; it installs when you say so."), func() {
 		if ui.Switch(c.Key("about-update-auto-switch"), &a.updPrefs.AutoCheck).Label(i18n.T("Check for updates automatically")).Changed() {
 			a.setAutoCheck(a.updPrefs.AutoCheck)
 		}

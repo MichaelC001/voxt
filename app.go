@@ -37,6 +37,7 @@ import (
 //	soundsState       settings_sounds.go  the sounds' presets and previews
 //	muteState         mute_link.go    the system's output, muted while recording
 //	updateState       updates.go      the updater, an update installed while running
+//	crashState        crash_report.go the last run's crash, its report
 //
 // Add fields to your area's struct, not here.
 type app struct {
@@ -76,6 +77,7 @@ type app struct {
 	soundsState
 	muteState
 	updateState
+	crashState
 	announceState
 }
 

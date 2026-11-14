@@ -70,11 +70,14 @@ func (a *app) modelFolderRows(c *ui.Context, r *storageReport, open func(key, di
 	if others || r.modelsShared > 0 {
 		rows = []useRow{{i18n.T("Only VoxtMini"), r.modelsMine}, {i18n.T("Shared with other ActNow apps"), r.modelsShared}}
 	}
-	ui.Grid(c.Key("st-models-use")).ColumnTracks(ui.Fr(1), ui.Fixed(px(t, 90)), ui.Fixed(px(t, 80))).GapX(px(t, sp3)).GapY(px(t, 6)).AlignItems(ui.Center).Children(func() {
+	ui.Grid(c.Key("st-models-use")).ColumnTracks(ui.Fr(1), ui.Fixed(px(t, 90)), ui.Fixed(px(t, stActionW))).GapX(px(t, sp3)).GapY(px(t, 6)).AlignItems(ui.Center).Children(func() {
 		for _, row := range rows {
 			ui.Text(c, row.title)
 			ui.Text(c, uitext.HumanBytes(row.bytes)).TextColor(t.TextMuted).TextAlign(ui.End)
 			ui.Box(c)
+		}
+		if len(r.orphans) > 0 {
+			a.orphanRow(c, r) // settings_storage_orphans.go
 		}
 	})
 }

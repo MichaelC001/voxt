@@ -59,6 +59,9 @@ type settingsForm struct {
 	muteOutput   bool        // Audio.MuteOn()
 	sidebar      int         // automatic, names and icons, icons only (settings_appearance.go)
 	ovStyle      overlayForm // settings_overlay.go
+	// The pages' Advanced folds are open (closed at launch, kept while
+	// VoxtMini runs).
+	audioAdvanced, appearanceAdvanced bool
 
 	clearHistoryAsk bool // Privacy's Clear the history… dialog
 	// loginIs is whether macOS opens VoxtMini at login, as last read or

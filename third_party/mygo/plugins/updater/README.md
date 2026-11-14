@@ -30,6 +30,9 @@ drawn in native UI, with no webview.
 It speaks the user's language (English, Chinese, Dutch, French, German,
 Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Turkish,
 Ukrainian), and `Options.Strings` changes its texts or adds languages.
+An app that would rather not have the window pop up after an automatic
+check sets `Options.Found`: it hears of the new version and tells the user
+its own way; `CheckForUpdates` then shows it.
 
 The app must be built with updates: see
 [auto-updates](https://github.com/egoist/mygo/blob/main/docs/updates.md).

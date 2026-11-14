@@ -135,7 +135,7 @@ func (a *app) muteNotified(m proto.Message) {
 // recordingAudio is what a change of the session does to the speakers
 // (events.go: onSession): its cue (Settings → Audio → Play sounds) and
 // the output's mute. Leaving the recording gives the output back first,
-// and the stop cue plays once it is back; entering it mutes the output
+// and the stop cue (or the failure's) plays once it is back; entering it mutes the output
 // once the start cue played.
 func (a *app) recordingAudio(was, s session.Snapshot) {
 	cue := recordingCue(was, s)
@@ -145,7 +145,7 @@ func (a *app) recordingAudio(was, s session.Snapshot) {
 	if id := a.muting; id != "" && (s.ID != id || s.State != session.Recording) {
 		a.muting = ""
 		a.clearMuteNote(id)
-		if sounds && cue == stopCue {
+		if sounds && (cue == stopCue || cue == failCue) {
 			sounds = false
 			once := sync.Once{}
 			then := func() { once.Do(func() { a.post(func() { a.async(func() { play(sound) }) }) }) }

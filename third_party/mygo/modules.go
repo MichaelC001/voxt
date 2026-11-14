@@ -910,3 +910,22 @@ func notificationClicked(id string) {
 	}
 	fire1(&App.onNotificationClick, id)
 }
+
+// NotificationStatus is whether the user allows the app's notifications
+// and how they show (System Settings › Notifications).
+type NotificationStatus = platform.NotificationStatus
+
+// NotificationStatus asks the system whether the app's notifications are
+// allowed and how they show; fn runs on the main thread. A platform that
+// cannot tell answers a status that is not Known.
+func (a *Application) NotificationStatus(fn func(NotificationStatus)) {
+	needsApp("App.NotificationStatus")
+	onMain(func() {
+		r, ok := backend().(platform.NotificationStatusReader)
+		if !ok {
+			fn(NotificationStatus{})
+			return
+		}
+		r.NotificationStatus(fn)
+	})
+}

@@ -71,6 +71,14 @@ type Options struct {
 	//		"sv": {Title: "Programuppdatering", ...},
 	//	}
 	Strings map[string]Strings
+	// Found, when set, is called when an automatic check finds a version
+	// the user did not skip and that is not to install without asking
+	// (AutomaticDownloads). Returning true says the app tells the user
+	// itself (a note in its window, say, rather than a window that pops
+	// up while they work): the update window does not show, and the next
+	// automatic check is an interval later; CheckForUpdates shows the
+	// version again. It runs on a goroutine of the plugin's.
+	Found func(version string) bool
 }
 
 // Plugin is the plugin with the default options.
@@ -507,6 +515,9 @@ func (u *updater) run(s *session) {
 		}
 		if automatic {
 			u.install(s, r)
+			return
+		}
+		if u.opts.Found != nil && u.opts.Found(r.version) {
 			return
 		}
 	}

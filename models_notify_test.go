@@ -30,10 +30,10 @@ func TestDownloadNotes(t *testing.T) {
 	a.modelStatus[models.LLMBalanced] = models.Status{}                                // cancelled
 	a.noteDownloads(base)
 	want := []sysNote{
-		{"download/" + models.ASRFast, "Download finished", uitext.ModelName(models.ASRFast) + " is installed."},
+		{ID: "download/" + models.ASRFast, Title: "Download finished", Body: uitext.ModelName(models.ASRFast) + " is installed."},
 	}
 	msg, _ := uitext.DownloadErrorText(errors.New("connection reset"))
-	want = append(want, sysNote{"download/" + models.LLMFast, "Download failed", uitext.ModelName(models.LLMFast) + ": " + msg})
+	want = append(want, sysNote{ID: "download/" + models.LLMFast, Title: "Download failed", Body: uitext.ModelName(models.LLMFast) + ": " + msg})
 	if len(shown) != len(want) {
 		t.Fatalf("shown %+v", shown)
 	}

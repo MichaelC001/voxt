@@ -381,7 +381,7 @@ func TestAboutAndBundle(t *testing.T) {
 	}
 	bundleDir = t.TempDir()
 	t.Cleanup(func() { bundleDir = "" })
-	a.saveBundle()
+	a.saveBundle(nil)
 	if ents, _ := os.ReadDir(bundleDir); len(ents) != 1 || !strings.HasSuffix(ents[0].Name(), ".zip") {
 		t.Errorf("bundle: %v", ents)
 	}
