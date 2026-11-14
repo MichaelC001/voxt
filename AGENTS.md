@@ -38,6 +38,8 @@ scripts/mac.sh 'scripts/build-omni.sh && go tool mygo build'     # the Omni runt
 scripts/mac.sh 'scripts/build-llm.sh && go tool mygo build'      # voxtmini-llm (language models) into the app; --out DIR for VOXTMINI_LLM; on mac-air cp -Rc ~/voxtmini-runtime/llm resources/darwin-arm64/llm is quicker
 scripts/mac.sh 'scripts/release.sh --runtimes $HOME/voxtmini-runtime'   # the release build: helper, omni, LLM, mygo build, release-verify.sh (docs/release.md); VOXTMINI_SIGN_IDENTITY signs it (team 779M533DL5, as the other ActNow apps: scripts/release-identity.sh), over ssh through scripts/mac-gui.sh
 MAC_DIR=code/VoxtMini-xyz scripts/mac.sh 'VOXTMINI_COEXIST_OK=1 scripts/mac-hotkey-coexist.sh'   # a built app's helper beside a running Auralink: synthetic keys, right ⌥ fires only VoxtMini
+scripts/mac.sh scripts/mac-dev-identity.sh                         # once: the Mac's "VoxtMini Dev" signing identity (own keychain), so permissions survive dev installs
+MAC_DIR=code/VoxtMini-test scripts/mac.sh scripts/mac-dev-install.sh  # a dev build signed with it, installed into /Applications (not opened): rev <sha> … INSTALL_DONE | BUILD_FAILED
 MAC_DIR=code/VoxtMini-sign scripts/mac.sh scripts/mac-sign-e2e.sh  # the release's signing with a throwaway identity: every nested binary hardened and timestamped
 scripts/mac.sh 'scripts/build-llm.sh --test'                     # its Swift tests (the same fixtures as Go)
 scripts/mac.sh 'cd helper && swift test'                     # the helper's tests (same fixtures as Go)

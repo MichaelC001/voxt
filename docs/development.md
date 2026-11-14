@@ -22,17 +22,29 @@ From Linux, `scripts/mac.sh <command>` mirrors the project to a Mac over ssh (`M
 
 ## Signing during development
 
-macOS keeps the Microphone and Accessibility grants for a signature. An ad hoc signed build (the default) has a new one each time the app is rebuilt, so after a rebuild macOS forgets them: the microphone turns **denied without asking again**, and Accessibility still shows on in System Settings but does not work. The helper's grants are the app's (macOS checks the helper against VoxtMini.app, its responsible process), so the same happens to it. Ways around it:
+macOS keeps the Microphone and Accessibility grants for a signature's *designated requirement*. An ad hoc signature (`codesign -s -`, what `go tool mygo build`, `scripts/build-helper.sh` and `scripts/build-llm.sh` do without an identity) has the cdhash as its requirement, and every build has a new one: after a rebuild macOS forgets the grants. The microphone turns **denied without asking again**, and Accessibility still shows on in System Settings but does nothing. The helper's grants are the app's (macOS checks the helper against VoxtMini.app, its responsible process: [helper-protocol.md](helper-protocol.md)), so the app's signature is what counts. A release (Developer ID) keeps its grants; over ssh `codesign` cannot use that key (it is in the login keychain: `scripts/mac-gui.sh`), so development builds were ad hoc.
+
+**The dev identity.** On the Mac, a self-signed code signing certificate, "VoxtMini Dev" (ten years), in a keychain of its own (`~/Library/Keychains/voxtmini-dev.keychain-db`, its random password in `~/.config/voxtmini-dev/sign.env`, 0600) signs development builds over ssh without the GUI. A build signed with it has the certificate as its requirement, the same on every build, so the grants stay. The login keychain is not touched.
+
+```sh
+scripts/mac.sh scripts/mac-dev-identity.sh                             # once: creates it (does nothing if it is there)
+MAC_DIR=code/VoxtMini-test scripts/mac.sh scripts/mac-dev-install.sh    # build, sign, install into /Applications
+```
+
+`scripts/mac-dev-install.sh` runs the helper's Swift tests, builds the helper, copies the runtimes from `~/voxtmini-runtime` (`--runtimes DIR`), runs `go tool mygo build` (ad hoc), signs the app again with the identity (`scripts/mac-dev-identity.sh --sign`), checks that the designated requirements of the app, the helper and `voxtmini-llm` name the certificate (`--check`), then installs: a copy to `/Applications/.VoxtMini.new.app`, a running VoxtMini asked to quit (SIGTERM), the copy swapped in. It never opens the app, prints `rev <commit>` first (from `.rev` in a git archive) and `INSTALL_DONE` or `BUILD_FAILED` last, and deletes the build trees. `--dry-run` prints the steps; `VOXTMINI_MIN_FREE` (default 30) is the least free memory in percent to start with.
+
+The dev signature has **no hardened runtime**, as an ad hoc build: a self-signed certificate has no Team ID, and the hardened runtime's library validation would refuse the app's libraries (SQLite, `llama.framework`, the Omni runtime's). That is why the script signs the finished app itself instead of `go tool mygo build -sign`, which turns the hardened runtime on for every real identity. Releases (`scripts/release.sh`, Developer ID) are signed as before.
+
+Switching from ad hoc builds to the dev identity, or between it and a release build, costs one more grant: the old entries name the other requirement. Reset them first, so a stale Accessibility entry does not stay on without working: `tccutil reset Microphone dev.hehehai.voxtnew` and `tccutil reset Accessibility dev.hehehai.voxtnew`, then open the app and grant again. Deleting the dev keychain, or creating the identity again, does the same. Downloaded models stay.
+
+Other ways, without the identity:
 
 - **Change only the helper:** keep one built app and run it with a helper outside the bundle. The helper inherits the app's grants wherever it lives, so rebuilding it costs nothing:
   ```sh
   scripts/build-helper.sh --out ~/voxtmini-dev
   open --env VOXTMINI_HELPER=$HOME/voxtmini-dev/voxtmini-helper build/darwin-arm64/VoxtMini.app
   ```
-- **Start over:** `tccutil reset Microphone dev.hehehai.voxtnew` (likewise `Accessibility`), then open the app and grant again. If a stale Accessibility entry stays on but does nothing, remove it with − in System Settings and grant again.
-- **Sign with a fixed identity:** an Apple Development certificate keeps the grants across rebuilds: `go tool mygo build -sign "Apple Development: …"` (or `macos.signingIdentity` in a local mygo.json; `VOXTMINI_SIGN_IDENTITY` for `scripts/build-helper.sh` and `scripts/build-llm.sh`). Over ssh, `codesign` fails with `errSecInternalComponent` until the key may be used without the GUI: once, in Terminal on the Mac, `security set-key-partition-list -S apple-tool:,apple: -s ~/Library/Keychains/login.keychain-db`.
-
-Switching between your own builds and a release build (Developer ID) needs the same reset once. Downloaded models stay.
+- **An Apple Development certificate** (in Terminal on the Mac, or over ssh once `security set-key-partition-list -S apple-tool:,apple: -s ~/Library/Keychains/login.keychain-db` has run there): `go tool mygo build -sign "Apple Development: …"` (`VOXTMINI_SIGN_IDENTITY` for `scripts/build-helper.sh` and `scripts/build-llm.sh`). It has a Team ID, so the hardened runtime that mygo turns on works.
 
 ## Tests
 

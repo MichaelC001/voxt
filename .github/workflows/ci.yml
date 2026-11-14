@@ -23,6 +23,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The overlay and notice tests measure Chinese text: they need a CJK
+      # font (fc-list :lang=zh), which the runner image lacks.
+      - name: Chinese fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          fc-list :lang=zh family | head -3
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
