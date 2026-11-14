@@ -27,8 +27,14 @@ jobs:
       # font (fc-list :lang=zh), which the runner image lacks.
       - name: Chinese fonts
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          # The runner's package mirror sometimes serves an incomplete index:
+          # retry the update and the install a few times.
+          for i in 1 2 3; do
+            sudo apt-get update -qq || true
+            if sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk; then break; fi
+            [ "$i" = 3 ] && exit 1
+            sleep 15
+          done
           fc-list :lang=zh family | head -3
 
       - uses: actions/setup-go@v5
