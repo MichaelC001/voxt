@@ -68,6 +68,9 @@ func ModelErrorText(err error) (msg, more string) {
 // key refused or missing, a quota, an unknown model): the Remote models
 // page's words say it better than a local model's.
 func remoteFailure(err error) bool {
+	if plainNetText(err) != "" {
+		return true
+	}
 	var ae *asr.Error
 	if errors.As(err, &ae) {
 		return ae.Kind == asr.KindAuth || ae.Kind == asr.KindQuota

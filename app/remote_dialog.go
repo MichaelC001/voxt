@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
 	"github.com/hehehai/VoxtMini/internal/lang"
+	"github.com/hehehai/VoxtMini/internal/privnet"
 	"github.com/hehehai/VoxtMini/internal/providers"
 	"github.com/hehehai/VoxtMini/internal/settings"
 	"github.com/hehehai/VoxtMini/internal/uitext"
@@ -207,12 +209,16 @@ func (a *app) providerDialogView(c *ui.Context) {
 			a.keyField(c, name, mask, pr.KeyOptional)
 			a.sharedKeyNotes(c, mask)
 		}
-		fieldInfo(c, i18n.T("Endpoint"), i18n.T("Leave empty for the service's own. Only https:// (wss:// for streaming) addresses, or http:// to this Mac."), func() {
+		fieldInfo(c, i18n.T("Endpoint"), i18n.T("Leave empty for the service's own. https:// (wss:// for streaming); http:// only to this Mac or a private network (LAN, Tailscale)."), func() {
 			ph := pr.Endpoint
 			if ph == "" {
 				ph = "https://…/v1"
 			}
 			ui.TextInput(c.Key("rm-endpoint"), &d.endpoint).Placeholder(ph).Label(i18n.T("Endpoint"))
+			if plainOverNetwork(d.endpoint) {
+				note := i18n.T("Not encrypted: your key and text cross the network in plain text.")
+				statusMark(c, icons.DangerTriangle, tok(t).Warning, note).Tooltip(note)
+			}
 		})
 		fieldInfo(c, i18n.T("Model"), "", func() {
 			opts := append(slices.Clone(pr.Models), otherModel())
@@ -450,4 +456,19 @@ func (a *app) keyField(c *ui.Context, name, mask string, optional bool) {
 			caption(c, i18n.T("The saved key is removed when you save."))
 		}
 	})
+}
+
+// plainOverNetwork says whether endpoint is plain (http, ws) to another
+// machine (a private network's: privnet), where the key and the text
+// cross the network unencrypted.
+func plainOverNetwork(endpoint string) bool {
+	u, err := url.Parse(strings.TrimSpace(endpoint))
+	if err != nil || u.Host == "" {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "ws":
+		return !privnet.IsLoopback(u.Hostname())
+	}
+	return false
 }

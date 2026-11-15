@@ -1,7 +1,7 @@
 {
   "name": "VoxtMini",
   "identifier": "dev.hehehai.voxtmini",
-  "version": "0.1.0-beta.4",
+  "version": "0.1.0-beta.5",
   "copyright": "Copyright © 2026 ActNow and the SGLang-Omni Team. Licensed under the Apache License 2.0.",
   "main": "./app",
   "out": "build",
@@ -17,6 +17,7 @@
     "minimumSystemVersion": "15.0",
     "infoPlist": {
       "LSApplicationCategoryType": "public.app-category.productivity",
+      "NSLocalNetworkUsageDescription": "Only for a remote model service you set up at an address on your local network or Tailscale. 仅用于你在局域网或 Tailscale 地址上设置的远程模型服务。",
       "NSMicrophoneUsageDescription": "VoxtMini records your voice while you use its shortcut and recognises it on this Mac, unless you choose a remote speech service for a feature: then that feature's recordings go to the service. 录音只在你使用快捷键时进行，默认在这台 Mac 上识别；只有你为某个功能选了远程语音服务，该功能的录音才会发给这个服务。",
       "NSSpeechRecognitionUsageDescription": "With Apple Speech chosen, macOS recognises your recordings on this Mac only: the audio never leaves it. 选用 Apple 语音识别时，由 macOS 只在这台 Mac 上识别你的录音：音频不会离开这台 Mac。"
     },

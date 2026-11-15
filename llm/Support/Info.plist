@@ -10,7 +10,7 @@
 	<key>CFBundleName</key>
 	<string>voxtmini-llm</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0-beta.4</string>
+	<string>0.1.0-beta.5</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 the SGLang-Omni and VoxtMini contributors. Licensed under the Apache License 2.0.</string>
 </dict>

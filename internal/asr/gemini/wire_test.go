@@ -32,8 +32,8 @@ func TestNew(t *testing.T) {
 	if _, err := New(asr.Config{}); asr.KindOf(err) != asr.KindConfig {
 		t.Errorf("no key: %v", err)
 	}
-	if _, err := New(asr.Config{Key: "k", Endpoint: "ws://example.com/x"}); asr.KindOf(err) != asr.KindConfig {
-		t.Errorf("plain ws to a remote host: %v", err)
+	if _, err := New(asr.Config{Key: "k", Endpoint: "ws://203.0.113.5/x"}); asr.KindOf(err) != asr.KindConfig {
+		t.Errorf("plain ws to a public address: %v", err)
 	}
 	c, err := New(asr.Config{Key: " k ", Endpoint: "https://example.com?key=old"})
 	if err != nil {

@@ -11,18 +11,20 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/hehehai/VoxtMini/internal/core"
+	"github.com/hehehai/VoxtMini/internal/privnet"
 )
 
 // WSClient is the HTTP client WebSocket handshakes go through: the proxy
 // proxy (the family's network.proxy rule; nil: the environment's), HTTP/1.1 only (a
-// WebSocket upgrade needs it), dial and TLS timeouts.
+// WebSocket upgrade needs it), dial and TLS timeouts; plain ws only to the
+// loopback or a private network, direct (privnet.Guard).
 func WSClient(proxy ProxyFunc) *http.Client {
-	return &http.Client{CheckRedirect: core.CheckRedirect, Transport: &http.Transport{
+	return &http.Client{CheckRedirect: core.CheckRedirect, Transport: privnet.Guard(&http.Transport{
 		Proxy:               proxyOf(proxy),
 		DialContext:         (&net.Dialer{Timeout: ConnectTimeout, KeepAlive: 30 * time.Second}).DialContext,
 		TLSHandshakeTimeout: ConnectTimeout,
 		TLSNextProto:        map[string]func(string, *tls.Conn) http.RoundTripper{}, // no HTTP/2
-	}}
+	}, nil)}
 }
 
 // WSOptions is how Dial connects.

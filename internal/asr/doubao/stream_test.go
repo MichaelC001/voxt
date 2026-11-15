@@ -522,7 +522,7 @@ func TestNew(t *testing.T) {
 		{},
 		{AppID: "a"},
 		{AppID: "a", Key: "  "},
-		{AppID: "a", Key: "k", Endpoint: "ws://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"},
+		{AppID: "a", Key: "k", Endpoint: "ws://203.0.113.5/api/v3/sauc/bigmodel_async"},
 		{AppID: "a", Key: "k", Endpoint: "https://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"},
 		{AppID: "a", Key: "k", Endpoint: "wss://user:pw@openspeech.bytedance.com/"},
 	} {

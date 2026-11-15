@@ -48,3 +48,17 @@ func TestChatAPISearch(t *testing.T) {
 		t.Errorf("anthropic: %q", firstTexts(tt))
 	}
 }
+
+// TestPlainOverNetwork: the dialog's "not encrypted" note is for plain
+// endpoints to another machine only.
+func TestPlainOverNetwork(t *testing.T) {
+	for ep, want := range map[string]bool{
+		"": false, "https://api.deepseek.com/v1": false, "wss://relay.example/x": false,
+		"http://localhost:11434/v1": false, "http://127.0.0.1:1234/v1": false, "ws://[::1]:9/x": false,
+		"http://100.88.1.2:3425/v1": true, "HTTP://gpubox.local:8000/v1": true, "ws://192.168.1.20/x": true,
+	} {
+		if got := plainOverNetwork(ep); got != want {
+			t.Errorf("%q: %v", ep, got)
+		}
+	}
+}

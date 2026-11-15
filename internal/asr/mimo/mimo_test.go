@@ -64,8 +64,8 @@ func TestErrors(t *testing.T) {
 	if _, err := New(asr.Config{}); asr.KindOf(err) != asr.KindConfig {
 		t.Errorf("no key: %v", err)
 	}
-	if _, err := New(asr.Config{Key: "k", Endpoint: "http://example.com/v1"}); err == nil {
-		t.Error("plain http to a remote host accepted")
+	if _, err := New(asr.Config{Key: "k", Endpoint: "http://203.0.113.5/v1"}); err == nil {
+		t.Error("plain http to a public address accepted")
 	}
 }
 

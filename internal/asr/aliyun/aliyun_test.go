@@ -64,8 +64,8 @@ func TestNew(t *testing.T) {
 	if _, err := New(asr.Config{}); asr.KindOf(err) != asr.KindConfig {
 		t.Errorf("no key: %v", err)
 	}
-	if _, err := New(asr.Config{Key: "k", Endpoint: "ws://dashscope.aliyuncs.com/api-ws/v1/inference"}); asr.KindOf(err) != asr.KindConfig {
-		t.Errorf("plain ws to a remote host: %v", err)
+	if _, err := New(asr.Config{Key: "k", Endpoint: "ws://203.0.113.5/api-ws/v1/inference"}); asr.KindOf(err) != asr.KindConfig {
+		t.Errorf("plain ws to a public address: %v", err)
 	}
 	if _, err := New(asr.Config{Key: "k", Endpoint: "wss://user:pw@dashscope.aliyuncs.com"}); asr.KindOf(err) != asr.KindConfig {
 		t.Errorf("credentials in the URL: %v", err)

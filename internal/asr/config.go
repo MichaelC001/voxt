@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hehehai/VoxtMini/internal/core"
+	"github.com/hehehai/VoxtMini/internal/privnet"
 )
 
 // ProxyFunc is an http.Transport's Proxy: the family's network.proxy rule
@@ -39,25 +40,13 @@ type Config struct {
 	HTTPClient *http.Client
 }
 
-// proxyOf is p, or the environment's proxy, never for the loopback.
+// proxyOf is p, or the environment's proxy. privnet.Guard keeps the
+// loopback, private hosts and plain requests off it.
 func proxyOf(p ProxyFunc) ProxyFunc {
 	if p == nil {
-		p = http.ProxyFromEnvironment
+		return http.ProxyFromEnvironment
 	}
-	return func(r *http.Request) (*url.URL, error) {
-		if loopbackHost(r.URL.Hostname()) {
-			return nil, nil
-		}
-		return p(r)
-	}
-}
-
-func loopbackHost(host string) bool {
-	if host == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	return p
 }
 
 // NewHTTPClient is an HTTP client through proxy, with dial and TLS
@@ -65,14 +54,15 @@ func loopbackHost(host string) bool {
 // no bound, for slow streaming answers such as a language model's.
 // Requests are otherwise bounded by their context. Redirects go only to
 // the same host, never from https to http (core.CheckRedirect): the
-// requests carry keys.
+// requests carry keys. Plain http goes direct and only to the loopback or
+// a private network (privnet.Guard).
 func NewHTTPClient(proxy ProxyFunc, responseHeader time.Duration) *http.Client {
-	return &http.Client{CheckRedirect: core.CheckRedirect, Transport: &http.Transport{
+	return &http.Client{CheckRedirect: core.CheckRedirect, Transport: privnet.Guard(&http.Transport{
 		Proxy:                 proxyOf(proxy),
 		DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		TLSHandshakeTimeout:   15 * time.Second,
 		ResponseHeaderTimeout: responseHeader,
 		MaxIdleConnsPerHost:   16,
 		ForceAttemptHTTP2:     true,
-	}}
+	}, nil)}
 }

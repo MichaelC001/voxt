@@ -15,6 +15,7 @@ appctx hotkey
 appctx settings
 appicons helper/proto
 asr core
+asr privnet
 compose lang
 datadir store/sqlitestore
 deliver helper/proto
@@ -28,6 +29,7 @@ helper/helpertest/cmd/fakehelper helper/helpertest
 hotkey helper/proto
 hotkey settings
 llm core
+llm privnet
 llmrt asr
 llmrt core
 llmrt lang
@@ -78,6 +80,7 @@ uitext helper/proto
 uitext hotkey
 uitext i18n
 uitext lang
+uitext privnet
 uitext llm
 uitext local
 uitext permission

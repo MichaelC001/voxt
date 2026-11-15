@@ -181,7 +181,7 @@ func TestConfig(t *testing.T) {
 	if _, err := New(asr.Config{}); asr.KindOf(err) != asr.KindConfig {
 		t.Errorf("no key: %v", err)
 	}
-	for _, ep := range []string{"http://api.example.com/v1", "ftp://x/y", "https://user:pw@api.example.com/v1", "not a url"} {
+	for _, ep := range []string{"http://203.0.113.5/v1", "ftp://x/y", "https://user:pw@api.example.com/v1", "not a url"} {
 		if _, err := New(asr.Config{Key: "k", Endpoint: ep}); asr.KindOf(err) != asr.KindConfig {
 			t.Errorf("%s: %v", ep, err)
 		}

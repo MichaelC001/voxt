@@ -12,6 +12,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/asr"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/llm"
+	"github.com/hehehai/VoxtMini/internal/privnet"
 	"github.com/hehehai/VoxtMini/internal/providers"
 	"github.com/hehehai/VoxtMini/internal/settings"
 )
@@ -101,6 +102,9 @@ func ProviderErrorText(err error) (msg, more string) {
 		return "", ""
 	}
 	more = err.Error()
+	if s := plainNetText(err); s != "" {
+		return s, more
+	}
 	var ae *asr.Error
 	if errors.As(err, &ae) {
 		switch ae.Kind {
@@ -142,7 +146,7 @@ func ProviderErrorText(err error) (msg, more string) {
 		case llm.CodeServer:
 			return i18n.T("The service had a problem on its side. Try again in a moment."), more
 		case llm.CodeConfig:
-			return i18n.T("The setup is incomplete or wrong: check the endpoint (https:// only) and the model."), more
+			return i18n.T("The setup is incomplete or wrong: check the endpoint and the model."), more
 		case llm.CodeBadRequest, llm.CodeContextLength, llm.CodeFiltered:
 			return i18n.T("The service refused the request."), more
 		case llm.CodeCancelled:
@@ -156,6 +160,12 @@ func ProviderErrorText(err error) (msg, more string) {
 // ProviderErrorShort is a failed test's reason beside its button: a few
 // words, and what to change.
 func ProviderErrorShort(err error) string {
+	switch {
+	case errors.Is(err, privnet.ErrPublic):
+		return i18n.T("Refused: http:// to a public address")
+	case errors.Is(err, privnet.ErrLocalNetwork):
+		return i18n.T("Allow Local Network access")
+	}
 	var ae *asr.Error
 	if errors.As(err, &ae) {
 		switch ae.Kind {
@@ -197,7 +207,7 @@ func ProviderErrorShort(err error) string {
 		case llm.CodeServer:
 			return i18n.T("The service failed: try again later")
 		case llm.CodeConfig:
-			return i18n.T("Check the endpoint (https://) and model")
+			return i18n.T("Check the endpoint and model")
 		case llm.CodeBadRequest, llm.CodeContextLength, llm.CodeFiltered:
 			return i18n.T("Request refused: check the model")
 		case llm.CodeCancelled:
@@ -246,4 +256,17 @@ func ProviderErrorDetail(err error) string {
 		return strings.Join(parts, " · ")
 	}
 	return asr.Clip(err.Error(), 300)
+}
+
+// plainNetText explains a plain connection's refusal (privnet.ErrPublic)
+// or a private address out of reach, which on macOS is usually the Local
+// Network permission (privnet.ErrLocalNetwork); "" for other errors.
+func plainNetText(err error) string {
+	switch {
+	case errors.Is(err, privnet.ErrPublic):
+		return i18n.T("Not sent: the endpoint's address is public, and http:// goes only to this Mac or a private network. Use https://.")
+	case errors.Is(err, privnet.ErrLocalNetwork):
+		return i18n.T("Could not reach the address on your network. Allow VoxtMini in System Settings → Privacy & Security → Local Network.")
+	}
+	return ""
 }

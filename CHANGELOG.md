@@ -4,6 +4,18 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.0-beta.5] - 2026-11-15
+
+### Added
+
+- Remote model services on your own network: an endpoint may use plain `http://` (`ws://` for streaming) to a LAN or Tailscale address (for example `http://100.88.1.2:3425/v1`) or a host name on it, not only to this Mac. A host name is checked when connecting: if it points to a public address, nothing is sent. The setup dialog notes that such a connection is not encrypted. If macOS blocks it, the error asks you to allow VoxtMini under System Settings → Privacy & Security → Local Network.
+
+### 中文
+
+#### 新增
+
+- 可以使用你自己网络中的远程模型服务：Endpoint 可以用明文 `http://`（流式为 `ws://`）连到局域网或 Tailscale 地址（例如 `http://100.88.1.2:3425/v1`）或其中的主机名，不再只限本机。主机名在连接时检查：指向公网地址时不会发送任何内容。设置对话框会提示这种连接未加密。如果 macOS 阻止连接，错误会提示你在“系统设置 → 隐私与安全性 → 本地网络”中允许 VoxtMini。
+
 ## [0.1.0-beta.4] - 2026-11-15
 
 ### Changed

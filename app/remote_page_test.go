@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/hotkey"
 	"github.com/hehehai/VoxtMini/internal/llm"
 	"github.com/hehehai/VoxtMini/internal/local"
+	"github.com/hehehai/VoxtMini/internal/privnet"
 	"github.com/hehehai/VoxtMini/internal/providers"
 	"github.com/hehehai/VoxtMini/internal/remote"
 	"github.com/hehehai/VoxtMini/internal/settings"
@@ -242,6 +244,12 @@ func remoteShots(a *app, save func(string)) {
 	a.openProviderDialog(providers.LLM, "openai") // remote_dialog_api.go
 	a.rmDlg.advanced, a.rmDlg.api, a.rmDlg.search = true, llm.APIResponses, true
 	save("remote-dialog-search")
+	a.rmDlg = providerDialog{}
+	a.openProviderDialog(providers.LLM, "ollama") // a server on Tailscale, the Local Network permission denied
+	a.rmDlg.endpoint = "http://100.88.1.2:11434/v1"
+	denied := &llm.Error{Code: llm.CodeNetwork, Err: fmt.Errorf("dial tcp 100.88.1.2:11434: %w", privnet.ErrLocalNetwork)}
+	a.rmDlg.test = providerTest{res: providers.TestResult{Err: denied, At: time.Unix(1, 0)}}
+	save("remote-dialog-lan")
 	a.rmDlg = providerDialog{}
 	familyOfferShot(a, save) // family_keys_test.go
 	a.updateSettings(func(s *settings.Settings) { s.Features.Translate.LLM = settings.RemoteID("deepseek") })

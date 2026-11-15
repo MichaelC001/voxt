@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hehehai/VoxtMini/internal/asr"
 	"github.com/hehehai/VoxtMini/internal/core"
+	"github.com/hehehai/VoxtMini/internal/privnet"
 )
 
 func TestWAVAndFrames(t *testing.T) {
@@ -175,5 +177,25 @@ func TestClientsRedirects(t *testing.T) {
 	}
 	if leaked.Load() != 0 {
 		t.Error("a request reached the other host")
+	}
+}
+
+// TestClientsPlain: the clients' plain requests reach this Mac (by name
+// too) but never a public address (privnet.Guard), WebSocket handshakes
+// included.
+func TestClientsPlain(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	_, port, _ := net.SplitHostPort(strings.TrimPrefix(srv.URL, "http://"))
+	for name, c := range map[string]*http.Client{"http": asr.NewHTTPClient(nil, 0), "ws": asr.WSClient(nil)} {
+		resp, err := c.Get("http://localhost:" + port + "/v1")
+		if err != nil {
+			t.Errorf("%s: loopback: %v", name, err)
+		} else {
+			resp.Body.Close()
+		}
+		if _, err := c.Get("http://203.0.113.5:" + port + "/v1"); !errors.Is(err, privnet.ErrPublic) {
+			t.Errorf("%s: public: %v", name, err)
+		}
 	}
 }
