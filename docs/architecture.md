@@ -130,7 +130,8 @@ github.com/hehehai/VoxtMini
 │   ├── overlay/
 │   │   ├── layout/       the overlay's geometry as numbers: the pill's, the live text's, a notice's and
 │   │   │                 the answer card's sizes (Voxt's), the shadow's margin, the frame anchored to an
-│   │   │                 edge of the display, the waveform's bars, the loader's dots (mygo.Rectangle only)
+│   │   │                 edge of the display, the waveform's bars, the loader's dots, the spring the
+│   │   │                 face's size changes move with (Motion) (mygo.Rectangle only)
 │   │   └── ink/          the overlay's ink check: the face and its strokes measured from a picture, against
 │   │                     the layout (Tester renders on Linux, the window's captures on the Mac)
 │   ├── uitext/           the words the UI shows from the domain's values (shortcuts, models' errors,
@@ -284,7 +285,7 @@ While a session is live (or the answer card shows) the bindings go to the helper
 | `a.railMode()` (the only place that decides: the user's choice, else a window narrower than 740), `a.setRail(on)` | shell_nav.go | the sidebar, `pageWidth`, Settings → Appearance |
 | `a.audio` (the inputs `capture.devices` listed when the helper became ready, kept current by `capture.devices.changed`: `a.devicesListed`), `a.loadDevices()`, `a.moveDevices(rows, to)` (the list's drag, `moveRows`), `deviceInUse(list, devs)`, `a.playSound` (`macx.PlayWait`, on a goroutine; tests record), `recordingCue(was, s)` (start, stop or none), `cueSound(cue, preset)`; `a.trySound(preset)` (a preview, `a.startSound`: `macx.Start`; tests record), `a.soundsRow(c)` (the presets' menu and Try) | settings_audio.go, settings_sounds.go | Settings → Audio, helperlink.go (a helper that became ready), mute_link.go (`recordingAudio` plays the cues) |
 | `a.mute` (`*outmute.Controller`), `a.muting`, `a.recordingAudio(was, s)` (the cues and the mute around a recording; `startCueWait(sound)`), `a.muteHelperChanged`, `a.muteNotified`, `a.muteSettingChanged`, `a.pillSession()` (the pill's text line with the output's note), `a.closeMute()` | mute_link.go | events.go (onSession), helperlink.go, settings_audio.go, overlay_face.go, overlay_size.go, app.go (quit) |
-| `faceStyle(e, o, mode, h)`, `overlayPill(c, s, mode, look)`, `noticeFace(c, n, o, h, live)`, `cardFace{…}.view(c)` (`live` nil: draws only), `a.overlayRestyle()` | overlay_face.go, overlay_card_view.go, overlay.go | the overlay, the preview of Settings → Overlay style (settings_overlay_preview.go), `settingsChanged` |
+| `faceStyle(e, o, mode, h)`, `overlayPill(c, s, mode, look)`, `noticeFace(c, n, o, h, fit, live)`, `cardFace{…}.view(c)` (`live` nil: draws only), `a.overlayRestyle()` | overlay_face.go, overlay_card_view.go, overlay.go | the overlay, the preview of Settings → Overlay style (settings_overlay_preview.go), `settingsChanged` |
 | `uitext.TriggerText(trigger)` (its name; the setup guide's `uitext.TriggerHowText` says how to use it), `featurePath(feature)` | internal/uitext (keys.go), settings_shortcuts.go | Settings → Shortcuts |
 | `a.trayItems()`, `a.loadTrayRecent()` (the last three results), `a.trayMicItem` / `a.chooseDevice(d)` (the Microphone submenu: the one chosen goes first in Settings → Audio's list, tray_mic.go), `trayicon.Icon(recording)` (Voxt's microphone, `internal/trayicon`), `a.copyText` (tests) | tray.go, tray_mic.go | `historyChanged`, the menu bar |
 | `a.helperStatus()`, `helperCall[T](a, method, params, timeout, then)`, `a.helperNotified(m)`, `a.restartHelper()`, `a.hotkeys` (hotkey.state), `a.front` (app.activated) | helperlink.go | the helper's card (shell_notices.go), Home, permissions, Diagnostics, sessions |

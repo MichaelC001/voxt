@@ -43,6 +43,9 @@ func (r *run) onAudio(ev AudioEvent) {
 			s.HeardAt, s.Device, s.FellBack = at, st.DeviceName, st.FellBack
 			s.Waiting = r.waitOf(s)
 		})
+		r.heardAudio()
+		r.logf("debug", "the microphone (%s) gave its first audio %v after the start (helper: %.0f ms)", st.DeviceName,
+			at.Sub(r.m.Current().StartedAt).Round(time.Millisecond), st.StartMS)
 		if st.FellBack {
 			r.logf("warning", "recording from %s: %s", st.DeviceName, st.FallbackReason)
 		}

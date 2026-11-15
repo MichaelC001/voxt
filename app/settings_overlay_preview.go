@@ -181,7 +181,7 @@ func (a *app) previewFace(c *ui.Context, o settings.Overlay, state int) {
 		n := previewNotice()
 		tw, _ := measure(noticeText(n.text))
 		w, h = layout.NoticeWidth(tw, noticeActionLabel(n.action) != ""), layout.PillH
-		draw = func() { noticeFace(c, n, o, h, nil) }
+		draw = func() { noticeFace(c, n, o, h, faceFit{}, nil) }
 	default:
 		mode := ovRecording
 		if state == ovPreviewWorking {

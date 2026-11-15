@@ -38,6 +38,7 @@ func (a *app) connectEvents() {
 	a.onSession = append(a.onSession,
 		func(_, s session.Snapshot) { a.obSessionChanged(s) }, // onboarding.go: a try of the setup guide passes
 		a.recordingAudio, // mute_link.go: the start and stop sounds, the output's mute
+		a.micHeard,       // permissions.go: audio came, so the microphone is allowed
 	)
 	a.afterSession = append(a.afterSession,
 		func(was, s session.Snapshot) {

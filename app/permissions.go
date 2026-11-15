@@ -24,6 +24,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/icons"
 	"github.com/hehehai/VoxtMini/internal/local"
 	"github.com/hehehai/VoxtMini/internal/permission"
+	"github.com/hehehai/VoxtMini/internal/session"
 	"github.com/hehehai/VoxtMini/internal/uitext"
 )
 
@@ -74,6 +75,15 @@ func (a *app) helperPerms(r proto.PermissionsResult, err error) {
 	}
 	a.perms.mic, a.perms.access, a.perms.checked = micState(r.Microphone), r.Accessibility, true
 	a.perms.speech = micState(r.SpeechRecognition)
+}
+
+// micHeard notes that the microphone is allowed once a session got
+// audio from it: macOS's prompt, if it asked, was answered yes (the next
+// session does not say it asks).
+func (a *app) micHeard(was, s session.Snapshot) {
+	if was.HeardAt.IsZero() && !s.HeardAt.IsZero() && a.perms.mic == permission.NotDetermined {
+		a.perms.mic = permission.Granted
+	}
 }
 
 // localPerms reads the Microphone and Accessibility from the app's own

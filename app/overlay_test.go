@@ -315,6 +315,9 @@ func overlayShots(t *testing.T, a *app, out, suffix string, dark bool) {
 		// The microphone gives no audio yet, then the speech model starts
 		// (10-20: the first session after launch).
 		{"overlay-waiting-mic", session.Snapshot{State: session.Recording, StartedAt: now, Waiting: session.WaitMic}, nil, nil},
+		{"overlay-waiting-permission", session.Snapshot{State: session.Recording, StartedAt: now, Waiting: session.WaitPermission}, nil, nil},
+		{"overlay-waiting-mic-time", session.Snapshot{State: session.Recording, StartedAt: now, Waiting: session.WaitMic},
+			func() { a.prefs.Overlay.ShowTime = true }, nil},
 		{"overlay-waiting-model", session.Snapshot{State: session.Recording, StartedAt: now, HeardAt: now.Add(-2 * time.Second), Levels: wave(),
 			Waiting: session.WaitModel}, nil, nil},
 		{"overlay-waiting-model-recognizing", session.Snapshot{State: session.Recognizing, Waiting: session.WaitModel}, nil, nil},
@@ -690,7 +693,7 @@ func TestOverlayInk(t *testing.T) {
 }
 
 // TestOverlayShots renders the overlay's states alone (overlayShots),
-// English over a light desktop and Chinese over a dark one:
+// English over a light desktop and Chinese over both:
 //
 //	VOXTMINI_OVERLAY_SHOTS=/tmp/ov go test -run TestOverlayShots .
 func TestOverlayShots(t *testing.T) { runSnapshots(t, "VOXTMINI_OVERLAY_SHOTS", snapshotsOverlay) }
@@ -699,7 +702,7 @@ func snapshotsOverlay(t *testing.T, out string) {
 	for _, run := range []struct {
 		lang string
 		dark bool
-	}{{"en", false}, {"zh-Hans", true}} {
+	}{{"en", false}, {"zh-Hans", false}, {"zh-Hans", true}} {
 		a, _, _ := newTestApp(t)
 		if run.lang != "en" {
 			a.updateSettings(func(s *settings.Settings) { s.General.Language = run.lang })

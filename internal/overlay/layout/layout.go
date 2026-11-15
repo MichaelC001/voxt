@@ -1,8 +1,9 @@
 // Package layout is the overlay's geometry, as pure numbers: the sizes of
 // the pill, the live text, a notice and the answer card (Voxt's, in DIPs),
 // the shadow's margin, the face's width for its texts, its window's frame
-// and place on the display (anchored to an edge), the waveform's bars and
-// the loader's dots. Package main's overlay draws with them; the ink check
+// and place on the display (anchored to an edge), the waveform's bars,
+// the loader's dots, and the spring its size changes move with
+// (motion.go). Package main's overlay draws with them; the ink check
 // (internal/overlay/ink) measures pictures against them. No MyGo UI: only
 // mygo.Rectangle, the display's geometry.
 package layout
@@ -271,37 +272,25 @@ func LoaderDot(t float64) (scale, alpha float64) {
 	return 0.6, 0.15
 }
 
-// MicRing is the starting microphone's ring at t seconds: a ping that
-// grows from the icon (MicRingMin) to MicRingMax over 1.2 s, fading out;
-// still (without motion), at 22 and 0.35.
-func MicRing(t float64, motion bool) (d, alpha float64) {
+// Starting is Voxt's initializing icon's motion at t seconds
+// (ModelInitializingIconView): 1.25 s each way, ease in and out, it turns
+// a full circle, grows from 0.96 to 1.04 and brightens from 0.62 to 0.98,
+// then goes back; still (without motion), upright at 0.8.
+func Starting(t float64, motion bool) (degrees, scale, alpha float64) {
 	if !motion {
-		return 22, 0.35
-	}
-	p := math.Mod(t, 1.2) / 1.2
-	if p < 0 {
-		p++
-	}
-	ease := 1 - (1-p)*(1-p) // ease out
-	return MicRingMin + (MicRingMax-MicRingMin)*ease, 0.6 * (1 - p)
-}
-
-// MicPulse is the starting microphone icon's opacity and scale at t
-// seconds (Voxt's initializing icon: 1.25 s each way, ease in and out);
-// still, 0.7 and 1.
-func MicPulse(t float64, motion bool) (alpha, scale float64) {
-	if !motion {
-		return 0.7, 1
+		return 0, 1, 0.8
 	}
 	u := 0.5 - 0.5*math.Cos(2*math.Pi*t/2.5)
-	return 0.55 + 0.43*u, 0.94 + 0.1*u
+	return 360 * u, 0.96 + 0.08*u, 0.62 + 0.36*u
 }
 
-// The ring's diameters: the icon's size to just inside the row.
-const (
-	MicRingMin = IconSize
-	MicRingMax = RowH - 4
-)
+// QuietBar is bar i's height while the microphone gives no audio yet:
+// Voxt's quiet pattern (WaveformView's while a model initializes), still.
+func QuietBar(i int) float32 {
+	return quietBars[i%len(quietBars)]
+}
+
+var quietBars = [...]float32{4.0, 4.7, 5.4, 6.0, 5.0, 4.3, 5.2, 5.8}
 
 // FaceAlpha is how opaque the face's fill is (Overlay.Opacity).
 func FaceAlpha(o settings.Overlay) float32 {

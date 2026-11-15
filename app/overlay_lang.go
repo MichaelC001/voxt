@@ -104,7 +104,9 @@ func (a *app) syncLangMenu() {
 		}
 		return
 	}
-	frame := langMenuFrame(a.ov.frame, a.prefs.Overlay.Position == "top")
+	// By the card where it rests: while it moves, the window is its room
+	// (overlay_motion.go).
+	frame := langMenuFrame(layout.Frame(a.ov.area, a.prefs.Overlay, a.ov.w, a.ov.h), a.prefs.Overlay.Position == "top")
 	moved := frame != m.frame || !m.shown
 	m.frame = frame
 	if !m.shown {

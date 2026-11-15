@@ -90,6 +90,11 @@ const (
 	ProblemMicrophone = "microphone"
 	// ProblemDevice: no input gave audio.
 	ProblemDevice = "device"
+	// ProblemMicStart: the microphone gave no audio at all: it did not
+	// start within Config.MicStartLimit, or the user stopped before it
+	// did (the first session after launch, the models loading: 10-20,
+	// 11-14).
+	ProblemMicStart = "micStart"
 	// ProblemHelper: the helper is not running (or died).
 	ProblemHelper = "helper"
 	// ProblemASR: the speech model failed (Err is an *asr.Error). Degraded:
@@ -357,6 +362,10 @@ type Config struct {
 	// discarding the capture job (a capture.stop that raced its start);
 	// DefaultStopGrace.
 	StopGrace time.Duration
+	// MicStartLimit is how long a recording waits for the microphone's
+	// first audio before it fails (ProblemMicStart); not while macOS asks
+	// for the microphone (DefaultMicStartLimit).
+	MicStartLimit time.Duration
 }
 
 // Defaults of Config's limits.
@@ -375,6 +384,9 @@ const (
 	DefaultDeliverTimeout = 5 * time.Second
 	DefaultStopGrace      = 3 * time.Second
 	DefaultWaitNote       = 400 * time.Millisecond
+	// The slowest starts seen were 5.8 and 5.9 s (the first session after
+	// launch, three models loading on a Mac short of memory).
+	DefaultMicStartLimit = 12 * time.Second
 )
 
 // StartRequest starts a session.
@@ -403,6 +415,9 @@ type StartRequest struct {
 	// Previous are a Rewrite conversation's earlier turns: the session is
 	// a follow-up to the answer card.
 	Previous []compose.Turn
+	// MicPrompt: the microphone's permission is not determined, so macOS
+	// asks the user when the recording starts (Snapshot.Waiting says so).
+	MicPrompt bool
 }
 
 // TextInput is a session's input given at Start.

@@ -62,6 +62,7 @@ func New(cfg Config) *Manager {
 	def(&cfg.DeliverTime, DefaultDeliverTimeout)
 	def(&cfg.StopGrace, DefaultStopGrace)
 	def(&cfg.WaitNote, DefaultWaitNote)
+	def(&cfg.MicStartLimit, DefaultMicStartLimit)
 	return &Manager{cfg: cfg, snap: Snapshot{State: Idle}}
 }
 
@@ -117,7 +118,7 @@ func (m *Manager) Start(req StartRequest) (string, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	r := &run{
 		m: m, id: m.cfg.NewID(), req: req, settings: m.cfg.Settings(), ctx: ctx, cancel: cancel,
-		stop: make(chan struct{}), pcm: newPCMBuffer(),
+		stop: make(chan struct{}), pcm: newPCMBuffer(), heardCh: make(chan struct{}),
 	}
 	m.cur = r
 	m.rev++
@@ -125,6 +126,7 @@ func (m *Manager) Start(req StartRequest) (string, error) {
 		Rev: m.rev, ID: r.id, Kind: req.Kind, State: r.firstState(), Try: req.Try, HoldBinding: req.HoldBinding,
 		Target: req.Target, StartedAt: at,
 	}
+	m.snap.Waiting = r.waitOf(&m.snap)
 	if req.Kind == store.KindTranslate {
 		r.target = TranslateTarget(r.settings, m.cfg.Locale(), req.TargetLanguage)
 		m.snap.TargetLanguage = r.target

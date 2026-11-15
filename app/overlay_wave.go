@@ -14,14 +14,18 @@ import (
 // waveform draws the input levels as 16 rounded bars, newest on the
 // right, in the waveform's slot (layout.WaveSlotW, layout.RowH), centred (Voxt's):
 // smoothed (layout.WaveBars), and, where it is quiet, breathing a little about
-// their least height while look moves. Dim until the first audio.
+// their least height while look moves. Until the first audio, dim and
+// still in Voxt's quiet pattern (layout.QuietBar).
 func waveform(c *ui.Context, levels []float64, heard bool, look pillLook) {
 	bars := layout.WaveBars(levels)
 	ui.Row(c.Key("ov-wave")).Width(layout.WaveSlotW).Height(layout.RowH).Shrink(0).Center().Children(func() {
 		ui.Row(c).Width(layout.WaveW).Height(layout.RowH).Shrink(0).Gap(layout.WaveBarGap).AlignItems(ui.Center).Label(i18n.T("Input level")).Children(func() {
 			for i, v := range bars {
 				h := layout.WaveBarMinH + (layout.WaveBarMaxH-layout.WaveBarMinH)*float32(v)
-				if look.motion {
+				switch {
+				case !heard:
+					h = layout.QuietBar(i) // Voxt's quiet pattern, still, until the first audio
+				case look.motion:
 					h += float32(layout.WaveIdle(i, v, look.phase))
 				}
 				// Voxt's fill: white, 98 % at the top to 80 % at the bottom.

@@ -24,7 +24,8 @@ package main
 //	           high as its text up to Voxt's 220 for it; the result that
 //	           was not inserted, its actions in the header
 //
-// Nothing shows after an insert: the pill fades out (100 ms). Every
+// A size change of the shown overlay springs to the new size
+// (overlay_motion.go, Voxt's spring). Nothing shows after an insert: the pill fades out (100 ms). Every
 // action is a shortcut: the feature's shortcut stops, Escape cancels,
 // releasing a long press stops.
 //
@@ -74,6 +75,17 @@ type overlayState struct {
 		// the next showing compares with it (10-15: a pill that had grown
 		// with live text came back grown and empty in the next session).
 		frame mygo.Rectangle
+		// motion is the face's shape on its way to w × h (overlay_motion.go);
+		// meanwhile the window holds a room of roomW × roomH for it, the
+		// largest of the move, and shrinks to the face once it rests.
+		motion       layout.Motion
+		roomW, roomH int
+		// modeAt is when the mode changed to another face (the pill, a
+		// notice, the card) as the face moved: its content fades in from
+		// then. Zero: no fade.
+		modeAt time.Time
+		// opaque: the window shows, revealed; size changes move from then.
+		opaque bool
 		// live is the session whose live text widened the face, and to
 		// what: within it the face only grows (a revised or restarted
 		// text does not make it jump back), the next starts as a pill.
@@ -124,6 +136,10 @@ type overlayState struct {
 	// measureHook measures the face's texts (width, height) in tests,
 	// which build no view (nil: the view measures them, overlayMeasure).
 	measureHook func(ovSized) (float32, float32)
+	// Tests: moveHook makes size changes move without a window, clock
+	// is their time (nil: time.Now).
+	moveHook bool
+	clock    func() time.Time
 }
 
 // overlayNative says whether the overlay has a real window: in the app,
@@ -176,7 +192,8 @@ func (a *app) overlayModeNow() overlayMode {
 // session, the notice or the answer card. Main thread.
 //
 // The window is as large as the face (and the shadow's margin), so that
-// the desktop around it takes clicks; it grows and shrinks about its
+// the desktop around it takes clicks, or while the face moves to a new
+// size as its room (overlay_motion.go); it grows and shrinks about its
 // anchor (the bottom edge and the centre, or the top edge), the size and
 // the place set in one move: the material (patch 0004) follows it in the
 // same Core Animation transaction, and MyGo draws the new size's frame
@@ -201,8 +218,9 @@ func (a *app) overlaySync() {
 	w, h := a.overlayFace(mode)
 	if !was {
 		a.ov.area = a.overlayArea()
+		a.ov.opaque = false
 	}
-	frame := layout.Frame(a.ov.area, a.prefs.Overlay, w, h)
+	frame := a.overlayFit(mode, w, h, was)
 	moved := frame != a.ov.frame
 	a.ov.mode, a.ov.w, a.ov.h, a.ov.frame = mode, w, h, frame
 	a.ov.shown = true
@@ -254,22 +272,9 @@ const ovRevealMax = 120 * time.Millisecond
 // revealOverlay makes the window opaque once it shows the new face.
 func (a *app) revealOverlay() {
 	a.ov.reveal = false
+	a.ov.opaque = a.ov.shown
 	if a.ov.win != nil && a.ov.shown {
 		a.ov.win.SetOpacity(1)
-	}
-}
-
-// syncOverlayMaterial shapes the window's material to the face: inside
-// the shadow's margin, with the face's corners, dark.
-func (a *app) syncOverlayMaterial() {
-	if a.ov.win == nil {
-		return
-	}
-	style := mygo.VibrancyStyle{Top: layout.Pad, Right: layout.Pad, Bottom: layout.Pad, Left: layout.Pad,
-		Radius: float64(faceRadius(a.prefs.Overlay, a.ov.mode, a.ov.h)), Dark: true}
-	if style != a.ov.style {
-		a.ov.style = style
-		a.ov.win.SetVibrancyStyle(style)
 	}
 }
 
@@ -331,7 +336,7 @@ func (a *app) overlayRestyle() {
 		return
 	}
 	w, h := a.overlayFace(a.ov.mode)
-	frame := layout.Frame(a.ov.area, a.prefs.Overlay, w, h)
+	frame := a.overlayFit(a.ov.mode, w, h, true)
 	moved := frame != a.ov.frame
 	a.ov.w, a.ov.h, a.ov.frame = w, h, frame
 	a.syncLangMenu()

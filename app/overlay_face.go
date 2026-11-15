@@ -43,19 +43,24 @@ func (a *app) overlayView(c *ui.Context) {
 		c.After(250 * time.Millisecond) // the time
 	}
 	look := pillLook{time: a.prefs.Overlay.ShowTime, motion: motion, phase: a.overlayPhase(), w: a.ov.w}
-	ui.Column(c).Fill().Padding(layout.Pad).Children(func() {
+	fit := a.overlayFaceFit(c) // overlay_motion.go: the face as it moves
+	ui.Column(c).Fill().Padding(layout.Pad).AlignItems(ui.Center).Justify(a.overlayJustify()).Children(func() {
 		o := a.prefs.Overlay
 		switch a.ov.mode {
 		case ovAnswer:
 			// Voxt's card does not move (isMovableByWindowBackground off):
 			// its text is selectable.
-			faceStyle(ui.Column(c.Key("ov-face")), o, ovAnswer, a.ov.h).Children(func() { a.overlayCard(c) })
+			fit.face(faceStyle(ui.Column(c.Key("ov-face")), o, ovAnswer, a.ov.h)).Children(func() {
+				fit.content(c, func() { a.overlayCard(c) })
+			})
 		case ovNotice:
-			a.overlayNotice(c)
+			a.overlayNotice(c, fit)
 		default:
 			// The pointer goes through it (passThrough): nothing to drag.
-			faceStyle(ui.Column(c.Key("ov-face")), o, a.ov.mode, a.ov.h).Children(func() {
-				overlayPill(c, a.pillSession(), a.ov.mode, look) // mute_link.go: the output's note
+			fit.face(faceStyle(ui.Column(c.Key("ov-face")), o, a.ov.mode, a.ov.h)).Children(func() {
+				fit.content(c, func() {
+					overlayPill(c, a.pillSession(), a.ov.mode, look) // mute_link.go: the output's note
+				})
 			})
 		}
 	})
@@ -147,15 +152,15 @@ func overlayPill(c *ui.Context, s session.Snapshot, mode overlayMode, look pillL
 }
 
 // pillLine is the line under the pill's row: the live text, else (hint)
-// "Starting the microphone…" while the microphone gives no audio (what
-// is said then is lost); "" for none. A speech model that is still
-// loading shows only the starting icon (the user, 10-21): the recording
-// works meanwhile, so no line is needed.
+// what the user must do for the recording to start: answer macOS's
+// microphone prompt; "" for none. A microphone or a speech model that is
+// still starting shows only the starting icon (the user, 10-21 and
+// 11-14: no text while it prepares; the recording works meanwhile).
 func pillLine(s session.Snapshot) (text string, hint bool) {
 	if text := liveLineText(s); text != "" {
 		return text, false
 	}
-	if s.Waiting == session.WaitMic {
+	if s.Waiting == session.WaitPermission {
 		if w := uitext.WaitText(s); w != "" {
 			return w, true
 		}
@@ -163,18 +168,14 @@ func pillLine(s session.Snapshot) (text string, hint bool) {
 	return "", false
 }
 
-// startingIcon is the feature's icon while the microphone or the speech
-// model starts (Voxt's initializing icon): it breathes, and a ring pings
-// out of it (layout.MicRing, layout.MicPulse); still without motion.
+// startingIcon is the pill's icon while the microphone or the speech
+// model starts: Voxt's initializing hourglass (icons.VoxtStarting), which
+// turns, swells and brightens (layout.Starting); still without motion.
 func startingIcon(c *ui.Context, s session.Snapshot, look pillLook) {
-	d, ringA := layout.MicRing(look.phase, look.motion)
-	iconA, scale := layout.MicPulse(look.phase, look.motion)
+	deg, scale, alpha := layout.Starting(look.phase, look.motion)
 	ui.Box(c.Key("ov-starting")).Size(layout.IconSlot, layout.RowH).Shrink(0).Center().Label(uitext.WaitText(s)).Children(func() {
-		ring := float32(d)
-		ui.Box(c).Absolute().Left((layout.IconSlot-ring)/2).Top((layout.RowH-ring)/2).Size(ring, ring).Radius(radiusPill).
-			Border(1.2, ui.RGBA(255, 255, 255, float32(ringA)))
-		ui.Icon(c, overlayKindIcon(s.Kind).Bold).Size(layout.IconSize, layout.IconSize).TextColor(ui.RGBA(255, 255, 255, float32(iconA))).
-			Scale(float32(scale), float32(scale)).Shrink(0)
+		ui.Icon(c, icons.VoxtStarting.Bold).Size(layout.IconSize, layout.IconSize).TextColor(ui.RGBA(255, 255, 255, float32(alpha))).
+			Scale(float32(scale), float32(scale)).Rotate(float32(deg)).Shrink(0)
 	})
 }
 
@@ -285,16 +286,16 @@ func kindIcon(k store.Kind) icons.Icon {
 
 // overlayNotice is a notice: the pill with an icon and one line in place
 // of the waveform; with an action, a click on it runs the action.
-func (a *app) overlayNotice(c *ui.Context) {
+func (a *app) overlayNotice(c *ui.Context, fit faceFit) {
 	if a.notice != nil {
-		noticeFace(c, a.notice, a.prefs.Overlay, a.ov.h, a)
+		noticeFace(c, a.notice, a.prefs.Overlay, a.ov.h, fit, a)
 	}
 }
 
-// noticeFace draws the notice n with the look o, h DIPs high; a click on
-// its action runs it in the app live (nil: the settings' preview, where
-// nothing runs).
-func noticeFace(c *ui.Context, n *sessionNotice, o settings.Overlay, h int, live *app) {
+// noticeFace draws the notice n with the look o, h DIPs high, fit as
+// it moves; a click on its action runs it in the app live (nil: the
+// settings' preview, where nothing runs).
+func noticeFace(c *ui.Context, n *sessionNotice, o settings.Overlay, h int, fit faceFit, live *app) {
 	t := c.Theme()
 	label := noticeActionLabel(n.action)
 	content := func() {
@@ -315,14 +316,14 @@ func noticeFace(c *ui.Context, n *sessionNotice, o settings.Overlay, h int, live
 		})
 	}
 	if label == "" {
-		faceStyle(ui.Column(c.Key("ov-face")), o, ovNotice, h).DragWindow().Label(n.text).Children(content)
+		fit.face(faceStyle(ui.Column(c.Key("ov-face")), o, ovNotice, h)).DragWindow().Label(n.text).Children(func() { fit.content(c, content) })
 		return
 	}
-	b := faceStyle(ui.ButtonBase(c.Key("ov-notice")), o, ovNotice, h).Label(n.text + " · " + label)
+	b := fit.face(faceStyle(ui.ButtonBase(c.Key("ov-notice")), o, ovNotice, h)).Label(n.text + " · " + label)
 	if b.Hovered() {
 		b.Background(ui.RGBA(34, 34, 40, min(layout.FaceAlpha(o)+0.06, 1)))
 	}
-	if b.Children(content).Clicked() && live != nil {
+	if b.Children(func() { fit.content(c, content) }).Clicked() && live != nil {
 		live.noticeAction(n.action)
 	}
 }

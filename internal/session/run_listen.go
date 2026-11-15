@@ -132,6 +132,21 @@ func (r *run) listen() (string, bool) {
 	if waitNote == nil {
 		r.noteWait()
 	}
+	if r.req.MicPrompt {
+		r.logf("info", "macOS asks for the microphone: the recording starts once the user answers")
+	}
+	// The microphone gets MicStartLimit for its first audio. The
+	// language model warms up once it gave some (and the services are
+	// there): on a cold start the microphone, the speech model and the
+	// language model all start at once, and the microphone comes first
+	// (11-14: 5 s without audio while three models loaded).
+	micLimit, heardCh, warmed := r.micTimer(), r.heardCh, false
+	warm := func() {
+		if !warmed && r.resolved && r.micOn.Load() {
+			warmed = true
+			r.warmLLM()
+		}
+	}
 	if r.resolved {
 		if p := r.lacks(); p != nil {
 			r.fail(p)
@@ -144,6 +159,16 @@ func (r *run) listen() (string, bool) {
 		case <-r.ctx.Done():
 			r.endCancelled(stream)
 			return "", false
+		case <-heardCh:
+			heardCh, micLimit = nil, nil
+			warm()
+		case <-micLimit:
+			micLimit = nil
+			if !r.micOn.Load() {
+				capCancel()
+				r.endFailed(r.micProblem(false), stream)
+				return "", false
+			}
 		case s := <-svcDone:
 			svcDone = nil
 			if s.err != nil {
@@ -151,7 +176,7 @@ func (r *run) listen() (string, bool) {
 				return "", false
 			}
 			r.useServices(s)
-			r.warmLLM()
+			warm()
 			if p := r.lacks(); p != nil {
 				r.fail(p)
 				return "", false
@@ -178,9 +203,16 @@ func (r *run) listen() (string, bool) {
 			}
 			early = &e // a final before the end: kept for the end
 		case <-stopCh:
-			stopCh = nil
+			stopCh, micLimit = nil, nil
 			at := r.now()
-			r.m.update(r, func(s *Snapshot) { s.State, s.StoppedAt = Recognizing, at })
+			if r.micOn.Load() {
+				r.m.update(r, func(s *Snapshot) { s.State, s.StoppedAt = Recognizing, at })
+			} else {
+				// Nothing recorded yet: it stays recording until the capture
+				// answers, then fails (or goes on with audio that came late),
+				// so the stop sound does not precede the failure's.
+				r.m.update(r, func(s *Snapshot) { s.StoppedAt = at })
+			}
 			go func() {
 				ctx, cancel := context.WithTimeout(r.ctx, cfg.StopGrace)
 				defer cancel()
@@ -206,6 +238,12 @@ func (r *run) listen() (string, bool) {
 		return "", false
 	}
 	pcm := r.pcm.bytes()
+	if len(pcm) == 0 && !r.micOn.Load() {
+		p := r.micProblem(stopped)
+		r.logf("info", "recorded nothing (capture: %q, %d frames, %d restarts)", captured.res.Reason, captured.res.Frames, captured.res.Restarts)
+		r.endFailed(p, stream)
+		return "", false
+	}
 	audioLen := asr.Duration(pcm, asr.SampleRate)
 	r.m.update(r, func(s *Snapshot) {
 		s.State = Recognizing

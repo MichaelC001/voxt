@@ -42,6 +42,8 @@ package helpertest
 //	untrusted        no Accessibility: the tap is not installed, textio fails
 //	trust-after=MS   with untrusted: Accessibility comes MS ms after the start
 //	                 (then the tap installs and hotkey.state is sent)
+//	mic-start=MS     capture.start gives its first audio MS ms late (a cold
+//	                 audio engine): a capture.stop meanwhile answers with 0 frames
 //	frame-ms=N       a capture.pcm frame (and level) every N ms of wall time (default 100)
 //	pcm=PATH         capture.pcm plays this WAV (16-bit mono, any rate) or raw
 //	                 PCM16 at the requested rate, then silence

@@ -131,6 +131,9 @@ final class CaptureManager: @unchecked Sendable {
     let file: CaptureFileConfig?
     private let lock = NSLock()
     private var run: CaptureRun?
+    /// Jobs waiting for macOS's microphone prompt, and whether a
+    /// capture.stop (or job.cancel) came for them meanwhile.
+    private var asking: [String: Bool] = [:]
 
     init(out: Writer, file: CaptureFileConfig? = CaptureFileConfig.from(environment: ProcessInfo.processInfo.environment)) {
         self.out = out
@@ -144,8 +147,18 @@ final class CaptureManager: @unchecked Sendable {
             switch AVCaptureDevice.authorizationStatus(for: .audio) {
             case .authorized: break
             case .notDetermined:
-                if !(await AVCaptureDevice.requestAccess(for: .audio)) {
+                // macOS asks the user: a stop meanwhile ends the job once
+                // they answer, without recording (no run to stop yet).
+                lock.withLock { asking[job] = false }
+                let t = monotonicMs()
+                let granted = await AVCaptureDevice.requestAccess(for: .audio)
+                let stopped = lock.withLock { asking.removeValue(forKey: job) ?? false }
+                out.logLine("info", "capture: macOS asked for the microphone: \(granted ? "allowed" : "refused") after \(ms(monotonicMs() - t))", job: job)
+                if !granted {
                     throw RPCError.denied(PermissionName.microphone, "VoxtMini may not use the microphone")
+                }
+                if stopped {
+                    throw RPCError(Code.cancelled, "The recording was stopped while macOS asked for the microphone")
                 }
             default:
                 throw RPCError.denied(PermissionName.microphone, "VoxtMini may not use the microphone")
@@ -169,14 +182,26 @@ final class CaptureManager: @unchecked Sendable {
 
     /// Ends the job's recording (it answers first); false when not running.
     func stop(job: String) -> Bool {
+        if markAsking(job) { return true }
         guard let r = lock.withLock({ run }), r.job == job else { return false }
         return r.finish(reason: CaptureReason.stopped)
     }
 
     /// Discards the job's recording (it answers cancelled first).
     func cancel(job: String) -> Bool {
+        if markAsking(job) { return true }
         guard let r = lock.withLock({ run }), r.job == job else { return false }
         return r.cancel()
+    }
+
+    /// Marks a job waiting for the microphone prompt as stopped; false
+    /// when it does not wait.
+    private func markAsking(_ job: String) -> Bool {
+        lock.withLock {
+            guard asking[job] != nil else { return false }
+            asking[job] = true
+            return true
+        }
     }
 
     func cancelAll() {
@@ -219,6 +244,8 @@ private final class CaptureRun: @unchecked Sendable {
     private var noCallbackRestarts = 0
     private var ended = false
     private var startedSent = false
+    /// Where begin()'s time went, per engine (logged when it was slow).
+    private var startTimes = ""
     private var frames = 0
     private var peak: Double = -120
     private let t0: Double
@@ -240,9 +267,19 @@ private final class CaptureRun: @unchecked Sendable {
     }
 
     /// Starts on the first device that starts, else the default input.
+    /// A start that takes long is logged with where its time went (11-14:
+    /// the first session after launch got no audio in 5 s); a recording
+    /// stopped meanwhile stops the engine that started after it.
     func begin() throws {
         if let file {
             return try startFile(file)
+        }
+        let t = monotonicMs()
+        defer {
+            let took = monotonicMs() - t
+            if took >= 1000 {
+                out.logLine("warning", "capture: the input took \(ms(took)) to start (\(lock.withLock { startTimes }))", job: job)
+            }
         }
         var reasons: [String] = []
         for uid in params.devices ?? [] where !uid.isEmpty {
@@ -270,11 +307,19 @@ private final class CaptureRun: @unchecked Sendable {
                 out.logLine("warning", "capture: \(reasons.joined(separator: "; ")): recording from the default input", job: job)
             }
         }
+        if lock.withLock({ ended }) {
+            // Stopped or cancelled while the engine started: it answered
+            // already; the engine must not keep the microphone.
+            out.logLine("info", "capture: the recording ended before its input started: input stopped", job: job)
+            stopEngine()
+            return
+        }
         startWatchers()
     }
 
     /// Builds and starts an engine on uid (nil: the default input).
     private func startEngine(uid: String?) throws {
+        let setupStart = monotonicMs()
         let (ids, def) = inputDeviceIDs()
         let device: AudioObjectID
         if let uid {
@@ -314,6 +359,11 @@ private final class CaptureRun: @unchecked Sendable {
             self?.receive(buffer, generation: gen)
         }
         engine.prepare()
+        let engineStart = monotonicMs()
+        defer {
+            let note = "\(deviceName(device)): set up \(ms(engineStart - setupStart)), start \(ms(monotonicMs() - engineStart))"
+            lock.withLock { startTimes += (startTimes.isEmpty ? "" : "; ") + note }
+        }
         do {
             try engine.start()
         } catch {
@@ -422,6 +472,12 @@ private final class CaptureRun: @unchecked Sendable {
         }
         t.resume()
         watcher = t
+        if lock.withLock({ ended }) {
+            // Ended meanwhile: its teardown ran before these existed.
+            t.cancel()
+            if let o = configObserver { NotificationCenter.default.removeObserver(o) }
+            stopEngine()
+        }
     }
 
     private func stopEngine() {

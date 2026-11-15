@@ -59,6 +59,10 @@ type run struct {
 	// opening: the speech model is still starting (wait.go); waitDue:
 	// Config.WaitNote has passed since the start.
 	opening, waitDue atomic.Bool
+	// micOn: the microphone gave its first audio (capture.started);
+	// heardCh closes then.
+	micOn   atomic.Bool
+	heardCh chan struct{}
 	// dsp and gainDB are what the sound processing did (noteDSP), for a
 	// retry's entry.
 	dsp    string

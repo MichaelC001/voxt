@@ -12,12 +12,14 @@ package main
 // without resources/sounds) the cues are Voxt's Pop and Tink.
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/icons"
 	"github.com/hehehai/VoxtMini/internal/settings"
@@ -148,7 +150,27 @@ func (a *app) soundLabel(choice string) string {
 // before the system's output is muted): its file's length, or startCueMax
 // for a system sound of unknown length.
 func (a *app) playCueWait(t sounds.Target) {
-	if _, err := a.cuePlayer.Play(t); err != nil {
+	start := time.Now()
+	v, err := a.cuePlayer.Play(t)
+	if err != nil {
+		return
+	}
+	if late := time.Since(start); late > cueLate {
+		// The Mac's output started slowly (its engine stops when idle; on
+		// a cold start short of memory it took seconds): a cue this late
+		// would sound after what it marks — the start cue under the mute,
+		// heard when the recording ends, next to the stop cue (11-14).
+		if v != nil {
+			v.Stop()
+		}
+		logs := a.logs
+		msg := fmt.Sprintf("sound: %s took %v to start: not played", t.Name, late.Round(time.Millisecond))
+		a.post(func() {
+			if logs == nil {
+				return
+			}
+			logs.Append(core.LogEntry{Time: time.Now(), Level: core.SeverityWarning, Source: muteSource, Message: msg})
+		})
 		return
 	}
 	d := startCueMax
@@ -177,6 +199,8 @@ const (
 	cueMargin = 150 * time.Millisecond
 	// previewMin is the least Try shows the accent (Voxt's).
 	previewMin = 650 * time.Millisecond
+	// cueLate: a cue that takes longer to start is not played.
+	cueLate = 700 * time.Millisecond
 )
 
 // previewPlayer plays one preview at a time, off the main thread: a new

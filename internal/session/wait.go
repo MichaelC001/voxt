@@ -1,6 +1,9 @@
 package session
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Wait is what a session waits for before its recording works in full
 // (Snapshot.Waiting).
@@ -17,15 +20,24 @@ const (
 	// is sent to it once it is ready, so the live text comes late. Also
 	// after Stop, while recognition waits for it.
 	WaitModel Wait = "model"
+	// WaitPermission: macOS asks the user for the microphone (its
+	// permission was not determined when the session started,
+	// StartRequest.MicPrompt): the recording starts once they answer.
+	// Said at once, and the microphone has no time limit meanwhile.
+	WaitPermission Wait = "permission"
 )
 
 // slowMic is a microphone start worth a warning in the log.
 const slowMic = time.Second
 
-// waitOf is what s waits for: nothing before Config.WaitNote passed (a
+// waitOf is what s waits for: macOS's microphone prompt at once (until
+// the first audio); otherwise nothing before Config.WaitNote passed (a
 // short wait is not worth a word), the microphone while recording
 // without audio, then the speech model while it starts (r.opening).
 func (r *run) waitOf(s *Snapshot) Wait {
+	if r.req.MicPrompt && s.State == Recording && s.HeardAt.IsZero() {
+		return WaitPermission
+	}
 	if !r.waitDue.Load() {
 		return WaitNone
 	}
@@ -64,4 +76,33 @@ func (r *run) waitTimer(started time.Time) <-chan time.Time {
 		return nil
 	}
 	return time.After(left)
+}
+
+// micTimer fires when the microphone has had Config.MicStartLimit to
+// give its first audio; nil while macOS asks for it (the user answers
+// in their own time).
+func (r *run) micTimer() <-chan time.Time {
+	if r.req.MicPrompt {
+		return nil
+	}
+	return time.After(r.m.cfg.MicStartLimit)
+}
+
+// heardAudio marks the microphone's first audio (onAudio, on the
+// helper's reader goroutine).
+func (r *run) heardAudio() {
+	if !r.micOn.Swap(true) {
+		close(r.heardCh)
+	}
+}
+
+// micProblem is a recording that never got audio: the microphone did
+// not start within the limit, or the user stopped before it did.
+func (r *run) micProblem(stopped bool) *Problem {
+	after := r.now().Sub(r.m.Current().StartedAt).Round(time.Millisecond)
+	err := fmt.Errorf("no audio from the microphone %v after the start", after)
+	if stopped {
+		err = fmt.Errorf("stopped %v after the start, before the microphone gave any audio", after)
+	}
+	return &Problem{Code: ProblemMicStart, Err: err}
 }

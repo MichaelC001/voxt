@@ -55,20 +55,20 @@ func TestOverlayPlace(t *testing.T) {
 	}
 }
 
-func TestMicLoader(t *testing.T) {
-	if d, a := MicRing(0, true); d != MicRingMin || a != 0.6 {
-		t.Errorf("ring at 0: %v %v", d, a)
+func TestStarting(t *testing.T) {
+	if d, sc, a := Starting(0, true); d != 0 || sc != 0.96 || a != 0.62 {
+		t.Errorf("at 0: %v %v %v", d, sc, a)
 	}
-	if d, a := MicRing(1.199, true); d < MicRingMax-0.1 || a > 0.01 {
-		t.Errorf("ring at the end: %v %v", d, a)
+	if d, sc, a := Starting(1.25, true); math.Abs(d-360) > 1e-9 || math.Abs(sc-1.04) > 1e-9 || math.Abs(a-0.98) > 1e-9 {
+		t.Errorf("at its top: %v %v %v", d, sc, a)
 	}
-	if d, a := MicRing(5, false); d != 22 || a != 0.35 {
-		t.Errorf("still ring %v %v", d, a)
+	if d, sc, a := Starting(2.5, true); math.Abs(d) > 1e-9 || math.Abs(sc-0.96) > 1e-9 {
+		t.Errorf("back at 2.5 s: %v %v %v", d, sc, a)
 	}
-	if a, s := MicPulse(0, true); a != 0.55 || s != 0.94 {
-		t.Errorf("pulse at 0: %v %v", a, s)
+	if d, sc, a := Starting(5, false); d != 0 || sc != 1 || a != 0.8 {
+		t.Errorf("still %v %v %v", d, sc, a)
 	}
-	if a, s := MicPulse(1.25, true); math.Abs(a-0.98) > 1e-9 || math.Abs(s-1.04) > 1e-9 {
-		t.Errorf("pulse at its top: %v %v", a, s)
+	if QuietBar(0) != 4 || QuietBar(11) != 6 {
+		t.Errorf("quiet bars %v %v", QuietBar(0), QuietBar(11))
 	}
 }

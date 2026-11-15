@@ -27,6 +27,8 @@ func sessionProblemText(p *session.Problem) (text, more, action string) {
 		return i18n.T("VoxtMini may not use the microphone."), errText(p.Err), actionPermissions
 	case session.ProblemDevice:
 		return i18n.T("No microphone gave any sound."), errText(p.Err), actionNone
+	case session.ProblemMicStart:
+		return i18n.T("The microphone did not start. Try again."), errText(p.Err), actionNone
 	case session.ProblemHelper:
 		return i18n.T("The helper stopped: try again in a moment."), errText(p.Err), actionHelper
 	case session.ProblemASR:

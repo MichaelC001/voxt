@@ -96,10 +96,12 @@ func WorkingText(s session.Snapshot) string {
 }
 
 // WaitText says what a session waits for (session.Snapshot.Waiting): the
-// starting icon's accessibility label, and the pill's line for WaitMic
-// until the live text comes; "" for nothing.
+// starting icon's accessibility label, and the pill's line for
+// WaitPermission until the first audio; "" for nothing.
 func WaitText(s session.Snapshot) string {
 	switch {
+	case s.Waiting == session.WaitPermission && s.State == session.Recording:
+		return i18n.T("Allow the microphone in the macOS dialog")
 	case s.Waiting == session.WaitMic && s.State == session.Recording:
 		return i18n.T("Starting the microphone…")
 	case s.Waiting == session.WaitModel && (s.State == session.Recording || s.State == session.Recognizing):

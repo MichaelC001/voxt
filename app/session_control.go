@@ -14,6 +14,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/local"
+	"github.com/hehehai/VoxtMini/internal/permission"
 	"github.com/hehehai/VoxtMini/internal/session"
 	"github.com/hehehai/VoxtMini/internal/store"
 	"github.com/hehehai/VoxtMini/internal/uitext"
@@ -77,6 +78,8 @@ func (a *app) startSessionID(req session.StartRequest) (string, *sessionNotice) 
 		a.answer = answerCard{}
 	}
 	a.notice = nil
+	// macOS asks for the microphone at the recording's start (permissions.go).
+	req.MicPrompt = req.Text == nil && a.perms.mic == permission.NotDetermined
 	id, err := a.mgr.Start(req)
 	if err != nil {
 		return "", nil // a session runs already

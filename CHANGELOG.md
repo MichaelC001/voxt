@@ -4,6 +4,30 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.0-beta.4] - 2026-11-15
+
+### Changed
+
+- The floating overlay changes size smoothly (live text growing, the answer card, a notice) instead of jumping; with Reduce motion on it changes at once.
+- While the microphone or a model is getting ready, the overlay shows a turning hourglass instead of a line of text.
+
+### Fixed
+
+- The first dictation after VoxtMini opened could stay on "Starting the microphone" while the speech models were still loading, end with nothing, and play two sounds. Recording now starts at once; if the microphone has not started when you stop (or after 12 s), VoxtMini says so with one sound. While macOS asks for the microphone, the overlay says so.
+- A microphone that started after its dictation had already ended stayed in use until VoxtMini quit.
+
+### 中文
+
+#### 变更
+
+- 浮窗改变大小（实时文字变长、答案卡片、提示）时平滑过渡，不再跳变；打开“减弱动态效果”时直接变化。
+- 麦克风或模型准备时，浮窗显示转动的沙漏，不再显示一行文字。
+
+#### 修复
+
+- VoxtMini 打开后的第一次听写，在语音模型还在加载时可能一直停在“正在启动麦克风”，结束时什么也没有，还响两声。现在录音立即开始；结束时（或 12 秒后）麦克风还没启动，会提示一次并只响一声。macOS 询问麦克风权限时，浮窗会说明。
+- 听写已经结束后才启动的麦克风，会一直被占用到 VoxtMini 退出。
+
 ## [0.1.0-beta.3] - 2026-11-14
 
 ### Added

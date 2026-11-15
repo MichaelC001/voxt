@@ -127,7 +127,7 @@ jobs:
         if: env.RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: scripts/release-github.sh "v$VERSION"
+        run: bash scripts/release-github.sh "v$VERSION"
 
       - name: Upload dry-run installer
         if: env.RELEASE != 'true'

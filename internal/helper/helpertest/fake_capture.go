@@ -139,6 +139,28 @@ func (f *fake) capture(id string, p proto.CaptureParams, stop chan struct{}) {
 		}
 		src.pcm = pcm
 	}
+	if ms, err := strconv.Atoi(f.opts["mic-start"]); err == nil && ms > 0 {
+		// A cold start (mic-start=): the job runs, the audio comes late. A
+		// stop meanwhile answers with nothing, as the helper's does.
+		late := time.NewTimer(time.Duration(ms) * time.Millisecond)
+		defer late.Stop()
+		wait := time.NewTicker(10 * time.Millisecond)
+		defer wait.Stop()
+		for waiting := true; waiting; {
+			select {
+			case <-stop:
+				f.result(id, proto.CaptureResult{Device: dev.ID, Reason: proto.CaptureStopped})
+				return
+			case <-late.C:
+				waiting = false
+			case <-wait.C:
+				if f.cancelled(id) {
+					f.fail(id, proto.CodeCancelled, "The recording was cancelled")
+					return
+				}
+			}
+		}
+	}
 	started := proto.CaptureStartedParams{Job: id, Device: dev.ID, DeviceName: dev.Name, FellBack: fellBack,
 		DeviceSampleRate: dev.SampleRate, DeviceChannels: dev.Channels, SampleRate: rate, StartMS: 5}
 	if fellBack {
