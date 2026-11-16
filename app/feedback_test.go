@@ -272,3 +272,25 @@ func connectFeedbackShots(t *testing.T, a *app) {
 	a.fbMgr.Reset()
 	a.fbForm = feedbackForm{kind: 0, body: "The overlay stays on screen after a recording ends.", diagnostics: true}
 }
+
+// TestFeedbackSiteOverride: VOXTMINI_FEEDBACK_SERVER points a development
+// build at another site; a published build ignores it.
+func TestFeedbackSiteOverride(t *testing.T) {
+	a, _, _ := newTestApp(t)
+	t.Setenv(feedbackSiteEnv, "http://127.0.0.1:3100")
+	old := devOverrides
+	t.Cleanup(func() { devOverrides = old })
+	for _, c := range []struct {
+		dev  bool
+		want string
+	}{{true, "http://127.0.0.1:3100/feedback"}, {false, feedbackSite + "/feedback"}} {
+		devOverrides = func() bool { return c.dev }
+		m, err := a.newFeedback(feedbackOptions{Dir: filepath.Join(t.TempDir(), "feedback"), Version: "0.1.0"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if u := m.WebURL(); !strings.HasPrefix(u, c.want) {
+			t.Errorf("dev %v: %s", c.dev, u)
+		}
+	}
+}
