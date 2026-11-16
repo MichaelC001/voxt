@@ -104,6 +104,7 @@ func snapshotsMain(t *testing.T, out string) {
 			s.Audio.Devices = []string{"AirPodsPro:input", "USB-Mic-1234"}
 			s.Audio.DeviceNames = map[string]string{"USB-Mic-1234": "Blue Yeti"}
 		})
+		connectFeedbackShots(t, a) // feedback_test.go
 		for _, s := range settingsSections() {
 			a.navigate("/settings/" + s.id)
 			if s.id == "storage" {
@@ -114,6 +115,10 @@ func snapshotsMain(t *testing.T, out string) {
 				a.sys = &sysInfo{OS: "macOS 26.7", Chip: "Apple M2", Memory: 16 << 30, Cores: 8, Arch: "arm64"}
 			}
 			save("settings-" + s.id)
+			if s.id == "feedback" { // the history, under the fold
+				scrollToText(tt, i18n.T("Your feedback"))
+				save("settings-feedback-history")
+			}
 			if s.id == "about" { // Updates, under the fold (updates.go)
 				scrollToText(tt, i18n.T("Updates"))
 				save("settings-about-updates")

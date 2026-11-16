@@ -4,6 +4,16 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+
+- **Settings → Feedback**: send a problem, a suggestion or a question to actnow.dev from the app, with screenshots or a screen recording and, if you want, diagnostics you can look at before sending (versions, models, settings, recent log lines and the last crash, without what you said or wrote, keys, names or addresses). Replies show in the app and by email. Feedback written offline is sent once you are online. **Help → Send Feedback**, the command palette and the crash card's **Send feedback** open it; GitHub issues still work.
+
+### 中文
+
+#### 新增
+
+- **设置 → 反馈**：在 App 里把问题、建议或咨询发到 actnow.dev，可以附截图或录屏；也可以附上诊断信息（版本、模型、设置、最近的日志和上次崩溃记录，不含你说的话和写的文字、密钥、名字和地址），提交前能先查看。回复会显示在 App 里，也会发到邮箱。离线时写的反馈会在联网后发出。**帮助 → 发送反馈**、命令面板和崩溃卡片上的 **发送反馈** 都能打开；GitHub issue 仍然可用。
+
 ## [0.1.0-beta.6] - 2026-11-16
 
 ### Fixed

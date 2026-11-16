@@ -251,25 +251,36 @@ func (a *app) noticeCard(c *ui.Context, n core.Notification) {
 				ui.Text(c, n.Body).FontSize(px(t, fsMicro)).TextColor(k.Text2).MaxLines(3).Ellipsis("…")
 			}
 			if n.Link != "" {
-				label := cardActionLabel(n.Link)
-				b := ui.ButtonBase(c.Key("notice-act")).Padding(px(t, 2), 0).Label(label).AlignSelf(ui.Start).MinWidth(0)
-				b.Children(func() {
-					txt := ui.Text(c, label).FontSize(px(t, fsMicro)).FontWeight(500).TextColor(k.AccentInk).SingleLine().Ellipsis("…").MinWidth(0)
-					if b.Hovered() {
-						txt.Underline()
+				ui.Row(c).Wrap().GapX(px(t, sp3)).AlignItems(ui.Center).Children(func() {
+					if cardLinkButton(c, "notice-act", cardActionLabel(n.Link)).Clicked() {
+						if isWebLink(n.Link) { // an announcement's page (announcements.go)
+							a.noticesOpen = false
+							a.openWeb(c, n.Link)
+						} else {
+							a.cardAction(n)
+						}
+					}
+					if n.Link == linkCrashReport && cardLinkButton(c, "notice-feedback", i18n.T("Send feedback")).Clicked() {
+						a.crashFeedback() // crash_report.go
 					}
 				})
-				if b.Clicked() {
-					if isWebLink(n.Link) { // an announcement's page (announcements.go)
-						a.noticesOpen = false
-						a.openWeb(c, n.Link)
-					} else {
-						a.cardAction(n)
-					}
-				}
 			}
 		})
 	})
+}
+
+// cardLinkButton is a card's action: a link in the accent's ink.
+func cardLinkButton(c *ui.Context, key, label string) ui.Element {
+	t := c.Theme()
+	k := tok(t)
+	b := ui.ButtonBase(c.Key(key)).Padding(px(t, 2), 0).Label(label).MinWidth(0)
+	b.Children(func() {
+		txt := ui.Text(c, label).FontSize(px(t, fsMicro)).FontWeight(500).TextColor(k.AccentInk).SingleLine().Ellipsis("…").MinWidth(0)
+		if b.Hovered() {
+			txt.Underline()
+		}
+	})
+	return b
 }
 
 // noticePopover is the rail's: the same stack, then Settings, which the

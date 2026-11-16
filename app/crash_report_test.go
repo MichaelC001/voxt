@@ -73,3 +73,21 @@ func TestCrashCard(t *testing.T) {
 		t.Error("not dismissed")
 	}
 }
+
+// TestCrashCardSendFeedback: the crash card's Send feedback opens
+// Settings → Feedback on a problem with the diagnostics on, and the card
+// goes.
+func TestCrashCardSendFeedback(t *testing.T) {
+	a, _, tt := newTestApp(t)
+	a.fbForm.kind, a.fbForm.diagnostics = 2, false
+	a.tellCrash(&crashlog.Run{Path: filepath.Join(t.TempDir(), crashlog.CrashFile), Previous: "2026-11-14T10:00:00Z VoxtMini 0.1.0 pid 42"})
+	a.navigate("/home")
+	see(t, tt, "VoxtMini quit unexpectedly")
+	click(t, tt, "Send feedback")
+	if a.shownPath() != "/settings/feedback" || a.fbForm.kind != 0 || !a.fbForm.diagnostics {
+		t.Fatalf("path %s form %+v", a.shownPath(), a.fbForm)
+	}
+	if slices.ContainsFunc(a.notices, func(n core.Notification) bool { return n.ID == noticeCrash }) {
+		t.Error("the card stayed after Send feedback")
+	}
+}

@@ -90,3 +90,8 @@ turntable-music-note-line-duotone   # play a sound (a duotone variant: both Line
 volume-cross             # volume: muted
 volume-small             # volume: low
 volume-loud              # volume: high
+
+# Settings → Feedback (feedback_view.go).
+chat-round-dots          # the section
+gallery                  # a screenshot
+videocamera              # a screen recording

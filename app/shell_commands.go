@@ -49,6 +49,7 @@ func (a *app) commands() []command {
 	add("shortcuts", view, i18n.T("Keyboard shortcuts"), "Keyboard shortcuts", "?", true, func() { a.sheetOpen = true })
 	add("helper-restart", view, i18n.T("Restart the helper"), "Restart the helper", "", true, a.restartHelper)
 	add("check-updates", view, i18n.T("Check for Updates"), "Check for Updates", "", a.upd != nil, a.checkForUpdates)
+	add("send-feedback", view, i18n.T("Send Feedback"), "Send Feedback bug report contact support", "", true, a.sendFeedback)
 	add("setup-guide", view, i18n.T("Open the setup guide"), "Open the setup guide onboarding", "", true, a.openOnboarding)
 
 	look := i18n.T("Appearance")
@@ -361,6 +362,8 @@ func (a *app) buildMenu() {
 		{Label: i18n.T("Help"), Submenu: []*mygo.MenuItem{
 			{Label: i18n.T("Keyboard shortcuts"), Click: act(func() { a.sheetOpen = true })},
 			{Label: i18n.T("Logs"), Click: act(func() { a.navigate("/logs") })},
+			mygo.Separator(),
+			{Label: i18n.T("Send Feedback"), Click: act(a.sendFeedback)},
 		}},
 	}))
 }

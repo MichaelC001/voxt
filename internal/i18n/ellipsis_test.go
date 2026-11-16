@@ -19,6 +19,7 @@ var statusEllipses = map[string]bool{
 	"Loading the speech model…":  true,
 	"Looking for apps…":          true,
 	"Measuring…":                 true,
+	"Preparing attachments…":     true,
 	"Reading the address…":       true,
 	"Reading the selection…":     true,
 	"Recognising…":               true,

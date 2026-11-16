@@ -111,6 +111,7 @@ func main() {
 
 	mygo.App.WhenReady(func() {
 		a.openWindow()         // shell.go
+		a.connectFeedback()    // feedback.go: Settings → Feedback, the outbox sent
 		a.applyBeta()          // updates.go: betas or not, before the first check
 		a.startHelper()        // helperlink.go
 		a.openTray()           // tray.go: the menu bar icon, close to the menu bar

@@ -138,5 +138,6 @@ func (a *app) quit() {
 	a.closeOmni()         // models_omni.go: the speech models' servers
 	a.closeFamily()       // family.go: the runtime file goes
 	a.stopAnnouncements() // announcements.go: before the store closes
+	a.closeFeedback()     // feedback.go: the outbox stays
 	a.closeShell()
 }

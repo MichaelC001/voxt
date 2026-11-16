@@ -4,8 +4,10 @@ package main
 // crash.log in the logs folder, and the next start shows a card, "VoxtMini
 // quit unexpectedly", whose Report saves the diagnostic bundle (crash.log
 // with the other logs, redacted) and opens a new GitHub issue with the
-// crash's first lines filled in; × dismisses it. Nothing is sent by
-// itself. The helper's crashes have their own card (checkHelper).
+// crash's first lines filled in, and whose Send feedback opens Settings →
+// Feedback with the diagnostics on (they carry the crash, feedback.go);
+// × dismisses it. Nothing is sent by itself. The helper's crashes have
+// their own card (checkHelper).
 
 import (
 	"io"
@@ -101,6 +103,16 @@ func (a *app) reportCrash() {
 			a.post(func() { openExternal(u) })
 		})
 	})
+}
+
+// crashFeedback is the crash card's Send feedback: the card goes, and
+// Settings → Feedback opens on a problem with the diagnostics on.
+func (a *app) crashFeedback() {
+	a.dismissNotice(noticeCrash)
+	a.noticesOpen = false
+	a.fbForm.kind = 0 // feedback.KindBug
+	a.fbForm.diagnostics = true
+	a.sendFeedback()
 }
 
 // homeRE is a home folder in a path: a name the issue, which is public,

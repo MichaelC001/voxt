@@ -25,9 +25,10 @@ import (
 // settingsState is the settings dialog's sections' view state, embedded
 // in app: each section keeps its own struct in its file.
 type settingsState struct {
-	storageState // settings_storage.go
-	aboutState   // settings_about.go
-	settingsForm // shell_settings.go: the controls that edit a setting
+	storageState  // settings_storage.go
+	aboutState    // settings_about.go
+	feedbackState // feedback_page.go
+	settingsForm  // shell_settings.go: the controls that edit a setting
 }
 
 // settingsForm is the settings pages' view state: the controls bind to
@@ -85,10 +86,16 @@ func settingsSections() []settingsSection {
 		{"appearance", i18n.T("Appearance"), "Appearance theme size sidebar"},
 		{"privacy", i18n.T("Privacy"), "Privacy history audio logs"},
 		{"storage", i18n.T("Storage"), "Storage disk data folder reset"},
+		{"feedback", i18n.T("Feedback"), "Feedback bug report support contact"},
 		// "About" in English: "Diagnostics and about" does not fit the
 		// column in bold; Chinese keeps 诊断与关于, which does.
 		{"about", i18n.X("settings section", "About"), "Diagnostics about version bug report"},
 	}
+}
+
+// settingsDot: a section has news (Feedback: a reply not read).
+func (a *app) settingsDot(id string) bool {
+	return id == "feedback" && a.fbUnread() > 0
 }
 
 // settingsSectionIcon is a settings section's icon.
@@ -110,6 +117,8 @@ func settingsSectionIcon(id string) icons.Icon {
 		return icons.ShieldCheck
 	case "storage":
 		return icons.Database
+	case "feedback":
+		return icons.ChatRoundDots
 	}
 	return icons.InfoCircle
 }
@@ -335,6 +344,9 @@ func (a *app) settingsDialog(c *ui.Context) {
 								} else {
 									txt.TextColor(k.G[8])
 								}
+								if a.settingsDot(s.id) {
+									statusDot(c, k.Accent).Tooltip(i18n.T("New reply"))
+								}
 							})
 							if b.Clicked() {
 								a.navigate("/settings/" + s.id)
@@ -409,6 +421,7 @@ func (a *app) settingsSection(c *ui.Context, r *ui.Route) {
 		"appearance":  a.appearanceSettings,
 		"privacy":     a.privacySettings, // settings_privacy.go
 		"storage":     a.storageSettings, // settings_storage.go
+		"feedback":    a.feedbackSection, // feedback_view.go
 		"about":       a.aboutSettings,   // settings_about.go
 	}
 	for _, s := range settingsSections() {
