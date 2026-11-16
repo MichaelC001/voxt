@@ -4,6 +4,18 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.0-beta.6] - 2026-11-16
+
+### Fixed
+
+- Fixed a crash when logs contained malformed links: a link VoxtMini could not read (such as one with a broken `%` escape) in what it writes to its log could make it quit. Such links are now logged safely, with any password or key in them still hidden.
+
+### 中文
+
+#### 修复
+
+- 修复日志里出现格式错误的链接时闪退：写入日志的内容中如果有 VoxtMini 无法解析的链接（例如带错误的 `%` 转义），可能导致 VoxtMini 退出。现在这类链接会被安全地记录，其中的密码和密钥仍会隐藏。
+
 ## [0.1.0-beta.5] - 2026-11-15
 
 ### Added
