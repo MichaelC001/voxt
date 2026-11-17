@@ -2,7 +2,7 @@
 
 All notable changes to VoxtMini. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/). Each version's section is what the update window and actnow.dev show: English first, then the same in Chinese under `### 中文`, with `####` headings below it (docs/release.md, "Publishing a version"; `scripts/actnow-publish.sh` splits the notes at the first Chinese heading).
 
-## [Unreleased]
+## [0.1.0-beta.7] - 2026-11-17
 
 ### Added
 
