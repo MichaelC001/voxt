@@ -81,6 +81,8 @@ func (a *app) modelCard(c *ui.Context, m models.Model) {
 		if st.Err != nil && !st.Downloading {
 			msg, more := uitext.DownloadErrorText(st.Err)
 			notice(c, "model-err", noticeError, msg, more, func() {
+				a.reportLink(c, failure{key: m.ID, title: i18n.T("The download failed"), code: codeModel, kind: kindModelDownload,
+					where: "Models › Model card", message: st.Err.Error()})
 				if ui.Button(c.Key("retry"), i18n.T("Try again")).Clicked() {
 					a.downloadModel(m.ID)
 				}

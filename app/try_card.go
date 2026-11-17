@@ -203,7 +203,15 @@ func (a *app) tryEnded(c *ui.Context, p string, s session.Snapshot, clear func()
 		if s.Problem != nil {
 			text, more, action := sessionProblemText(s.Problem)
 			if text != "" {
-				notice(c, p+"-try-failed", noticeError, text, more, a.noticeButton(c, p+"-try-failed-action", action, clear), nil)
+				btn := a.noticeButton(c, p+"-try-failed-action", action, clear)
+				f := failure{key: s.ID, title: i18n.T("The try failed"), code: codeTry, kind: "session_" + s.Problem.Code,
+					where: tryWhere(p, s.Kind), message: errText(s.Problem.Err)}
+				notice(c, p+"-try-failed", noticeError, text, more, func() {
+					a.reportLink(c, f)
+					if btn != nil {
+						btn()
+					}
+				}, nil)
 				return
 			}
 		}
@@ -238,4 +246,20 @@ func (a *app) tryEnded(c *ui.Context, p string, s session.Snapshot, clear func()
 	if line := uitext.TimingsText(s); line != "" {
 		caption(c, line)
 	}
+}
+
+// tryWhere is where a Try card is, for its failure's report: Home, the
+// setup guide or a feature's page.
+func tryWhere(prefix string, kind store.Kind) string {
+	page := map[store.Kind]string{store.KindTranslate: "Translate", store.KindRewrite: "Rewrite"}[kind]
+	if page == "" {
+		page = "Transcribe"
+	}
+	switch {
+	case prefix == "home":
+		return "Home › Try"
+	case strings.HasPrefix(prefix, "ob-"):
+		return "Setup guide › " + page + " › Try"
+	}
+	return page + " › Try"
 }

@@ -85,6 +85,7 @@ func (a *app) stopHelper() {
 
 // restartHelper restarts it (its card, Home, the palette).
 func (a *app) restartHelper() {
+	a.step("restart_helper")
 	sup := a.host.sup
 	a.async(func() { sup.Restart() })
 }

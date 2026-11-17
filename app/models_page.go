@@ -151,6 +151,7 @@ func (a *app) modelsChanged() {
 
 // downloadModel starts downloading model id (and the models it needs).
 func (a *app) downloadModel(id string) {
+	a.step("download_model")
 	m := a.models
 	a.async(func() {
 		m.Download(id) // a failure is the status's

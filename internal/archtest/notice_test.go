@@ -11,9 +11,10 @@ import (
 // LICENSES/go: the Apache-2.0 ones share LICENSES/Apache-2.0.txt, MyGo is
 // vendored with its own.
 var noticeElsewhere = map[string]string{
-	"github.com/ebitengine/purego": "LICENSES/Apache-2.0.txt",
-	"github.com/hehehai/actnowkit": "LICENSES/Apache-2.0.txt",
-	"github.com/egoist/mygo":       "third_party/mygo/LICENSE",
+	"github.com/ebitengine/purego":            "LICENSES/Apache-2.0.txt",
+	"github.com/hehehai/actnowkit":            "LICENSES/Apache-2.0.txt",
+	"github.com/hehehai/actnowkit/feedbackui": "LICENSES/Apache-2.0.txt",
+	"github.com/egoist/mygo":                  "third_party/mygo/LICENSE",
 }
 
 // requires returns the modules go.mod requires, path → version.

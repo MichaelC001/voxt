@@ -158,6 +158,7 @@ func (a *app) loadUpdates() {
 // Settings → About).
 func (a *app) checkForUpdates() {
 	if a.upd != nil {
+		a.step("check_updates")
 		a.upd.CheckNow()
 	}
 }

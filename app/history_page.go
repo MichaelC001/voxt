@@ -188,6 +188,8 @@ func (a *app) historyPage(c *ui.Context) {
 	if h.err != "" {
 		ui.Column(c).Padding(0, px(t, sp6), px(t, sp3)).Shrink(0).Children(func() {
 			notice(c, "hist-err", noticeError, i18n.T("Could not read the history."), h.err, func() {
+				a.reportLink(c, failure{key: "history", title: i18n.T("Could not read the history."), code: codeHistory,
+					kind: kindHistoryRead, where: "History", message: h.err})
 				if ghostButton(c.Key("hist-retry"), i18n.T("Try again")).Clicked() {
 					a.loadHistory()
 				}

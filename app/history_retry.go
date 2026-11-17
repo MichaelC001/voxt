@@ -72,6 +72,7 @@ func (a *app) retryEntry(e store.Entry) {
 		return
 	}
 	a.hist.retry = entryRetry{id: e.ID, stage: session.Recognizing}
+	a.step("retry_entry")
 	mgr := a.mgr
 	a.async(func() {
 		out, err := mgr.Retry(context.Background(), session.RetryRequest{Entry: e, OnStage: func(st session.State) {

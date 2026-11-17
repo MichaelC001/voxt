@@ -84,6 +84,11 @@ func (a *app) startSessionID(req session.StartRequest) (string, *sessionNotice) 
 	if err != nil {
 		return "", nil // a session runs already
 	}
+	if req.Try {
+		a.step("try_" + string(req.Kind)) // feedback_report.go
+	} else {
+		a.step("start_" + string(req.Kind))
+	}
 	return id, nil
 }
 

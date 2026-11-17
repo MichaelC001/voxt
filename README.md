@@ -81,7 +81,7 @@ Needs a Mac with Apple silicon and macOS 15 or later; 16 GB of memory is comfort
 
 ## 🔒 Privacy
 
-Audio and text stay on your Mac unless you choose a remote service for a feature; then only that feature's data goes to that service. Keys stay in the Keychain. No account, no server of VoxtMini's, no analytics. Feedback goes to actnow.dev only when you send it from **Settings → Feedback** ([privacy policy](https://actnow.dev/legal/privacy)); you can see its diagnostics before sending, and they never hold what you said or wrote. Bugs can also be reported as public issues on GitHub.
+Audio and text stay on your Mac unless you choose a remote service for a feature; then only that feature's data goes to that service. Keys stay in the Keychain. No account, no server of VoxtMini's, no analytics. Feedback goes to actnow.dev only when you send it from the feedback window (**Help → Send Feedback**, [privacy policy](https://actnow.dev/legal/privacy)); you can see its diagnostics and an error report before sending, and they never hold what you said or wrote. Bugs can also be reported as public issues on GitHub.
 
 [![][back-to-top]](#readme-top)
 

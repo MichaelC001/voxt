@@ -4,12 +4,14 @@ package main
 // crash.log in the logs folder, and the next start shows a card, "VoxtMini
 // quit unexpectedly", whose Report saves the diagnostic bundle (crash.log
 // with the other logs, redacted) and opens a new GitHub issue with the
-// crash's first lines filled in, and whose Send feedback opens Settings →
-// Feedback with the diagnostics on (they carry the crash, feedback.go);
+// crash's first lines filled in, and whose Send feedback opens the
+// feedback window with an error report of the crash and the diagnostics
+// on (they carry crash.log, feedback.go);
 // × dismisses it. Nothing is sent by itself. The helper's crashes have
 // their own card (checkHelper).
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/url"
@@ -21,6 +23,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/crashlog"
 	"github.com/hehehai/VoxtMini/internal/i18n"
+	"github.com/hehehai/actnowkit/feedback"
 	"github.com/hehehai/actnowkit/redact"
 )
 
@@ -105,14 +108,48 @@ func (a *app) reportCrash() {
 	})
 }
 
-// crashFeedback is the crash card's Send feedback: the card goes, and
-// Settings → Feedback opens on a problem with the diagnostics on.
+// crashFeedback is the crash card's Send feedback: the card goes, an
+// error report of the crash is captured (its first line: the panic,
+// redacted and scrubbed; the trace is crash.log in the diagnostics), and
+// the feedback window opens on a problem with it.
 func (a *app) crashFeedback() {
 	a.dismissNotice(noticeCrash)
 	a.noticesOpen = false
-	a.fbForm.kind = 0 // feedback.KindBug
-	a.fbForm.diagnostics = true
-	a.sendFeedback()
+	m, path, title := a.fbMgr, a.crashLog, i18n.T("VoxtMini quit unexpectedly")
+	if m == nil || a.fbWin == nil {
+		a.sendFeedback()
+		return
+	}
+	a.async(func() {
+		var err error
+		if path != "" {
+			_, out := crashlog.Last(path, crashExcerpt)
+			if line := crashFirstLine(out); line != "" {
+				err = errors.New(line)
+			}
+		}
+		rep, cerr := m.Capture(feedback.ErrorContext{Title: title, Code: codeCrash, Kind: kindCrash, Where: "Crash card", Err: err})
+		if cerr != nil && (rep == nil || rep.ID == "") {
+			rep = nil
+		}
+		a.post(func() {
+			if a.fbWin != nil && a.fbMgr == m {
+				a.fbWin.Open(feedback.Prefill{Kind: feedback.KindBug, Report: rep})
+			}
+		})
+	})
+}
+
+// crashFirstLine is the crash's first line that says what happened
+// ("panic: …", "fatal error: …"), "" none.
+func crashFirstLine(out string) string {
+	for line := range strings.Lines(out) {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "===") {
+			return line
+		}
+	}
+	return ""
 }
 
 // homeRE is a home folder in a path: a name the issue, which is public,

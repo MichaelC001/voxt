@@ -69,7 +69,14 @@ func (a *app) historyDetail(c *ui.Context, e store.Entry) {
 			if e.Status != store.StatusFailed {
 				kind, text = noticeWarn, i18n.T("Done with a problem: %s", uitext.FirstLine(e.Error))
 			}
-			notice(c, "hist-detail-err", kind, text, e.Error, nil, nil)
+			var report func()
+			if e.Status == store.StatusFailed {
+				report = func() {
+					a.reportLink(c, failure{key: e.ID, title: i18n.T("The dictation failed"), code: codeSession,
+						kind: string(e.Kind) + "_failed", where: "History › Entry details", message: e.Error})
+				}
+			}
+			notice(c, "hist-detail-err", kind, text, e.Error, report, nil)
 		}
 		a.entryRetryButton(c, e) // history_retry.go
 		if e.Audio != "" {
