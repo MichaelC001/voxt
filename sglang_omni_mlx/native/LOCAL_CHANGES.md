@@ -35,6 +35,17 @@ server (`tools/guard_server.cpp`) with the system's compilers, no MLX, and
 runs `ci/test_guard.py`: it runs on Linux too. `ci/test_server_api.py` tests
 the real server.
 
+## The oldest macOS (2026-11-17)
+
+`scripts/build_runtime.sh` builds for `MACOSX_DEPLOYMENT_TARGET` (default
+15.0; VoxtMini's `scripts/build-omni.sh` passes `mygo.json`'s minimum): it
+installs the MLX wheels for that macOS (`uv pip install --python-platform
+aarch64-apple-darwin`, reinstalling `mlx` and `mlx-metal` in case the venv
+holds another platform's) and passes `CMAKE_OSX_DEPLOYMENT_TARGET`. Upstream
+takes the build host's wheel: on macOS 26 its `mlx.metallib` is Metal 4 and
+its libraries need macOS 26.2, so the runtime did not load on macOS 15
+(VoxtMini issue #162).
+
 ## civetweb past v1.16
 
 `CMakeLists.txt` pins civetweb to master `d110e87` (v1.16 + 270 commits;

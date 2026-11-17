@@ -1093,6 +1093,7 @@
   "The model could not be saved to the disk.": "无法把模型保存到磁盘。",
   "The model gave no answer.": "模型没有给出回答。",
   "The model is not installed.": "模型未安装。",
+  "This VoxtMini build does not support this Mac's macOS version. Update VoxtMini.": "这个版本的 VoxtMini 不支持这台 Mac 的 macOS 版本，请更新 VoxtMini。",
   "The model stopped or did not answer. Try again in a moment.": "模型已停止或没有响应。请稍后再试。",
   "The models run here. No account, no server, no analytics.": "模型在本机运行。无需账号，没有服务器，不做统计。",
   "The most accurate: good with accents, dialects, names and mixed languages. Shows the text as you speak.": "最准确：口音、方言、人名和混杂多种语言都能识别好，说话时实时显示文字。",

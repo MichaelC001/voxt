@@ -152,7 +152,8 @@ github.com/hehehai/VoxtMini
 │   │                     dictionary terms found, clean-up checks (docs/eval.md)
 │   ├── archtest/         tests of the code's structure only: file sizes, import layering ("Code structure rules")
 │   └── tools/            developer commands (standard library only): snapcmp (snapshot comparison),
-│                         declhash (pure-move check), evalsynth (the speech fixtures, Qwen3-TTS on a Mac)
+│                         declhash (pure-move check), evalsynth (the speech fixtures, Qwen3-TTS on a Mac),
+│                         minos (no shipped Mach-O or metallib needs a newer macOS than mygo.json says)
 ├── helper/               the Swift helper (helper/README.md): Sources/, Tests/, Fixtures/, Support/
 └── third_party/mygo/     MyGo 0.5.5 with seven patches (scripts/vendor-mygo.sh)
 ```

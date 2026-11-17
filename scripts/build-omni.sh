@@ -53,6 +53,12 @@ if ! command -v uv >/dev/null; then
   export PATH="$WORK/tools/bin:$PATH"
 fi
 
+# The oldest macOS VoxtMini runs on: MLX's wheel and the servers are built
+# for it (issue #162: a runtime built on macOS 26 needed macOS 26).
+MACOSX_DEPLOYMENT_TARGET="$(sed -n 's/^ *"minimumSystemVersion": *"\([^"]*\)".*/\1/p' "$ROOT/mygo.json")"
+[[ -n "$MACOSX_DEPLOYMENT_TARGET" ]] || { echo "no minimumSystemVersion in mygo.json" >&2; exit 1; }
+export MACOSX_DEPLOYMENT_TARGET
+
 log="$WORK/build.log"
 echo "building the Omni runtime from $NATIVE (log: $log)"
 if ! bash "$NATIVE/scripts/build_runtime.sh" "$WORK/runtime" "$WORK/work" >"$log" 2>&1; then
@@ -93,6 +99,13 @@ for s in "${SERVERS[@]}"; do
   fi
   du -h "$OUT/bin/$s" | sed "s|^|  |"
 done
+# Nothing in it may need a newer macOS (Mach-O minos, the metallib's
+# target and Metal language).
+if ! (cd "$ROOT" && go run ./internal/tools/minos -mygo mygo.json "$OUT/bin") >"$WORK/minos.log" 2>&1; then
+  grep -v '^ok ' "$WORK/minos.log" >&2
+  echo "the staged runtime needs a newer macOS than $MACOSX_DEPLOYMENT_TARGET" >&2
+  exit 1
+fi
 du -sh "$OUT/bin" | sed "s|^|staged |"
 echo "VOXTMINI_OMNI_RUNTIME=$OUT"
 

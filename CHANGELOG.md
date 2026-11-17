@@ -2,6 +2,20 @@
 
 All notable changes to VoxtMini. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/). Each version's section is what the update window and actnow.dev show: English first, then the same in Chinese under `### 中文`, with `####` headings below it (docs/release.md, "Publishing a version"; `scripts/actnow-publish.sh` splits the notes at the first Chinese heading).
 
+## [Unreleased]
+
+## [0.1.0-beta.8] - 2026-11-17
+
+### Fixed
+
+- Local models work on macOS 15 again: the speech runtime was built for macOS 26 only, so on macOS 15 every local speech model failed to start ("language version 4.0 which is not supported on this OS"). Releases are now checked so that nothing in them needs a newer macOS than 15.0. If this ever happens again, VoxtMini says that this build does not support the Mac's macOS version.
+
+### 中文
+
+#### 修复
+
+- 修复 macOS 15 上本地模型无法使用：语音运行时此前只为 macOS 26 构建，在 macOS 15 上所有本地语音模型都无法启动（"language version 4.0 which is not supported on this OS"）。现在每次发布都会检查，确保其中没有任何部分需要高于 macOS 15.0 的系统。万一再发生这种情况，VoxtMini 会提示这个版本不支持这台 Mac 的 macOS 版本。
+
 ## [0.1.0-beta.7] - 2026-11-17
 
 ### Added

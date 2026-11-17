@@ -4,6 +4,10 @@ VoxtMini is distributed through [GitHub Releases](https://github.com/hehehai/Vox
 
 The native speech runtime is included at `sglang_omni_mlx/native` and pinned in [`UPSTREAM_PIN`](../sglang_omni_mlx/native/UPSTREAM_PIN). `scripts/build-omni.sh` builds only this checked-in version, so a release does not depend on a neighboring SGLang-Omni checkout.
 
+### The oldest macOS
+
+A release runs on macOS 15.0 and later (`mygo.json`'s `macos.minimumSystemVersion`), though the runner builds on macOS 26 with Xcode 26. MLX publishes a wheel per macOS (14, 15, 26), and the macOS 26 one's `mlx.metallib` uses Metal 4, which macOS 15 cannot load (issue #162: every local speech model failed on macOS 15 in 0.1.0-beta.6 and earlier). So `scripts/build-omni.sh` sets `MACOSX_DEPLOYMENT_TARGET` from `mygo.json`, and the runtime's `build_runtime.sh` installs the wheel for it (`uv pip install --python-platform aarch64-apple-darwin`) and builds the servers for it (`CMAKE_OSX_DEPLOYMENT_TARGET`). voxtmini-llm's `mlx.metallib` follows mlx-swift's own platform (macOS 14, Metal 3.1). The macOS 26 build's extra kernels (Metal 4, for the M5's neural accelerators) are not shipped. `scripts/release-verify.sh` runs `internal/tools/minos` over the app: it fails when any Mach-O file's `minos`, a Metal library's target macOS or its Metal language version is newer than `mygo.json`'s minimum. To check a published build on any machine, unpack its update archive and run `go run ./internal/tools/minos -mygo mygo.json VoxtMini.app`.
+
 ## GitHub Actions setup
 
 The release workflow builds on an Apple silicon macOS runner. Add these repository secrets in **Settings → Secrets and variables → Actions**. Organization secrets with access to this repository also work.

@@ -5,6 +5,7 @@ package uitext
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/hehehai/VoxtMini/internal/asr"
 	"github.com/hehehai/VoxtMini/internal/i18n"
@@ -19,6 +20,9 @@ func ModelErrorText(err error) (msg, more string) {
 		return "", ""
 	}
 	more = err.Error()
+	if osTooOld(more) {
+		return i18n.T("This VoxtMini build does not support this Mac's macOS version. Update VoxtMini."), more
+	}
 	if s := appleErrorText(err); s != "" { // Apple's models: permission, language, availability
 		return s, more
 	}
@@ -80,4 +84,14 @@ func remoteFailure(err error) bool {
 		return le.Code == llm.CodeNoKey || le.Code == llm.CodeAuth || le.Code == llm.CodeModelNotFound
 	}
 	return false
+}
+
+// osTooOld says whether a runtime's failure is that this macOS cannot load
+// its code: Metal's "… is using language version 4.0 which is not
+// supported on this OS" for a metallib, dyld's "… which is newer than
+// running OS" for a library (issue #162, a runtime built for a newer
+// macOS than the app says it needs; scripts/release-verify.sh now refuses
+// such a build).
+func osTooOld(msg string) bool {
+	return strings.Contains(msg, "not supported on this OS") || strings.Contains(msg, "newer than running OS")
 }
