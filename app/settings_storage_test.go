@@ -28,7 +28,7 @@ func TestStorageModels(t *testing.T) {
 	if r == nil || r.modelsShared != fast.Size() || r.modelsMine != vad.Size()+tr.Size() {
 		t.Fatalf("usage: %+v (want shared %d, mine %d)", r, fast.Size(), vad.Size()+tr.Size())
 	}
-	for _, s := range []string{"Model folder", "Shared by all ActNow apps", "Only VoxtMini", "Shared with other ActNow apps"} {
+	for _, s := range []string{"Model folder", "Shared by all ActNow apps", "Only VoxtMini", "Shared across ActNow"} {
 		if !has(tt, s) {
 			t.Errorf("no %q", s)
 		}

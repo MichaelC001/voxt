@@ -134,7 +134,7 @@ func TestNetworkUseTheirs(t *testing.T) {
 // only when a release of another ActNow app is installed (a dev build of
 // one does not count); alone, VoxtMini says nothing of it, though the data
 // still follows the family's files. Model descriptions never say "another
-// app": the status line names it ("Installed by Dicta").
+// app": the status line says so ("Installed · Shared across ActNow").
 func TestFamilyLinesNeedAnotherApp(t *testing.T) {
 	a, _, tt := newTestApp(t)
 	a.famStarted = true
@@ -156,7 +156,7 @@ func TestFamilyLinesNeedAnotherApp(t *testing.T) {
 		click(t, tt, "Cancel")
 		a.navigate("/settings/storage")
 		frames(tt)
-		if has(tt, "Shared by all ActNow apps") != want || has(tt, "Shared with other ActNow apps") != want || has(tt, "Used by VoxtMini") == want {
+		if has(tt, "Shared by all ActNow apps") != want || has(tt, "Shared across ActNow") != want || has(tt, "Used by VoxtMini") == want {
 			t.Errorf("%s: storage %q", when, tt.Texts())
 		}
 	}

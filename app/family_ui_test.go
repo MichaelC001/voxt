@@ -99,7 +99,7 @@ func TestOnboardingReuse(t *testing.T) {
 	a.familyFound(a.fam.Discover())
 	a.models.Refresh()
 	a.obGo(obModels)
-	for _, s := range []string{"2 models are already on this Mac", "Installed by AudioSmith · 2.5 GB · no download needed",
+	for _, s := range []string{"2 models are already on this Mac", "Shared across ActNow · 2.5 GB · no download needed",
 		"Accurate speech recognition · Voice detection", "Use them", "Choose models", "Installed · from AudioSmith",
 		"3.3 GB still to download", "Download (3.3 GB)"} {
 		if !has(tt, s) {

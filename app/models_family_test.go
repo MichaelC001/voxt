@@ -74,7 +74,7 @@ func TestModelDeleteShared(t *testing.T) {
 	useModels(t, a, models.ASRFast)
 	claimFor(t, a, audioSmithID, models.ASRFast)
 	a.navigate(modelsPath)
-	if !has(tt, "Shared with AudioSmith") {
+	if !has(tt, "Shared across ActNow") {
 		t.Fatalf("no Shared with: %q", tt.Texts())
 	}
 
@@ -117,7 +117,7 @@ func TestModelDeleteCancelShared(t *testing.T) {
 	claimFor(t, a, dictaID, models.LLMTranslate)
 	claimFor(t, a, audioSmithID, models.LLMTranslate)
 	a.navigate(modelsPath + "/language")
-	if !has(tt, "Shared with AudioSmith and Dicta") {
+	if !has(tt, "Shared across ActNow") {
 		t.Fatalf("no Shared with: %q", tt.Texts())
 	}
 	chooseMenu(t, tt, "More actions for Translation model", "Delete")
@@ -242,14 +242,14 @@ func TestModelFamilyText(t *testing.T) {
 		st   models.Status
 		want string
 	}{
-		{asr, models.Status{Installed: true, OnDisk: true, Users: []string{"AudioSmith", "Dicta", "Auralink"}}, "Shared with AudioSmith, Dicta and Auralink"},
+		{asr, models.Status{Installed: true, OnDisk: true, Users: []string{"AudioSmith", "Dicta", "Auralink"}}, "Shared across ActNow"},
 		{asr, models.Status{Downloading: true, Done: 43, Total: 100, WaitingFor: "unknown"}, "Downloading in another app… 43%"},
 		{asr, models.Status{Elsewhere: "dev.hehehai.dicta.dev"}, "Downloading in Dicta (dev)…"},
 		{asr, models.Status{DeletedBy: dictaID}, "Deleted in Dicta"},
 		{asr, models.Status{Installed: true, OnDisk: true, DeletedBy: dictaID}, ""},
-		{qwen, models.Status{OnDisk: true, Users: []string{"Dicta"}}, "Installed by Dicta"},
+		{qwen, models.Status{OnDisk: true, Users: []string{"Dicta"}}, "Installed · Shared across ActNow"},
 		{qwen, models.Status{OnDisk: true}, "Already on this Mac"},
-		{qwen, models.Status{OnDisk: true, Installed: true, Mine: true, Users: []string{"Dicta"}}, "Shared with Dicta"},
+		{qwen, models.Status{OnDisk: true, Installed: true, Mine: true, Users: []string{"Dicta"}}, "Shared across ActNow"},
 	} {
 		if got := modelFamilyText(c.m, c.st); got != c.want {
 			t.Errorf("%s %+v: %q, want %q", c.m.ID, c.st, got, c.want)
@@ -272,11 +272,11 @@ func TestBorrowedModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	claimFor(t, a, dictaID, models.LLMQwen3)
-	if !has(tt, name) || !has(tt, "Installed by Dicta") || has(tt, "Download "+name) {
+	if !has(tt, name) || !has(tt, "Installed · Shared across ActNow") || has(tt, "Download "+name) {
 		t.Fatalf("borrowed: %q", tt.Texts())
 	}
 	click(t, tt, "Use "+name)
-	if st := a.models.Status(models.LLMQwen3); !st.Installed || !st.Mine || !has(tt, "Shared with Dicta") {
+	if st := a.models.Status(models.LLMQwen3); !st.Installed || !st.Mine || !has(tt, "Shared across ActNow") {
 		t.Fatalf("used: %+v %q", st, tt.Texts())
 	}
 	chooseMenu(t, tt, "More actions for "+name, "Remove")
@@ -284,7 +284,7 @@ func TestBorrowedModel(t *testing.T) {
 		t.Fatalf("dialog: %q", tt.Texts())
 	}
 	click(t, tt, "Remove from VoxtMini")
-	if st := a.models.Status(models.LLMQwen3); st.Installed || !st.OnDisk || !has(tt, "Installed by Dicta") {
+	if st := a.models.Status(models.LLMQwen3); st.Installed || !st.OnDisk || !has(tt, "Installed · Shared across ActNow") {
 		t.Errorf("removed: %+v %q", st, tt.Texts())
 	}
 }

@@ -185,7 +185,8 @@ func (a *app) obReuseCard(c *ui.Context, found []models.Found) {
 	}
 	sub := i18n.T("%s · no download needed", uitext.HumanBytes(size))
 	if by != "" {
-		sub = i18n.T("Installed by %s · %s · no download needed", by, uitext.HumanBytes(size))
+		// Not the app's name (actnowkit v0.22.1).
+		sub = i18n.T("Shared across ActNow · %s · no download needed", uitext.HumanBytes(size))
 	}
 	card(c.Key("ob-reuse")).Children(func() {
 		ui.Row(c).Gap(px(t, sp3)).AlignItems(ui.Start).Children(func() {

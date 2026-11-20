@@ -176,19 +176,20 @@ func percent(done, total int64) int {
 	return int(done * 100 / total)
 }
 
-// modelFamilyText is what the family says of a model ("" nothing): the
-// apps that installed a borrowed model VoxtMini does not use yet, the other
-// apps that share it, another app downloading what VoxtMini's download
-// waits for or the model itself, or the app that deleted it for all apps.
+// modelFamilyText is what the family says of a model ("" nothing): a
+// borrowed model VoxtMini does not use yet, one it shares with other apps
+// (neither names the apps, actnowkit v0.22.1: the list grows with the
+// family), another app downloading what VoxtMini's download waits for or
+// the model itself, or the app that deleted it for all apps.
 func modelFamilyText(m models.Model, st models.Status) string {
 	switch {
 	case (m.Borrowed || st.OnDisk) && !st.Installed:
 		if len(st.Users) == 0 {
 			return i18n.T("Already on this Mac")
 		}
-		return i18n.T("Installed by %s", uitext.Names(st.Users))
+		return i18n.T("Installed · Shared across ActNow")
 	case st.Installed && len(st.Users) > 0:
-		return i18n.T("Shared with %s", uitext.Names(st.Users))
+		return i18n.T("Shared across ActNow")
 	case st.Downloading && st.WaitingFor != "":
 		return i18n.T("Downloading in %s… %d%%", ownerName(st.WaitingFor), percent(st.Done, st.Total))
 	case !st.Downloading && !st.OnDisk && st.Elsewhere != "":

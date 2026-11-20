@@ -8,7 +8,7 @@ package main
 // again when it comes to the front, as notifications are only hints.
 // Nothing here stops VoxtMini: a failure is logged.
 //
-// What it gives the pages: a.famApps (the apps found, for "Shared with",
+// What it gives the pages: a.famApps (the apps found, for "Shared across ActNow",
 // conflicts), a.famConflicts (VoxtMini's shortcuts that other apps also
 // use), and the shared settings VoxtMini follows (the language, the
 // downloads' network: family_network.go).

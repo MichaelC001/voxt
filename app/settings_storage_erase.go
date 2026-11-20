@@ -68,7 +68,7 @@ func (a *app) modelFolderRows(c *ui.Context, r *storageReport, open func(key, di
 	}
 	rows := []useRow{{i18n.T("Used by VoxtMini"), r.modelsMine}}
 	if others || r.modelsShared > 0 {
-		rows = []useRow{{i18n.T("Only VoxtMini"), r.modelsMine}, {i18n.T("Shared with other ActNow apps"), r.modelsShared}}
+		rows = []useRow{{i18n.T("Only VoxtMini"), r.modelsMine}, {i18n.T("Shared across ActNow"), r.modelsShared}}
 	}
 	ui.Grid(c.Key("st-models-use")).ColumnTracks(ui.Fr(1), ui.Fixed(px(t, 90)), ui.Fixed(px(t, stActionW))).GapX(px(t, sp3)).GapY(px(t, 6)).AlignItems(ui.Center).Children(func() {
 		for _, row := range rows {

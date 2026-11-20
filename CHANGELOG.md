@@ -4,6 +4,10 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Changed
+
+- Models and Settings → Storage: models other ActNow apps use too say “Shared across ActNow” instead of naming the apps.
+
 ## [0.1.0-beta.8] - 2026-11-17
 
 ### Fixed
