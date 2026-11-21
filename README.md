@@ -8,13 +8,13 @@ Voice input for macOS on local models: press a shortcut in any app, speak, and t
 
 **English** · [简体中文](./README.zh-CN.md) · [Report Issues][github-issues-link]
 
+[![][website-shield]][website-link]
 [![][github-release-shield]][github-release-link]
 [![][macos-version-shield]][macos-version-link]
 [![][license-shield]][license-link]
 [![][release-date-shield]][release-date-link]
 
-<!-- Placeholder: Voxt's screenshot, until VoxtMini has its own. -->
-<img width="2664" height="1752" alt="VoxtMini" src="https://github.com/user-attachments/assets/67f6e1d7-0761-4685-992d-15cc89821475" />
+<img width="1642" height="1098" alt="VoxtMini's Models page: speech models that run on the Mac" src="docs/images/models.webp" />
 
 </div>
 
@@ -96,6 +96,8 @@ Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 <!-- LINK GROUP: the releases page, not /releases/latest, which is Voxt's v1.15.0 until a VoxtMini release is marked latest. -->
 
 [back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
+[website-link]: https://actnow.dev/voxtmini
+[website-shield]: https://img.shields.io/badge/website-actnow.dev%2Fvoxtmini-0d9384?style=flat-square&labelColor=000000
 [github-issues-link]: https://github.com/hehehai/VoxtMini/issues/new/choose
 [github-release-link]: https://github.com/hehehai/VoxtMini/releases
 [macos-version-link]: https://github.com/hehehai/VoxtMini/releases

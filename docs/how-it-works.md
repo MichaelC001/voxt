@@ -37,7 +37,7 @@ A Mac with Apple silicon and macOS 15 or later (Apple Intelligence and the newer
 
 Download VoxtMini from [actnow.dev/voxtmini](https://actnow.dev/voxtmini) ([download](https://actnow.dev/download/voxtmini), with a free ActNow account), or from [GitHub Releases](https://github.com/hehehai/VoxtMini/releases), both notarised Apple silicon disk images (tags `v0.x`; the `v1.x` releases there are Voxt's). Installed copies update from actnow.dev (`/updates/voxtmini`), with a Beta channel in Settings → About.
 
-> **Status: beta** (latest release `0.1.0-beta.2`; what came since is in [CHANGELOG.md](../CHANGELOG.md) under Unreleased). Not yet checked on a real Mac: Apple Speech and Apple Intelligence, and Gemini Live and the Responses API against the real services; models marked experimental have not been run on a Mac with VoxtMini.
+> **Status: beta** (the releases and what changed are in [CHANGELOG.md](../CHANGELOG.md)). Not yet checked on a real Mac: Apple Speech and Apple Intelligence, and Gemini Live and the Responses API against the real services; models marked experimental have not been run on a Mac with VoxtMini.
 
 ## Privacy
 
@@ -88,7 +88,7 @@ Apple 芯片、macOS 15 及以上的 Mac（Apple 智能和新版 Apple 语音识
 
 从 [actnow.dev/voxtmini](https://actnow.dev/voxtmini) 下载（[下载页](https://actnow.dev/download/voxtmini)，需要免费的 ActNow 账户），或从 [GitHub Releases](https://github.com/hehehai/VoxtMini/releases) 下载，都是经过公证的 Apple 芯片版磁盘映像（标签 `v0.x`；那里的 `v1.x` 是 Voxt 的版本）。装好后从 actnow.dev（`/updates/voxtmini`）更新，设置 → 诊断与关于 里有 Beta 通道。
 
-> **状态：beta**（最新发布 `0.1.0-beta.2`；之后的改动见 [CHANGELOG.md](../CHANGELOG.md) 的 Unreleased）。尚未在真机上验证：Apple 语音识别和 Apple 智能，以及 Gemini Live 和 Responses API 对真实服务的调用；标为实验性的模型还没在 Mac 上用 VoxtMini 跑过。
+> **状态：beta**（各版本和改动见 [CHANGELOG.md](../CHANGELOG.md)）。尚未在真机上验证：Apple 语音识别和 Apple 智能，以及 Gemini Live 和 Responses API 对真实服务的调用；标为实验性的模型还没在 Mac 上用 VoxtMini 跑过。
 
 ### 隐私
 

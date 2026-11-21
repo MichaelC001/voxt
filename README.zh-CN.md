@@ -8,13 +8,13 @@
 
 [English](./README.md) · **简体中文** · [反馈问题][github-issues-link]
 
+[![][website-shield]][website-link]
 [![][github-release-shield]][github-release-link]
 [![][macos-version-shield]][macos-version-link]
 [![][license-shield]][license-link]
 [![][release-date-shield]][release-date-link]
 
-<!-- Placeholder: Voxt's screenshot, until VoxtMini has its own. -->
-<img width="2664" height="1752" alt="VoxtMini" src="https://github.com/user-attachments/assets/67f6e1d7-0761-4685-992d-15cc89821475" />
+<img width="1642" height="1098" alt="VoxtMini 的模型页：在 Mac 本机运行的语音模型" src="docs/images/models-zh.webp" />
 
 </div>
 
@@ -96,6 +96,8 @@ Apache 2.0，见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
 <!-- LINK GROUP: the releases page, not /releases/latest, which is Voxt's v1.15.0 until a VoxtMini release is marked latest. -->
 
 [back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
+[website-link]: https://actnow.dev/zh/voxtmini
+[website-shield]: https://img.shields.io/badge/website-actnow.dev%2Fvoxtmini-0d9384?style=flat-square&labelColor=000000
 [github-issues-link]: https://github.com/hehehai/VoxtMini/issues/new/choose
 [github-release-link]: https://github.com/hehehai/VoxtMini/releases
 [macos-version-link]: https://github.com/hehehai/VoxtMini/releases
