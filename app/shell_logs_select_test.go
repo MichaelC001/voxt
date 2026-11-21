@@ -333,10 +333,15 @@ func TestLogsKeys(t *testing.T) {
 		t.Errorf("copy command %q", tt.Clipboard())
 	}
 	wantSelected(t, a)
-	// The filter keeps its own ⌘A.
-	if err := tt.Click("Filter the logs"); err != nil {
-		t.Fatal(err)
+	// The filter keeps its own ⌘A. The "Copied" toast covers the field's
+	// middle (Tester.Click only presses what is on top, MyGo 0.10): a
+	// press at its start, as a user's.
+	f, ok := tt.Access("Filter the logs")
+	if !ok {
+		t.Fatal("no filter")
 	}
+	tt.ClickAt(f.Bounds.X+12, f.Bounds.Y+f.Bounds.H/2)
+	frames(tt)
 	tt.Key(ui.Cmd, ui.KeyA)
 	frames(tt)
 	wantSelected(t, a)
