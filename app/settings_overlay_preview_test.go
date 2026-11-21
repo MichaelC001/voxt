@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/egoist/mygo/ui"
 	"github.com/hehehai/VoxtMini/internal/i18n"
 	"github.com/hehehai/VoxtMini/internal/settings"
 )
@@ -63,8 +64,8 @@ func TestOverlayPreviewStates(t *testing.T) {
 		t.Errorf("answer: %q", firstTexts(tt))
 	}
 	// A picture: its buttons do nothing.
-	click(t, tt, "Continue")
-	click(t, tt, "Insert")
+	pressOn(t, tt, "Continue")
+	pressOn(t, tt, "Insert")
 	if a.answer.open || a.sess.ID != "" || !a.settingsOpen || !has(tt, "AI Answer") {
 		t.Error("a click went through the preview")
 	}
@@ -74,10 +75,23 @@ func TestOverlayPreviewStates(t *testing.T) {
 	if !has(tt, n.text) {
 		t.Errorf("notice: %q", firstTexts(tt))
 	}
-	click(t, tt, n.text+" · "+noticeActionLabel(n.action))
+	pressOn(t, tt, n.text+" · "+noticeActionLabel(n.action))
 	if a.shownPath() != "/settings/overlay" {
 		t.Errorf("the notice's action ran: %s", a.shownPath())
 	}
+}
+
+// pressOn presses where the element named s is, as a user would on the
+// preview's picture: Tester.Click refuses a control that takes no input
+// (MyGo 0.10), which is the point here.
+func pressOn(t *testing.T, tt *ui.Tester, s string) {
+	t.Helper()
+	r, ok := tt.Find(s)
+	if !ok {
+		t.Fatalf("no %q: %q", s, firstTexts(tt))
+	}
+	tt.ClickAt(r.X+r.W/2, r.Y+r.H/2)
+	frames(tt)
 }
 
 // The preview's faces take the settings' look, in Chinese too.
