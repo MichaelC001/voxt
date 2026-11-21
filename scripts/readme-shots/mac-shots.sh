@@ -55,9 +55,10 @@ else
   echo "== build"
   nice -n 10 go build -tags readmeshots -o "$app/Contents/MacOS/VoxtMiniReadmeShots" ./app
 fi
-# The store's SQLite, which mygo build puts in an app: from a built one.
-for lib in "$HOME"/code/VoxtMini*/build/darwin-arm64/VoxtMini.app/Contents/Resources/libmygo-sqlite3.dylib \
-  /Applications/VoxtMini.app/Contents/Resources/libmygo-sqlite3.dylib; do
+# The store's SQLite, which mygo build puts among an app's resources: from
+# a built one.
+for lib in "$HOME"/code/VoxtMini*/build/darwin-arm64/VoxtMini.app/Contents/Resources/libSqlitecore.dylib \
+  /Applications/VoxtMini.app/Contents/Resources/libSqlitecore.dylib; do
   [[ -f "$lib" ]] && { cp "$lib" "$app/Contents/Resources/"; break; }
 done
 cat >"$app/Contents/Info.plist" <<PLIST
