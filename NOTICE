@@ -20,8 +20,8 @@ VoxtMini includes the material below. Each part keeps its own licence:
 the Apache License 2.0, MIT, ISC, BSD-3-Clause and CC BY 4.0 (for the
 icons, which are artwork rather than code) ask for their notices to be
 kept, which this file and LICENSES/ do. Full licence texts:
-LICENSES/Apache-2.0.txt, third_party/mygo/LICENSE, LICENSES/go/ (the Go
-modules' own files, copied unchanged), LICENSES/omni/ and LICENSES/llm/
+LICENSES/Apache-2.0.txt, LICENSES/go/ (the Go modules' own files, copied
+unchanged, MyGo's among them), LICENSES/omni/ and LICENSES/llm/
 (the runtimes' libraries).
 
 AudioSmith
@@ -29,10 +29,9 @@ AudioSmith
   (https://github.com/hehehai/AudioSmith) at commit f171c86, Copyright 2026
   the AudioSmith authors, licensed under the Apache License 2.0
   (LICENSES/Apache-2.0.txt): the window shell and UI kit, the settings,
-  store, i18n, logs, notification and Keychain code, the MyGo patches 0001
-  and 0002, and the helper supervisor (adapted from its engine
-  supervisor). They have been modified; docs/architecture.md lists what
-  was taken and how it changed.
+  store, i18n, logs, notification and Keychain code, and the helper
+  supervisor (adapted from its engine supervisor). They have been
+  modified; docs/architecture.md lists what was taken and how it changed.
 
 Voxt overlay preview background
   assets/overlay-preview-background.png, the desktop picture behind the
@@ -94,13 +93,14 @@ Speech samples
 
 MyGo
   Copyright (c) 2026 MyGo contributors — https://github.com/egoist/mygo
-  Licensed under the MIT License (third_party/mygo/LICENSE). VoxtMini
-  builds against a copy with its own patches (third_party/mygo-patches),
-  made by scripts/vendor-mygo.sh, until upstream releases the fixes. The
-  patches are licensed under MyGo's MIT License, so that they can go
-  upstream (third_party/mygo-patches/README.md).
-  VoxtMini.app also carries MyGo's prebuilt SQLite library (SQLite 3.53.4,
-  https://sqlite.org, in the public domain).
+  Licensed under the MIT License (its LICENSE, copied to
+  LICENSES/go/github.com_egoist_mygo.LICENSE.txt). VoxtMini builds
+  against ActNow's fork of it, https://github.com/hehehai/mygo, at the
+  version go.mod's replace names: upstream MyGo with ActNow's changes,
+  under the same MIT License (the fork's ACTNOW.md lists them).
+  VoxtMini.app also carries MyGo's prebuilt SQLite library
+  (libSqlitecore.dylib: SQLite 3.53.4, https://sqlite.org, in the public
+  domain).
 
 The Omni native runtime (VoxtMini.app/Contents/Resources/omni)
   bin/qwen3_asr_server and bin/whisper_server are built from sglang-omni's

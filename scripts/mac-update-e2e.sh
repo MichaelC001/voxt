@@ -11,9 +11,10 @@
 # the real updater, driven without a window (--update-check, -tags
 # updatecheck: update_check.go):
 #
-#   A. the delta: found, downloaded alone, installed; the bundle on disk is
-#      0.1.1 file for file (code signature included), its helper the new
-#      one, and the supervisor of the old app starts no helper;
+#   A. the delta: found, downloaded alone, staged; while the old app runs
+#      the bundle on disk stays 0.1.0 and its supervisor starts no helper
+#      (as after an update); once it exited the bundle on disk is 0.1.1
+#      file for file (code signature included), its helper the new one;
 #   B. the archive, when the feed has no delta;
 #   C. the archive after a delta that fails (an installed file changed);
 #   D. 0.1.1 is up to date.
@@ -155,9 +156,22 @@ install_v0() {
   tar -xzf "$WORK/out-$V0/darwin-arm64/"*.tar.gz -C "$WORK/inst"
 }
 
-# run REPORT: the installed app's update check.
+# run REPORT: the installed app's update check, then the wait for the
+# update it staged, which replaces the bundle once the process exited.
 run_check() {
   SSL_CERT_FILE="$WORK/cert.pem" nice -n 10 "$WORK/inst/VoxtMini.app/Contents/MacOS/VoxtMini" --update-check "$1"
+  wait_swap
+}
+
+# wait_swap: until nothing is left next to the installed app (an update's
+# work directory, .VoxtMini.app.update-*), at most 60 s.
+wait_swap() {
+  local i
+  for i in $(seq 600); do
+    [[ -z "$(find "$WORK/inst" -maxdepth 1 -name '.VoxtMini.app.*' -print)" ]] && return 0
+    sleep 0.1
+  done
+  echo "  (an update is still staged next to the app after 60 s)"
 }
 
 step "build $V0"
@@ -197,7 +211,7 @@ verify() {
   check "the same code directory hash" test "$(codesign -dv "$app" 2>&1 | grep CDHash=)" = "$(codesign -dv "$NEW" 2>&1 | grep CDHash=)"
   check "the helper is the new one" cmp -s "$app/Contents/Resources/helper/voxtmini-helper" "$NEW/Contents/Resources/helper/voxtmini-helper"
   check "the helper's signature verifies" codesign --verify --strict "$app/Contents/Resources/helper/voxtmini-helper"
-  check "the old app sees the update" test "$(jq -r '"\(.diskVersion) \(.stale)"' "$r")" = "$V1 true"
+  check "while the old app ran: staged, the bundle still $V0, the app stale" test "$(jq -r '"\(.staged) \(.diskVersion) \(.stale)"' "$r")" = "true $V0 true"
   check "its supervisor starts no helper (updated)" test "$(jq -r '"\(.helperState) \(.helperReason) \(.helperPID)"' "$r")" = "failed updated 0"
   check "nothing left next to the app" test -z "$(find "$WORK/inst" -maxdepth 1 -name '.VoxtMini.app.*' -print)"
 }
@@ -225,7 +239,7 @@ verify "$WORK/report-fallback.json" "[$delta_size,$archive_size]"
 
 step "D: $V1 is up to date"
 run_check "$WORK/report-current.json"
-check "nothing found" test "$(jq -r '"\(.running) [\(.found)] [\(.checkErr)] \(.stale)"' "$WORK/report-current.json")" = "$V1 [] [] false"
+check "nothing found" test "$(jq -r '"\(.running) [\(.found)] [\(.checkErr)] \(.staged) \(.stale)"' "$WORK/report-current.json")" = "$V1 [] [] false false"
 
 if pgrep -f "$WORK/inst/VoxtMini.app/Contents/Resources/helper/voxtmini-helper" >/dev/null; then
   echo "  FAIL a helper is running" && FAILS=$((FAILS + 1))

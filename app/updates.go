@@ -3,8 +3,8 @@ package main
 // Updates: MyGo's updater plugin in native UI (native.Plugin, main.go)
 // checks actnow.dev once a day. What a daily check finds shows quietly, as
 // a card at the foot of the sidebar ("Update available", Install), not as
-// a window popping up over the app the user dictates into (MyGo patch
-// 0010, updateFound); Install, or Check for Updates, opens the plugin's
+// a window popping up over the app the user dictates into
+// (updater.Options.Found, updateFound); Install, or Check for Updates, opens the plugin's
 // window with the version's notes, in the language VoxtMini shows, which
 // installs it (a delta when there is one) on the user's word, then offers
 // to restart. Its
@@ -13,16 +13,21 @@ package main
 // Release builds only: `updates` is put in mygo.json by the release
 // workflow (docs/release.md), so other builds cannot update themselves.
 //
-// The updater replaces VoxtMini.app while the old version runs. Until it
-// restarts, the helper on disk is the new version's: the supervisor does
-// not start it (helper.FailUpdated), and a card asks to restart VoxtMini
-// (appUpdated), which a timer, a check and the helper's failure look for
-// (checkBundle, appbundle.Updated).
+// An installed update is staged: on macOS MyGo replaces VoxtMini.app once
+// the running version has exited (the window's Relaunch, a quit, a
+// crash), so that the Dock keeps its tile. From the install on
+// (updater.OnInstalled), the app behaves as an updated one, as when the
+// updater replaced the bundle at once (MyGo 0.5): the supervisor starts no
+// helper (helper.FailUpdated) and a card asks to restart VoxtMini
+// (appUpdated). Besides the staged update (updateStaged), a timer, a check
+// and the helper's failure look for a bundle replaced on disk by other
+// means, such as a new copy dragged over the running one (checkBundle,
+// appbundle.Updated).
 //
 // Beta updates (Settings → About): betas are in the feed's beta channel
 // (https://actnow.dev/updates/voxtmini/beta, whose manifest is the newer
 // of the newest beta and release), which MyGo reads only while
-// mygo.Updater.SetPrereleases is on (patch 0006);
+// mygo.Updater.SetPrereleases is on (mygo.json updates.prereleases);
 // the switch is Updates.Beta in VoxtMini's settings, on by default while
 // the running version is itself a beta (settings.Updates.BetaOn), and
 // applied when the app starts and when it changes (applyBeta).
@@ -30,6 +35,7 @@ package main
 import (
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -70,6 +76,9 @@ type updateService interface {
 	// OnChange calls fn on the main thread after the preferences or the
 	// time of the last check changed.
 	OnChange(fn func()) (off func())
+	// OnInstalled calls fn on the main thread once an update is installed
+	// (staged: it replaces the app as VoxtMini exits).
+	OnInstalled(fn func()) (off func())
 }
 
 // updatePrefs is a snapshot of the updater for Settings → About.
@@ -94,6 +103,14 @@ func (pluginUpdates) SetAutomaticDownloads(on bool)   { updater.SetAutomaticDown
 func (pluginUpdates) SetPrereleases(on bool)          { mygo.Updater.SetPrereleases(on) }
 func (pluginUpdates) CheckNow()                       { updater.CheckForUpdates() }
 func (pluginUpdates) OnChange(fn func()) (off func()) { return updater.OnChange(fn) }
+func (pluginUpdates) OnInstalled(fn func()) (off func()) {
+	return updater.OnInstalled(fn)
+}
+
+// updateStaged is set once an update was installed, which replaces the app
+// on disk when VoxtMini exits: from then on the app is stale (appStale) as
+// one whose bundle was replaced. Any goroutine.
+var updateStaged atomic.Bool
 
 // updateState is the updater as the UI sees it.
 type updateState struct {
@@ -138,6 +155,10 @@ func (a *app) connectUpdates() {
 			a.loadUpdates()
 			a.checkBundle() // a check may be followed by an install
 		})
+	})
+	a.upd.OnInstalled(func() {
+		updateStaged.Store(true)
+		a.post(a.checkBundle) // stale now: the card, no helper
 	})
 }
 

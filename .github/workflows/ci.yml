@@ -48,9 +48,6 @@ jobs:
       - name: Vet the update-check build
         run: go vet -tags updatecheck ./app
 
-      - name: Vendored MyGo is MyGo and our patches
-        run: scripts/vendor-mygo.sh --check
-
       - name: gofmt and dead code (staticcheck U1000, deadcode)
         run: scripts/lint.sh
 

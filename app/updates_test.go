@@ -20,8 +20,9 @@ type fakeUpdates struct {
 	mu      sync.Mutex
 	prefs   updatePrefs
 	pre     bool // SetPrereleases
-	checks  int
-	changes []*func()
+	checks   int
+	changes  []*func()
+	installs []func()
 }
 
 func newFakeUpdates() *fakeUpdates {
@@ -69,6 +70,24 @@ func (f *fakeUpdates) OnChange(fn func()) func() {
 		f.mu.Lock()
 		f.changes = slices.DeleteFunc(f.changes, func(q *func()) bool { return q == p })
 		f.mu.Unlock()
+	}
+}
+
+func (f *fakeUpdates) OnInstalled(fn func()) func() {
+	f.mu.Lock()
+	f.installs = append(f.installs, fn)
+	f.mu.Unlock()
+	return func() {}
+}
+
+// installed calls the OnInstalled functions, as the plugin does once an
+// update is installed (staged).
+func (f *fakeUpdates) installed() {
+	f.mu.Lock()
+	installs := slices.Clone(f.installs)
+	f.mu.Unlock()
+	for _, fn := range installs {
+		fn()
 	}
 }
 
@@ -351,5 +370,27 @@ func TestUpdateFound(t *testing.T) {
 	}
 	if slices.ContainsFunc(trayLabels(), func(l string) bool { return strings.HasPrefix(l, "Update to") }) {
 		t.Errorf("tray after the update is installed %q", trayLabels())
+	}
+}
+
+// TestUpdateStaged: an update the updater installed is staged (MyGo
+// replaces the bundle once the app exits), and the app is stale at once,
+// as when the bundle was replaced on disk: the card asks to restart and
+// the supervisor starts no helper.
+func TestUpdateStaged(t *testing.T) {
+	t.Cleanup(func() { updateStaged.Store(false) })
+	a, _, tt := newTestApp(t)
+	resources := t.TempDir() // no Info.plist: appbundle.Updated is false
+	a.bundleStale = func() bool { return appStale(resources, "0.1.0") }
+	a.checkBundle()
+	if a.bundleUpdated || appStale(resources, "0.1.0") {
+		t.Fatal("updated before the install")
+	}
+	a.upd.(*fakeUpdates).installed()
+	if !appStale(resources, "0.1.0") {
+		t.Fatal("not stale once installed")
+	}
+	if !a.bundleUpdated || !has(tt, "Update installed") {
+		t.Errorf("no card: %q", firstTexts(tt))
 	}
 }

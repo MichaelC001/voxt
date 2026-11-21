@@ -19,7 +19,7 @@ deadcode="golang.org/x/tools/cmd/deadcode@v0.52.0"
 
 status=0
 echo "== gofmt"
-unformatted="$(gofmt -l $(git ls-files '*.go' | grep -v -e '^third_party/' -e '^sglang_omni_mlx/'))"
+unformatted="$(gofmt -l $(git ls-files '*.go' | grep -v -e '^sglang_omni_mlx/'))"
 if [ -n "$unformatted" ]; then
 	echo "$unformatted"
 	status=1

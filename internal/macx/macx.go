@@ -2,7 +2,7 @@
 // cgo), beside the helper's: bringing an app back to the front before a
 // paste, when a click on one of VoxtMini's own windows activated
 // VoxtMini (plan B of the M0 spike S3; the recording pill avoids it with
-// mygo.WindowOptions.NonActivating). macOS 14 activates cooperatively:
+// a panel that never takes the keyboard, mygo.PanelKeyboardNever). macOS 14 activates cooperatively:
 // only the active app can hand activation over, so this runs in the app,
 // not in the helper. It also reads the system's proxies for the model
 // downloads. (The recording's cues are actnowkit's sounds package's,

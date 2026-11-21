@@ -16,7 +16,8 @@ import "github.com/egoist/mygo/ui"
 //   - radiusChip: chips, keycaps, small buttons inside a row (≤ 22 high).
 //   - radiusControl: buttons, inputs, list rows, a menu's or a list's rows.
 //   - radiusPopover: what pops up over a page: menus, a select's list,
-//     popovers, toasts (MyGo's popups take it as Theme.PanelRadius).
+//     popovers, toasts (MyGo's popups take it as Theme.PopupRadius: a
+//     select's list, popovers and popover menus; its toasts keep their own).
 //   - radiusCard: cards on a page.
 //   - radiusDialog: dialogs (dialogFrame, modal: confirmations, the
 //     remote service dialog…), the command palette.
@@ -201,7 +202,7 @@ func styleTheme(th *ui.Theme) {
 	}
 	th.Scrollbar = k.Text.Alpha(0.22)
 	th.Radius = radiusControl
-	th.PanelRadius = radiusPopover
+	th.PopupRadius = radiusPopover
 }
 
 // inkTheme is th with ink as its accent: MyGo's primary button in it is

@@ -9,7 +9,7 @@ package main
 // The window does not resize every frame: when a change starts, it takes
 // the room the move needs (the larger of the face and its target, the
 // face staying where it is in it), and the face's shape moves inside, the
-// window's material (patch 0004) inset to it frame by frame from the
+// window's material (SetVibrancyStyle) inset to it frame by frame from the
 // overlay's view, which draws that frame; once the face rests, the window
 // shrinks to it again. The content keeps its new size from the start,
 // centred and from the face's top, the face clipping it: text does not

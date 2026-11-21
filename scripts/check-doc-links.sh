@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 if (($# == 0)); then
-  mapfile -t files < <(git ls-files '*.md' ':!:third_party/**' ':!:sglang_omni_mlx/**' ':!:testdata/**')
+  mapfile -t files < <(git ls-files '*.md' ':!:sglang_omni_mlx/**' ':!:testdata/**')
 else
   files=("$@")
 fi

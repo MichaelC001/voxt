@@ -174,7 +174,20 @@ channels() {
 # WANT ("" for none) and install it by HOW: delta (its delta from FROM
 # only), fallback (the delta, then the archive: the installed app was
 # changed) or archive; NOTE is what a check that finds nothing says
-# (notPublished, an error's words, or "" for nothing).
+# (an error's words, or "" for nothing: a channel with nothing published
+# yet is up to date too). The update is staged and replaces the bundle
+# once the process exited (wait_swap).
+# wait_swap: until nothing is left next to the installed app (an update's
+# work directory, .VoxtMini.app.update-*), at most 60 s.
+wait_swap() {
+  local i
+  for i in $(seq 600); do
+    [[ -z "$(find "$WORK/inst" -maxdepth 1 -name '.VoxtMini.app.*' -print)" ]] && return 0
+    sleep 0.1
+  done
+  echo "  (an update is still staged next to the app after 60 s)"
+}
+
 expect() {
   local name="$1" from="$2" beta="$3" want="$4" how="${5:-}" note="${6:-}"
   local r="$WORK/report-$name.json" app="$WORK/inst/VoxtMini.app" args=()
@@ -187,6 +200,7 @@ expect() {
   local before
   before="$(wc -l <"$WORK/server.log")"
   local_feed nice -n 10 "$app/Contents/MacOS/VoxtMini" --update-check "$r" ${args[@]+"${args[@]}"}
+  wait_swap
   local served
   served="$(tail -n +"$((before + 1))" "$WORK/server.log")"
   local on=false
@@ -196,7 +210,6 @@ expect() {
   if [[ -z "$want" ]]; then
     case "$note" in
       "") check "up to date, no error" test -z "$(jq -r .checkErr "$r")" ;;
-      notPublished) check "no release on the channel (ErrNotPublished)" test "$(jq -r .notPublished "$r")" = true ;;
       *) check "the error says: $note" bash -c "jq -r .checkErr '$r' | grep -qF '$note'" ;;
     esac
     check "the bundle is still $from" test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$from"
@@ -217,7 +230,7 @@ expect() {
   check "the bundle is $want's, file for file" diff -r "$app" "$WORK/out-$want/darwin-arm64/VoxtMini.app"
   check "its signature verifies (deep, strict)" codesign --verify --deep --strict "$app"
   check "CFBundleVersion is $want's numbers" test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "${want%%-*}"
-  check "the old app starts no helper (updated)" test "$(jq -r '"\(.diskVersion) \(.helperState) \(.helperReason) \(.helperPID)"' "$r")" = "$want failed updated 0"
+  check "while the old app ran: staged, still $from, no helper (updated)" test "$(jq -r '"\(.staged) \(.diskVersion) \(.helperState) \(.helperReason) \(.helperPID)"' "$r")" = "true $from failed updated 0"
   if [[ "$how" == delta ]]; then
     check "the feed served the delta, not the archive" bash -c "grep -q '\.delta' <<<\"\$1\" && ! grep -q '\.tar\.gz' <<<\"\$1\"" _ "$served"
   fi
@@ -237,7 +250,7 @@ check "the build passes release-verify.sh (ad hoc)" scripts/release-verify.sh "$
 
 step "betas only"
 expect a "$B1" default "$B2" delta
-expect b "$B1" off "" "" notPublished
+expect b "$B1" off ""
 
 step "build $R1, the first release (deltas from the betas)"
 build "$R1"
@@ -273,7 +286,7 @@ step "the beta channel's manifest broken: betas fall back to the releases'"
 cp "$FEED/beta/update-darwin-arm64.json" "$WORK/beta-manifest.json"
 echo '{"version":' >"$FEED/beta/update-darwin-arm64.json"
 expect o "$R1" on "$R2" delta
-expect p "$B3" on "" "" "checking for updates"
+expect p "$B3" on ""  # the releases' 0.1.1 is older: up to date, no error
 cp "$WORK/beta-manifest.json" "$FEED/beta/update-darwin-arm64.json"
 
 step "the feed"

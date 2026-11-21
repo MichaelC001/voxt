@@ -60,4 +60,4 @@ scripts/mac.sh scripts/mac-e2e.sh    # headless Mac tests: the real helper, fake
 scripts/mac.sh scripts/mac-regress.sh   # the real models on a Mac: runtimes, eval, the packaged app
 ```
 
-The store's tests use MyGo's SQLite plugin, which downloads its library once (checked against its SHA-256) or uses `MYGO_SQLITE_LIBRARY`. On Linux the overlay's pixel checks of Chinese text need a CJK font (Ubuntu: `fonts-noto-cjk`). The full list of commands is in [AGENTS.md](../AGENTS.md); the checks by hand on a Mac in [manual-test.md](manual-test.md).
+The store's tests use MyGo's SQLite plugin, which downloads its library once (checked against its SHA-256) or uses the file `MYGO_NATIVE_SQLITECORE` names. On Linux the overlay's pixel checks of Chinese text need a CJK font (Ubuntu: `fonts-noto-cjk`). The full list of commands is in [AGENTS.md](../AGENTS.md); the checks by hand on a Mac in [manual-test.md](manual-test.md).

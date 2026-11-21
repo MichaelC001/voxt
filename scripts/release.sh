@@ -207,6 +207,14 @@ echo "== mygo build"
 args=(-platform darwin/arm64)
 [[ -n "$IDENTITY" ]] && args+=(-sign "$IDENTITY")
 go tool mygo build "${args[@]}"
+# mygo build names the disk image after the slug (voxtmini-<version>-arm64.dmg);
+# it keeps the name releases had, "VoxtMini <version> arm64.dmg" (actnow.dev's
+# download takes it with dashes, the GitHub release with dots).
+for f in build/darwin-arm64/voxtmini-*-arm64.dmg; do
+  [[ -e "$f" ]] || continue
+  v="${f#build/darwin-arm64/voxtmini-}"
+  mv "$f" "build/darwin-arm64/VoxtMini ${v%-arm64.dmg} arm64.dmg"
+done
 
 echo "== verify"
 mode=ad-hoc

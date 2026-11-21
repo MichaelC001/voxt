@@ -28,14 +28,22 @@ type helperHost struct {
 	bin, logDir string
 	env         []string
 	sup         helper.Supervisor
-	// stale reports that an update replaced the app on disk
-	// (helper.Config.Stale, updates.go); nil in tests.
+	// stale reports that an update replaced the app on disk, or is staged
+	// to replace it as VoxtMini exits (helper.Config.Stale, updates.go);
+	// nil in tests.
 	stale func() bool
 }
 
 func newHelperHost(resources, logDir string) *helperHost {
 	return &helperHost{bin: helper.Find(resources, devOverrides()), logDir: logDir,
-		stale: func() bool { return appbundle.Updated(resources, mygo.App.Version()) }}
+		stale: func() bool { return appStale(resources, mygo.App.Version()) }}
+}
+
+// appStale reports that the app on disk is no longer the running version
+// of it: an update is staged to replace it as VoxtMini exits
+// (updateStaged), or its bundle was replaced (appbundle.Updated).
+func appStale(resources, running string) bool {
+	return updateStaged.Load() || appbundle.Updated(resources, running)
 }
 
 // helperLink is the helper's view state.

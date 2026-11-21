@@ -2,9 +2,9 @@ package main
 
 // The recording overlay: VoxtMini's one floating window,
 // redone after Voxt's (10-15): a small pill with no buttons. It is
-// non-activating (floating.go, mygo patch 0003): clicking it leaves the
-// app the user dictates into in front, with its caret. It always uses the
-// dark tokens, whatever the appearance.
+// non-activating (floating.go, a panel that never takes the keyboard):
+// clicking it leaves the app the user dictates into in front, with its
+// caret. It always uses the dark tokens, whatever the appearance.
 //
 //	recording  148×48 (Voxt's compact card): the feature's icon and a
 //	           16-bar waveform; the recording's time when Overlay.ShowTime
@@ -30,8 +30,9 @@ package main
 // releasing a long press stops.
 //
 // The face is a translucent dark fill (Overlay.Opacity) over the window's
-// HUD material, which blurs what is behind it (mygo patch 0004), with a
-// white hairline and a small shadow the window leaves room for (layout.Pad).
+// HUD material, which blurs what is behind it (Window.SetVibrancyStyle),
+// with a white hairline and a small shadow the window leaves room for
+// (layout.Pad).
 // Its place comes from settings.Overlay: the top or bottom of the display
 // under the pointer, and the margin from that edge.
 
@@ -195,10 +196,10 @@ func (a *app) overlayModeNow() overlayMode {
 // the desktop around it takes clicks, or while the face moves to a new
 // size as its room (overlay_motion.go); it grows and shrinks about its
 // anchor (the bottom edge and the centre, or the top edge), the size and
-// the place set in one move: the material (patch 0004) follows it in the
-// same Core Animation transaction, and MyGo draws the new size's frame
-// before it commits (darwin/surface.go). The view state is the new face's
-// before the window changes, so that frame is the new face. A window that
+// the place set in one move: the material (SetVibrancyStyle) follows it in
+// the same Core Animation transaction, and MyGo draws the new size's frame
+// before it commits. The view state is the new face's before the window
+// changes, so that frame is the new face. A window that
 // shows again is first transparent, until its view built the new face
 // (reveal): no frame of the last face shows.
 func (a *app) overlaySync() {

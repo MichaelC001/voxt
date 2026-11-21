@@ -18,9 +18,10 @@ import (
 // control: Core Text spaces a bracket apart from a letter of another script
 // and, between runs of two fonts, the measured width left that room out
 // (AudioSmith research/mygo-coretext-truncation.md). MyGo 0.5.0 counts
-// that room (penAdvances); long lines still need third_party/mygo-patches
-// 0001. textFits tells whether a text keeps to one line at its own width,
-// the test of that.
+// that room (penAdvances), and 0.6.0 the long lines' float32 sums
+// (TestLayoutAtMeasuredWidth), which a patch of ours fixed until then.
+// textFits tells whether a text keeps to one line at its own width, the
+// test of that.
 
 // textFitSizes are the type scale's sizes and the weights views use.
 var (

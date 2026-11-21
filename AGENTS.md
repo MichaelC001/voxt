@@ -1,6 +1,6 @@
 # Working on VoxtMini
 
-VoxtMini is a macOS voice input app on local models, with remote models the user may choose instead (docs/remote-models.md): Go + MyGo (native UI, no cgo) and a small Swift helper. Speech recognition and voice activity detection come from sglang-omni's native MLX servers (`sglang_omni_mlx/native`), the language models from a Swift process of their own (mlx-swift-lm and a few GGUF models). It started as a copy of Auralink, the same author's app on remote models (NOTICE). Read [docs/architecture.md](docs/architecture.md) first, then [docs/plan.md](docs/plan.md) for the milestones; [docs/behavior.md](docs/behavior.md) compares its behaviour with Voxt's.
+VoxtMini is a macOS voice input app on local models, with remote models the user may choose instead (docs/remote-models.md): Go + MyGo (native UI, no cgo; ActNow's fork github.com/hehehai/mygo, go.mod's replace: changes to MyGo go there, never into this repository) and a small Swift helper. Speech recognition and voice activity detection come from sglang-omni's native MLX servers (`sglang_omni_mlx/native`), the language models from a Swift process of their own (mlx-swift-lm and a few GGUF models). It started as a copy of Auralink, the same author's app on remote models (NOTICE). Read [docs/architecture.md](docs/architecture.md) first, then [docs/plan.md](docs/plan.md) for the milestones; [docs/behavior.md](docs/behavior.md) compares its behaviour with Voxt's.
 
 This repository held Voxt (Swift) until the tag `voxt-final`; everything since is VoxtMini, and these rules apply to all of it.
 
@@ -47,7 +47,6 @@ MAC_DIR=code/VoxtMini-mt scripts/mac.sh scripts/mac-e2e.sh    # headless Mac tes
 MAC_DIR=code/VoxtMini-logsel scripts/mac.sh scripts/mac-logs-shots.sh  # the logs' selection worked with the real pointer and captured (only while nobody uses the Mac; VOXTMINI_SHOTS_DRY=1: the window only)
 MAC_DIR=code/VoxtMini-xyz scripts/mac.sh scripts/mac-regress.sh  # the real models ($HUB, ~/voxtmini-runtime): Swift tests, omni, LLM, quick eval, app smoke
 scripts/mac.sh 'VOXTMINI_EVAL=1 VOXTMINI_OMNI_RUNTIME=$HOME/voxtmini-runtime/omni VOXTMINI_LLM=$HOME/voxtmini-runtime/llm/voxtmini-llm go test -run TestEval -v ./app'  # the eval (docs/eval.md)
-scripts/vendor-mygo.sh --check                               # third_party/mygo is MyGo + our patches
 scripts/snapshots.sh check                                   # every snapshot, pixel for pixel, against the merge base
 go run ./internal/tools/declhash ./app ./internal/...            # a hash per declaration: equal before and after a pure move
 go vet -tags updatecheck ./app                                   # the update-check build

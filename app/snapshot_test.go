@@ -144,7 +144,7 @@ func snapshotsMain(t *testing.T, out string) {
 				save("settings-about-check")
 				a.checks = nil
 			}
-			if s.id == "general" { // a select's list (MyGo's popup: Theme.PanelRadius)
+			if s.id == "general" { // a select's list (MyGo's popup: Theme.PopupRadius)
 				tt.Click(i18n.T("Follow the system")) // the select, by its value
 				frames(tt)
 				save("settings-general-select")

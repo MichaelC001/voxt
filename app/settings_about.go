@@ -99,11 +99,16 @@ func (a *app) diagnosticsText() string {
 	return b.String()
 }
 
-// moduleVersion is a dependency's version from the build.
+// moduleVersion is a dependency's version from the build: that of the
+// module go.mod replaces it with, when it has one (MyGo: ActNow's fork,
+// v0.10.0-actnow.N).
 func moduleVersion(path string) string {
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, m := range bi.Deps {
 			if m.Path == path {
+				if m.Replace != nil && m.Replace.Version != "" {
+					return m.Replace.Version
+				}
 				return m.Version
 			}
 		}

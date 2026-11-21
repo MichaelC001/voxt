@@ -7,17 +7,18 @@ package main
 // drives MyGo's updater with no window, no data, no lock: it checks the
 // build's feed, installs what it finds (the delta of the running version
 // when there is one, else the archive), reads the version of the bundle on
-// disk afterwards, and starts the helper supervisor as the app does, which
-// must see the update (appbundle.Updated) and start no helper. It writes
-// what happened to <report.json> and quits. With --update-beta on it takes
-// betas (mygo.Updater.SetPrereleases), as Beta updates does; without it,
-// as the app does by default: betas when the running version is one.
-// Release builds do not have it.
+// disk afterwards (still the running one: the update is staged and
+// replaces the bundle once the process exits), and starts the helper
+// supervisor as the app does, which must see the update (appStale) and
+// start no helper. It writes what happened to <report.json> and quits; the
+// script then waits for the bundle to be replaced. With --update-beta on
+// it takes betas (mygo.Updater.SetPrereleases), as Beta updates does;
+// without it, as the app does by default: betas when the running version
+// is one. Release builds do not have it.
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"slices"
 	"time"
@@ -38,16 +39,16 @@ type updateCheckReport struct {
 	Enabled  bool   `json:"enabled"`  // Updater.Enabled
 	Found    string `json:"found"`    // the version Check found, "" when up to date
 	Notes    string `json:"notes"`    // its release notes
-	CheckErr string `json:"checkErr"` // Check's error
-	// NotPublished: Check's error is mygo.ErrNotPublished (no release on
-	// the channel yet), which the update window shows as up to date.
-	NotPublished bool `json:"notPublished"`
+	CheckErr string `json:"checkErr"` // Check's error (nothing on the channel yet is no error: up to date)
 	// Totals are the sizes the progress reported, one per download: the
 	// delta's alone, or the archive's (after the delta's when it failed).
 	Totals     []int64 `json:"totals"`
 	Downloaded int64   `json:"downloaded"`
 	InstallErr string  `json:"installErr"`
-	// After the install: the bundle on disk, and the supervisor's view.
+	// After the install: the update staged, the bundle on disk (the
+	// running version's until the process exits), and the supervisor's
+	// view.
+	Staged       bool   `json:"staged"`
 	DiskVersion  string `json:"diskVersion"`
 	Stale        bool   `json:"stale"`
 	HelperState  string `json:"helperState"`
@@ -68,7 +69,7 @@ func runUpdateCheck(out string) {
 	defer cancel()
 	up, err := mygo.Updater.Check(ctx)
 	if err != nil {
-		rep.CheckErr, rep.NotPublished = err.Error(), errors.Is(err, mygo.ErrNotPublished)
+		rep.CheckErr = err.Error()
 	}
 	if up != nil {
 		rep.Found, rep.Notes = up.Version, up.Notes
@@ -80,11 +81,14 @@ func runUpdateCheck(out string) {
 		})
 		if err != nil {
 			rep.InstallErr = err.Error()
+		} else {
+			updateStaged.Store(true) // as updater.OnInstalled does in the app
 		}
 	}
 	resources, _ := mygo.App.Path(mygo.PathResources)
+	rep.Staged = updateStaged.Load()
 	rep.DiskVersion, _ = appbundle.Version(resources)
-	stale := func() bool { return appbundle.Updated(resources, rep.Running) }
+	stale := func() bool { return appStale(resources, rep.Running) }
 	rep.Stale = stale()
 	if rep.Stale {
 		// As the app makes it (helperlink.go): it must start nothing.

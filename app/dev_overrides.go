@@ -7,7 +7,7 @@ package main
 // run its code, which would inherit VoxtMini's microphone and
 // Accessibility permissions without a prompt (docs/audit
 // security-privacy.md, M2). A published build is one `mygo build` linked
-// an update feed into (scripts/release-config.sh; MyGo patch 0009).
+// an update feed into (scripts/release-config.sh; mygo.Updater.Configured).
 
 import (
 	"log"

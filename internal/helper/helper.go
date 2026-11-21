@@ -82,8 +82,8 @@ const (
 	FailHandshake FailReason = "handshake" // helper.hello was not answered in time
 	FailCrashed   FailReason = "crashed"   // it exited without being asked to
 	FailStuck     FailReason = "stuck"     // killed because a cancelled job did not stop within the grace period
-	// FailUpdated: an update replaced the app on disk and the app has not
-	// restarted (Config.Stale); the helper there is the new version's, so
+	// FailUpdated: an update replaced the app on disk, or is staged to,
+	// and the app has not restarted (Config.Stale); the helper there is the new version's, so
 	// it is not started (or, speaking another protocol, not restarted)
 	// until the app restarts.
 	FailUpdated FailReason = "updated"
@@ -156,8 +156,8 @@ type Config struct {
 	Env  []string
 	Logf func(format string, args ...any) // supervisor diagnostics; default log.Printf
 	// Stale reports that the app on disk is no longer the one running: an
-	// update replaced the bundle, Bin included, and the app has not
-	// restarted. The supervisor then starts no helper (FailUpdated, no
+	// update replaced the bundle, Bin included, or is staged to replace it
+	// as the app exits, and the app has not restarted. The supervisor then starts no helper (FailUpdated, no
 	// restart): the new version's helper belongs to the new app. It is
 	// asked before each start and when a helper speaks another protocol;
 	// it may read the disk. nil: never.
