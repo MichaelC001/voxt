@@ -49,6 +49,12 @@ func main() {
 		logsCheck(dir)
 		return
 	}
+	// The README's screenshots of -tags readmeshots builds
+	// (readme_shots.go): the same, with made-up data.
+	if dir := argAfter("--readme-shots"); dir != "" && readmeShots != nil {
+		readmeShots(dir)
+		return
+	}
 	// The packaged app's smoke run (smoke.go, scripts/mac-regress.sh): its
 	// own data, no window, no lock.
 	if dir := argAfter("--smoke"); dir != "" {

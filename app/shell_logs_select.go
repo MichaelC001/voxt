@@ -270,3 +270,8 @@ func (a *app) logRowMenu(c *ui.Context, row ui.Element, e core.LogEntry, lines [
 // logsCheck is the logs' screenshot run of -tags logscheck builds
 // (logs_check.go, scripts/mac-logs-shots.sh); nil in the others.
 var logsCheck func(dir string)
+
+// readmeShots is the README's screenshot run of -tags readmeshots builds
+// (readme_shots.go, scripts/readme-shots/mac-shots.sh); nil in the
+// others.
+var readmeShots func(dir string)

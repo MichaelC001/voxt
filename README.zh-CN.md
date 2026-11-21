@@ -14,7 +14,7 @@
 [![][license-shield]][license-link]
 [![][release-date-shield]][release-date-link]
 
-<img width="1642" height="1098" alt="VoxtMini 的模型页：在 Mac 本机运行的语音模型" src="docs/images/models-zh.webp" />
+<img width="1600" height="1037" alt="Mac 上的 VoxtMini：历史页，一条结果连同录音，下面是追问" src="docs/images/history-zh.webp" />
 
 </div>
 
@@ -28,18 +28,16 @@
 - 边说边显示文字，可以再由语言模型整理（去掉口头语，补上标点）
 - 可以设一个结束词（“over”“完毕”“以上”），说完就停止录音
 
-<!-- Placeholder: Voxt's demo video. -->
 <p align="center">
-  <video src="https://github.com/user-attachments/assets/75f08906-3e69-4ab5-9b29-f5c3745cebac" width="500px"></video>
+  <img width="720" alt="转录：录音浮窗边说边显示文字，下面是一个笔记窗口" src="docs/images/transcribe-zh.webp" />
 </p>
 
 **翻译，译成英文、中文或日文**
 
 - 翻译说的话，或者选中文字按快捷键翻译
 
-<!-- Placeholder: Voxt's demo video. -->
 <p align="center">
-  <video src="https://github.com/user-attachments/assets/e69c2737-5d8c-4bd6-9f5b-1123947c7e39" width="500px"></video>
+  <img width="720" alt="翻译：选中的中文在答案卡片里译成英文" src="docs/images/translate-zh.webp" />
 </p>
 
 **转写，说出你要什么**
@@ -47,11 +45,20 @@
 - 选中文字，说一句怎么改（“短一点”“正式一点”），或者让它写新内容
 - 在答案卡片里继续追问（按空格开始）
 
+<p align="center">
+  <img width="720" alt="转写：按口述要求写一条消息，再追问一句改短" src="docs/images/rewrite-zh.webp" />
+</p>
+
 **应用增强**：把 App 和网站分组，每组有自己的提示词和插入后的按键（聊天时口语一些，插入后按回车发送）。
 
 **词典**：人名和术语听得准、照你的写法输出；支持分类、使用次数、按分组生效。
 
 **历史**：每条结果连同录音（可选）：播放、重试、继续提问。
+
+<p align="center">
+  <img width="49%" alt="模型：语音模型，已安装或可下载，本地或远程" src="docs/images/models-zh.webp" />
+  <img width="49%" alt="词典：按分类列出的词条，可能被听成的写法和使用次数" src="docs/images/dictionary-zh.webp" />
+</p>
 
 中文结果一律是简体字；日文不做任何改动。
 
