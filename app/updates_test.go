@@ -17,9 +17,9 @@ import (
 // itself, checked two hours ago, automatic checks on and automatic
 // installs off (the plugin's defaults).
 type fakeUpdates struct {
-	mu      sync.Mutex
-	prefs   updatePrefs
-	pre     bool // SetPrereleases
+	mu       sync.Mutex
+	prefs    updatePrefs
+	pre      bool // SetPrereleases
 	checks   int
 	changes  []*func()
 	installs []func()
