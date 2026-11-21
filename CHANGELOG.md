@@ -7,14 +7,14 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 ### Changed
 
 - Models and Settings → Storage: models other ActNow apps use too say “Shared across ActNow” instead of naming the apps.
-- App framework updated to ActNow's v0.10.0-actnow.3 (based on upstream 0.10.0).
+- App framework updated to ActNow's v0.10.0-actnow.4 (based on upstream 0.10.0).
 
 ### 中文
 
 #### 变更
 
 - 模型和 设置 → 存储：其他 ActNow App 也在用的模型显示“ActNow 共用”，不再列出这些 App 的名字。
-- 应用框架换成 ActNow 维护的 v0.10.0-actnow.3（基于上游 0.10.0）。
+- 应用框架换成 ActNow 维护的 v0.10.0-actnow.4（基于上游 0.10.0）。
 
 ## [0.1.0-beta.8] - 2026-11-17
 
