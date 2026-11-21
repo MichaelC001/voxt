@@ -76,7 +76,8 @@ dmg="$(compgen -G "$dir/*.dmg" | head -1 || true)"
 ((want_dmg)) && check "a disk image" test -n "$dmg"
 
 # The code among the resources: the helper, the Omni server and MLX's
-# libraries, voxtmini-llm and llama.framework; and MyGo's in Frameworks. mygo signs them one by one
+# libraries, voxtmini-llm, llama.framework and MyGo's SQLite library
+# (libSqlitecore.dylib). mygo signs them one by one
 # (codesign --deep does not reach Resources), the frameworks after their
 # contents.
 code=("$app")
@@ -86,10 +87,7 @@ while IFS= read -r -d '' f; do
   fi
 done < <(find "$res" -type f \( -perm -u+x -o -name '*.dylib' \) -not -path '*.framework/*' -print0)
 while IFS= read -r -d '' f; do code+=("$f"); done < <(find "$res" -type d -name '*.framework' -print0)
-# MyGo's native libraries (the store's SQLite, libSqlitecore.dylib) are in
-# Contents/Frameworks.
-while IFS= read -r -d '' f; do code+=("$f"); done < <(find "$app/Contents/Frameworks" -maxdepth 1 -type f -name '*.dylib' -print0 2>/dev/null)
-check "the store's SQLite library (Frameworks/libSqlitecore.dylib)" test -f "$app/Contents/Frameworks/libSqlitecore.dylib"
+check "the store's SQLite library (Resources/libSqlitecore.dylib)" test -f "$res/libSqlitecore.dylib"
 echo "code inside: ${#code[@]} (app, executables, libraries, frameworks)"
 if ((want_runtimes)); then
   server="$res/omni/bin/qwen3_asr_server"
