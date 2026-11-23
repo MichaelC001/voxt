@@ -7,7 +7,7 @@
 #   scripts/mac.sh go test ./internal/permission
 #   scripts/mac.sh --pull build/darwin-arm64   # copy a path back
 #
-# MAC_HOST (default mac-air) and MAC_DIR (default code/VoxtMini) pick the
+# MAC_HOST (default mac-mini; mac-air is the spare) and MAC_DIR (default code/VoxtMini) pick the
 # target; MAC_GOPROXY its Go module proxy (proxy.golang.org times out there).
 #
 # ACTNOW_INGEST_TOKEN, when set here, reaches the command's environment
@@ -20,7 +20,7 @@
 # The command then reads an empty standard input.
 set -euo pipefail
 
-HOST="${MAC_HOST:-mac-air}"
+HOST="${MAC_HOST:-mac-mini}"
 GOPROXY_MAC="${MAC_GOPROXY:-https://goproxy.cn,direct}"
 DIR="${MAC_DIR:-code/VoxtMini}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

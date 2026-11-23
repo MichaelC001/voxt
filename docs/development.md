@@ -18,7 +18,7 @@ The helper and `voxtmini-llm` must be built before `go tool mygo build` or `mygo
 
 **The release build** is one command, on the Mac: `scripts/release.sh` builds the three, packages and signs the app, and checks the result (`--runtimes DIR` takes prebuilt runtimes; with the ActNow apps' Developer ID, `--notarize` and `--publish` notarise it and publish it on actnow.dev; over ssh it runs through `scripts/mac-gui.sh`). See [release.md](release.md).
 
-From Linux, `scripts/mac.sh <command>` mirrors the project to a Mac over ssh (`MAC_HOST`, an ssh host name; `MAC_DIR`, default `code/VoxtMini`) and runs the command there: `scripts/mac.sh 'scripts/build-helper.sh && scripts/build-llm.sh && go tool mygo build'`.
+From Linux, `scripts/mac.sh <command>` mirrors the project to a Mac over ssh (`MAC_HOST`, an ssh host name, default `mac-mini`, `mac-air` the spare; `MAC_DIR`, default `code/VoxtMini`) and runs the command there: `scripts/mac.sh 'scripts/build-helper.sh && scripts/build-llm.sh && go tool mygo build'`.
 
 ## Signing during development
 
