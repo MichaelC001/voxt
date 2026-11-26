@@ -121,6 +121,7 @@ type Store struct {
 	documents  *documentRepo
 	history    *historyRepo
 	dictionary *dictionaryRepo
+	mcpCalls   *mcpCallRepo
 }
 
 var _ store.Store = (*Store)(nil)
@@ -177,6 +178,7 @@ func Open(ctx context.Context, dir string) (*Store, error) {
 	s.documents = &documentRepo{db: db}
 	s.history = &historyRepo{db: db, dir: filepath.Join(dir, audioDir)}
 	s.dictionary = &dictionaryRepo{db: db}
+	s.mcpCalls = &mcpCallRepo{db: db}
 	return s, nil
 }
 
@@ -249,6 +251,7 @@ func (s *Store) Dir() string { return s.dir }
 func (s *Store) Documents() store.Documents   { return s.documents }
 func (s *Store) History() store.History       { return s.history }
 func (s *Store) Dictionary() store.Dictionary { return s.dictionary }
+func (s *Store) MCPCalls() store.MCPCalls     { return s.mcpCalls }
 
 // Close closes the database; operations in flight are cancelled.
 func (s *Store) Close() error { return s.db.Close() }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/hehehai/VoxtMini/internal/asr"
 	"github.com/hehehai/VoxtMini/internal/dsp"
+	"github.com/hehehai/VoxtMini/internal/helper/proto"
 	"github.com/hehehai/VoxtMini/internal/vad"
 )
 
@@ -39,8 +40,25 @@ func (r *run) onAudio(ev AudioEvent) {
 		}
 	case ev.Started != nil:
 		st, at := ev.Started, r.now()
+		if r.req.DeviceOverride != nil && r.req.DeviceOverride.FailMode() && st.FellBack {
+			reason := st.FallbackReason
+			if reason == "" {
+				reason = "fell back to another microphone"
+			}
+			r.setFallbackErr(&proto.Error{
+				Code:    proto.CodeDeviceUnavailable,
+				Message: fmt.Sprintf("microphone %q unavailable: %s", r.req.DeviceOverride.Query, reason),
+			})
+			r.m.update(r, func(s *Snapshot) {
+				s.DeviceID, s.Device, s.FellBack = st.Device, st.DeviceName, st.FellBack
+			})
+			if r.capCancel != nil {
+				r.capCancel()
+			}
+			return
+		}
 		r.m.update(r, func(s *Snapshot) {
-			s.HeardAt, s.Device, s.FellBack = at, st.DeviceName, st.FellBack
+			s.HeardAt, s.DeviceID, s.Device, s.FellBack = at, st.Device, st.DeviceName, st.FellBack
 			s.Waiting = r.waitOf(s)
 		})
 		r.heardAudio()

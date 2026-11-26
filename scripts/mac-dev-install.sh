@@ -63,7 +63,7 @@ run() {
 }
 
 cleanup() {
-  run rm -rf build "$RES/llm" "$RES/omni" helper/.build "$NEW" "$OLD"
+  run rm -rf build "$RES/llm" "$RES/omni" "$RES/ctl" helper/.build "$NEW" "$OLD"
 }
 finish() {
   local status=$?
@@ -111,6 +111,9 @@ run cp -Rc "$RUNTIMES/omni/bin" "$RES/omni/bin"
 
 echo "== helper"
 run scripts/build-helper.sh
+
+echo "== voxtmini-ctl"
+run scripts/build-ctl.sh
 
 echo "== app"
 run go tool mygo build -platform darwin/arm64 -skip-dmg

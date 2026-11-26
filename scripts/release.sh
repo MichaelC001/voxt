@@ -158,6 +158,8 @@ trap restore EXIT
 
 echo "== helper"
 VOXTMINI_SIGN_IDENTITY="${IDENTITY:--}" scripts/build-helper.sh
+echo "== voxtmini-ctl"
+VOXTMINI_SIGN_IDENTITY="${IDENTITY:--}" scripts/build-ctl.sh
 if [[ -n "$RUNTIMES" ]]; then
   echo "== runtimes from $RUNTIMES"
   for part in omni llm; do
@@ -173,6 +175,7 @@ else
   echo "== voxtmini-llm"
   VOXTMINI_SIGN_IDENTITY="${IDENTITY:--}" scripts/build-llm.sh
 fi
+[[ -x "$RES/ctl/voxtmini-ctl" ]] || { echo "no voxtmini-ctl in $RES/ctl" >&2; exit 1; }
 [[ -x "$RES/omni/bin/qwen3_asr_server" && -x "$RES/omni/bin/whisper_server" ]] || { echo "no Omni runtime (with whisper_server) in $RES/omni" >&2; exit 1; }
 [[ -x "$RES/llm/voxtmini-llm" ]] || { echo "no voxtmini-llm in $RES/llm" >&2; exit 1; }
 

@@ -97,6 +97,8 @@ func main() {
 	h := newHelperHost(resources, logDir)         // helperlink.go
 	a := newApp(lib, h)                           // app.go
 	a.dataHome = home                             // settings_storage.go
+	a.cacheDir = cacheDir                         // integrations_link.go
+	a.resourcesDir = resources                    // integrations_link.go
 	a.openIcons(cacheDir)                         // appicons.go
 	a.muteJournal = outputJournal(home, cacheDir) // mute_link.go
 	a.connectShell(logDir, crash)                 // shell.go
@@ -104,6 +106,7 @@ func main() {
 	a.tellCrash(crash)                            // crash_report.go: the last run crashed
 	logIgnoredOverrides()                         // dev_overrides.go
 	a.connectHelper()                             // helperlink.go
+	a.openIntegrations()                          // integrations_link.go
 	// Updates (updates.go): the update window in native UI, in the
 	// language VoxtMini shows (App.Locale), checking once a day; what a
 	// daily check finds shows as a card at the foot of the sidebar

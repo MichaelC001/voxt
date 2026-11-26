@@ -36,30 +36,38 @@ type settingsState struct {
 type settingsForm struct {
 	systemLocale string // mygo.App.Locale(), read when the window opens
 
-	language     string // label
-	mainLanguage string // label
-	theme        int
-	scale        int
-	reduceMotion bool
-	menuBar      bool
-	closeToTray  bool
-	showInDock   bool
-	openAtLogin  bool
-	keepResult   bool   // !General.RestoreClipboard
-	escCancels   bool   // !Features.EscapeOff (settings_shortcuts.go)
-	endCommand   bool   // Features.EndCommand.On
-	endChoice    string // the end word's select: a word, or Custom…
-	endWord      string // the typed word
-	endCustom    bool   // the word is typed, not one of session.EndWords
-	keepHistory  bool
-	keepAudio    bool
-	logText      bool
-	sounds       bool
-	skipSilence  bool        // !Audio.VAD.Off
-	cleanSound   bool        // !Audio.Clean.Off
-	muteOutput   bool        // Audio.MuteOn()
-	sidebar      int         // automatic, names and icons, icons only (settings_appearance.go)
-	ovStyle      overlayForm // settings_overlay.go
+	language        string // label
+	mainLanguage    string // label
+	theme           int
+	scale           int
+	reduceMotion    bool
+	menuBar         bool
+	closeToTray     bool
+	showInDock      bool
+	openAtLogin     bool
+	keepResult      bool   // !General.RestoreClipboard
+	escCancels      bool   // !Features.EscapeOff (settings_shortcuts.go)
+	endCommand      bool   // Features.EndCommand.On
+	endChoice       string // the end word's select: a word, or Custom…
+	endWord         string // the typed word
+	endCustom       bool   // the word is typed, not one of session.EndWords
+	keepHistory     bool
+	keepAudio       bool
+	logText         bool
+	mcpEnabled      bool
+	mcpRead         bool
+	mcpManage       bool
+	mcpLocalModels  bool
+	mcpRemoteModels bool
+	mcpTrigger      bool
+	triggerEnabled  bool
+	triggerAllowURL bool
+	sounds          bool
+	skipSilence     bool        // !Audio.VAD.Off
+	cleanSound      bool        // !Audio.Clean.Off
+	muteOutput      bool        // Audio.MuteOn()
+	sidebar         int         // automatic, names and icons, icons only (settings_appearance.go)
+	ovStyle         overlayForm // settings_overlay.go
 	// The pages' Advanced folds are open (closed at launch, kept while
 	// VoxtMini runs).
 	audioAdvanced, appearanceAdvanced bool
@@ -85,6 +93,7 @@ func settingsSections() []settingsSection {
 		{"shortcuts", i18n.T("Shortcuts"), "Shortcuts hotkeys keys fn"},
 		{"appearance", i18n.T("Appearance"), "Appearance theme size sidebar"},
 		{"privacy", i18n.T("Privacy"), "Privacy history audio logs"},
+		{"integrations", i18n.T("Integrations"), "Integrations mcp trigger cli url external"},
 		{"storage", i18n.T("Storage"), "Storage disk data folder reset"},
 		{"feedback", i18n.T("Feedback"), "Feedback bug report support contact"},
 		// "About" in English: "Diagnostics and about" does not fit the
@@ -115,6 +124,8 @@ func settingsSectionIcon(id string) icons.Icon {
 		return icons.Pallete2
 	case "privacy":
 		return icons.ShieldCheck
+	case "integrations":
+		return icons.Widget2
 	case "storage":
 		return icons.Database
 	case "feedback":
@@ -183,6 +194,9 @@ func (a *app) settingsChanged(old, new settings.Settings) {
 	if !reflect.DeepEqual(old.Models.Params, new.Models.Params) {
 		a.applyModelParams(new.Models) // models_settings.go
 	}
+	if !reflect.DeepEqual(old.MCP, new.MCP) || !reflect.DeepEqual(old.Trigger, new.Trigger) {
+		a.syncIntegrations() // integrations_link.go
+	}
 	a.historySettingsChanged(old, new) // history_settings_ops.go
 	// The problems' cards: the language of their text may have changed
 	// (shell_notices.go).
@@ -241,6 +255,14 @@ func (a *app) loadSettingsForm() {
 	f.keepResult = !s.General.RestoreClipboard
 	a.loadRecordingForm() // settings_recording.go
 	f.keepHistory, f.keepAudio, f.logText = s.Privacy.KeepHistory, s.Privacy.KeepAudio, s.Privacy.LogText
+	f.mcpEnabled = s.MCP.Enabled
+	f.mcpRead = s.MCP.Enabled
+	f.mcpManage = s.MCP.AllowManage
+	f.mcpLocalModels = s.MCP.AllowLocalModels
+	f.mcpRemoteModels = s.MCP.AllowRemoteModels
+	f.mcpTrigger = s.MCP.AllowTrigger
+	f.triggerEnabled = s.Trigger.Enabled
+	f.triggerAllowURL = s.Trigger.AllowURLOn()
 	f.sounds = s.Audio.Sounds
 	f.skipSilence = !s.Audio.VAD.Off
 	f.cleanSound = !s.Audio.Clean.Off
@@ -286,6 +308,10 @@ func (a *app) settingsShown(sub string) {
 		a.recheckPermissions() // permissions.go
 	case "/audio":
 		a.loadDevices() // settings_audio.go
+	case "/integrations":
+		a.loadDevices() // settings_integrations.go
+		a.refreshMCPStatus()
+		a.loadMCPSetup()
 	}
 }
 
@@ -413,16 +439,17 @@ func settingsDialogSize(t *ui.Theme, w, h float32) (dw, dh float32) {
 // settingsSection builds the section of the settings dialog r shows.
 func (a *app) settingsSection(c *ui.Context, r *ui.Route) {
 	sections := map[string]func(*ui.Context){
-		"general":     a.generalSettings,
-		"permissions": a.permissionsSettings, // permissions.go
-		"audio":       a.audioSettings,       // settings_audio.go
-		"overlay":     a.overlaySettings,     // settings_overlay.go
-		"shortcuts":   a.shortcutsSettings,   // settings_shortcuts.go
-		"appearance":  a.appearanceSettings,
-		"privacy":     a.privacySettings, // settings_privacy.go
-		"storage":     a.storageSettings, // settings_storage.go
-		"feedback":    a.feedbackSection, // feedback_view.go
-		"about":       a.aboutSettings,   // settings_about.go
+		"general":      a.generalSettings,
+		"permissions":  a.permissionsSettings, // permissions.go
+		"audio":        a.audioSettings,       // settings_audio.go
+		"overlay":      a.overlaySettings,     // settings_overlay.go
+		"shortcuts":    a.shortcutsSettings,   // settings_shortcuts.go
+		"appearance":   a.appearanceSettings,
+		"privacy":      a.privacySettings,      // settings_privacy.go
+		"integrations": a.integrationsSettings, // settings_integrations.go
+		"storage":      a.storageSettings,      // settings_storage.go
+		"feedback":     a.feedbackSection,      // feedback_view.go
+		"about":        a.aboutSettings,        // settings_about.go
 	}
 	for _, s := range settingsSections() {
 		if r.Match("/" + s.id) {

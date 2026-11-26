@@ -119,7 +119,7 @@ func Resolve(def string) (string, error) {
 func SkipData(rel string, db bool) bool {
 	top := strings.SplitN(filepath.ToSlash(rel), "/", 2)[0]
 	switch top {
-	case LocationFile, MoveFile, ResetFile, LocationFile + ".tmp", MoveFile + ".tmp":
+	case LocationFile, MoveFile, ResetFile, LocationFile + ".tmp", MoveFile + ".tmp", "run":
 		return true
 	}
 	return db && strings.HasPrefix(top, sqlitestore.FileName)

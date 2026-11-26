@@ -384,6 +384,10 @@ func (a *app) openURL(raw string) {
 		path = "/" + u.Host + u.Path
 	}
 	path = "/" + strings.Trim(path, "/")
+	if path == "/trigger" || strings.HasPrefix(path, "/trigger/") {
+		a.handleTriggerURL(raw)
+		return
+	}
 	if to, ok := movedPaths[path]; ok {
 		path = to
 	}

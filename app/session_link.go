@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/transfer"
 	"github.com/hehehai/VoxtMini/internal/compose"
 	"github.com/hehehai/VoxtMini/internal/core"
 	"github.com/hehehai/VoxtMini/internal/helper/proto"
@@ -134,7 +135,14 @@ func (a *app) openSessions() {
 	st := a.settings
 	a.mgr = session.New(session.Config{
 		Audio:   session.HelperAudio{H: sup},
+		Devices: session.HelperAudio{H: sup},
 		Text:    a.textIO(), // family_runtime.go: the family's paste rule
+		Copy: func(s string) error {
+			if a.copyText != nil {
+				return a.copyText(s)
+			}
+			return mygo.Clipboard.Write(transfer.TextData(s))
+		},
 		Select:  session.HelperText{H: sup},
 		Resolve: resolver(lm),
 		History: lib.store.History(),
@@ -230,6 +238,9 @@ func (a *app) sessionChanged(s session.Snapshot) {
 	}
 	was := a.sess
 	a.sess = s
+	if a.triggerSvc != nil {
+		a.triggerSvc.Notify(s)
+	}
 	for _, fn := range a.onSession { // events.go: the setup guide, the sounds
 		fn(was, s)
 	}

@@ -30,6 +30,7 @@ type Store interface {
 	Documents() Documents
 	History() History
 	Dictionary() Dictionary
+	MCPCalls() MCPCalls
 	Close() error
 }
 
@@ -269,4 +270,36 @@ type Dictionary interface {
 	// DeleteCategory deletes a category and moves its terms to the
 	// default one, at once.
 	DeleteCategory(ctx context.Context, id string) error
+}
+
+// MCPCall is one audited MCP tool call or refused connection.
+// It never stores user text, audio content, prompts, or API keys.
+type MCPCall struct {
+	ID         int64
+	At         time.Time
+	ClientKey  string
+	ClientName string
+	Tool       string
+	Scope      string
+	Count      int
+	Result     string // "ok", "refused", or error code
+	DurationMS int64
+	Bytes      int
+}
+
+// MCPCallQuery filters audited MCP calls.
+type MCPCallQuery struct {
+	ClientKey string
+	Tool      string
+	Result    string
+	Limit     int
+	Offset    int
+}
+
+// MCPCalls stores the content-free MCP audit log (retaining at most 30 days
+// or 5000 rows).
+type MCPCalls interface {
+	Record(ctx context.Context, c MCPCall) error
+	List(ctx context.Context, q MCPCallQuery) ([]MCPCall, error)
+	Clear(ctx context.Context) error
 }

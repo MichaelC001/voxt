@@ -76,7 +76,7 @@ create() {
   openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$NAME" \
     -addext "keyUsage=critical,digitalSignature" -addext "extendedKeyUsage=critical,codeSigning" \
     -addext "basicConstraints=critical,CA:false" -keyout "$work/key.pem" -out "$work/cert.pem" 2>/dev/null
-  openssl version | grep -q '^OpenSSL 3' && legacy=(-legacy)
+  openssl version | grep -qE '^OpenSSL [3-9]' && legacy=(-legacy)
   openssl pkcs12 -export ${legacy[@]+"${legacy[@]}"} -inkey "$work/key.pem" -in "$work/cert.pem" \
     -name "$NAME" -out "$work/id.p12" -passout "pass:$pass"
   security create-keychain -p "$pass" "$KC"

@@ -173,8 +173,9 @@ type Snapshot struct {
 	// longer than Config.WaitNote (wait.go): the microphone's first audio,
 	// or the speech model, still starting. The pill says so.
 	Waiting Wait
-	// Device is the input that records, FellBack whether it was not the
-	// first choice.
+	// Device is the input that records (DeviceID its Core Audio UID),
+	// FellBack whether it was not the first choice.
+	DeviceID string
 	Device   string
 	FellBack bool
 	// Partial is a streaming speech model's text so far; Raw the final
@@ -295,7 +296,9 @@ type Selector interface {
 // Config is what a Manager needs. Audio, Text and Resolve are required.
 type Config struct {
 	Audio   Audio
+	Devices Devices // optional: capture.devices lookup for StartRequest.DeviceOverride
 	Text    deliver.TextIO
+	Copy    func(string) error // optional: clipboard-only delivery (StartRequest.Clipboard)
 	Resolve Resolver
 	// Select reads the selection (nil: Translate and Rewrite never see
 	// one).
@@ -366,6 +369,9 @@ type Config struct {
 	// first audio before it fails (ProblemMicStart); not while macOS asks
 	// for the microphone (DefaultMicStartLimit).
 	MicStartLimit time.Duration
+	// DevicePoll is the polling interval while waiting for an overridden
+	// device to appear (0: default 150ms).
+	DevicePoll time.Duration
 }
 
 // Defaults of Config's limits.
@@ -412,6 +418,12 @@ type StartRequest struct {
 	// card's text into another language (Voxt's language menu replaces
 	// the card's answer).
 	Card bool
+	// Clipboard puts the result on the clipboard without inserting or
+	// opening the answer card (external trigger deliver=clipboard).
+	Clipboard bool
+	// DeviceOverride selects a microphone for this session only without
+	// changing settings.Audio.Devices.
+	DeviceOverride *DeviceOverride
 	// Previous are a Rewrite conversation's earlier turns: the session is
 	// a follow-up to the answer card.
 	Previous []compose.Turn

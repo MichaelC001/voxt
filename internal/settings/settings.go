@@ -46,6 +46,8 @@ type Settings struct {
 	// Providers are the remote services set up on the Remote models page;
 	// their keys are in the Keychain as "asr.<id>" and "llm.<id>".
 	Providers Providers `json:"providers,omitzero"` // providers.go
+	MCP       MCP       `json:"mcp,omitzero"`       // integrations.go
+	Trigger   Trigger   `json:"trigger,omitzero"`   // integrations.go
 }
 
 // General: languages and how the app stays around.

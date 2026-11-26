@@ -58,6 +58,11 @@ func (h HelperAudio) Stop(ctx context.Context, id string) error {
 	return err
 }
 
+func (h HelperAudio) Devices(ctx context.Context) ([]proto.CaptureDevice, error) {
+	res, err := call[proto.DevicesResult](ctx, h.H, proto.MethodCaptureDevices, nil)
+	return res.Devices, err
+}
+
 // HelperText is the text I/O of the app in front through the helper
 // (textio.*, app.frontmost); it is a deliver.TextIO.
 type HelperText struct{ H Caller }

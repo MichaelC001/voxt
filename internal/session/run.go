@@ -70,6 +70,25 @@ type run struct {
 	// endw watches the recording for the voice end command (endcmd.go);
 	// nil when it is off. Set before the recording starts.
 	endw *endWatch
+	// capCancel cancels the capture job; fallbackMu/fallbackErr record an
+	// abort when DeviceOverride is in fail mode and capture fell back.
+	capCancel   context.CancelFunc
+	fallbackMu  sync.Mutex
+	fallbackErr error
+}
+
+func (r *run) setFallbackErr(err error) {
+	r.fallbackMu.Lock()
+	if r.fallbackErr == nil {
+		r.fallbackErr = err
+	}
+	r.fallbackMu.Unlock()
+}
+
+func (r *run) getFallbackErr() error {
+	r.fallbackMu.Lock()
+	defer r.fallbackMu.Unlock()
+	return r.fallbackErr
 }
 
 type capResult struct {
@@ -226,6 +245,13 @@ func (r *run) finish(st State, problem *Problem, result string, o finishOpts) {
 	var dres deliver.Result
 	switch {
 	case result == "" || r.req.Try:
+	case r.req.Clipboard:
+		if cfg.Copy != nil {
+			if err := cfg.Copy(deliver.Sanitize(result)); err != nil {
+				r.logf("warning", "copy to clipboard: %v", err)
+			}
+		}
+		dres.Reason = deliver.ReasonNone
 	case o.card != "":
 		dres.Reason = o.card
 		r.m.update(r, func(s *Snapshot) { s.Result, s.Card = result, true })
@@ -263,7 +289,7 @@ func (r *run) finish(st State, problem *Problem, result string, o finishOpts) {
 		if dres.Inserted {
 			s.InsertedInto = dres.To
 		}
-		s.Card = result != "" && !r.req.Try && !dres.Inserted
+		s.Card = result != "" && !r.req.Try && !dres.Inserted && !r.req.Clipboard
 		s.Delivery = dres.Reason
 		s.Timings.Deliver, s.Timings.Total = dres.Elapsed, total
 	}, func(s Snapshot) {
@@ -368,6 +394,8 @@ func (r *run) keep(s Snapshot, status store.Status) {
 		if to := s.InsertedInto; to.PID != 0 && to.PID != s.Target.PID {
 			e.InsertedBundle, e.InsertedName = to.BundleID, to.Name // where it went; the app and the rule stay the start app's
 		}
+	case r.req.Clipboard:
+		e.Delivery = "copy"
 	case s.Card:
 		e.Delivery = "card"
 	}

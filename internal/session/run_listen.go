@@ -82,6 +82,7 @@ func (r *run) listen() (string, bool) {
 	cfg := r.m.cfg
 	// The recording, at once: the user is speaking already.
 	capCtx, capCancel := context.WithCancel(r.ctx)
+	r.capCancel = capCancel
 	defer capCancel()
 	capDone := make(chan capResult, 1)
 	if ec := r.settings.Features.EndCommand; ec.On {
@@ -92,8 +93,26 @@ func (r *run) listen() (string, bool) {
 		})
 	}
 	go func() {
-		params := proto.CaptureParams{Devices: r.settings.Audio.Devices, SampleRate: asr.SampleRate, MaxSeconds: cfg.MaxRecording.Seconds()}
+		devices := r.settings.Audio.Devices
+		if r.req.DeviceOverride != nil {
+			resolved, matched, err := resolveDeviceOverride(capCtx, cfg.Devices, r.req.DeviceOverride, devices, cfg.devicePollInterval())
+			if err != nil {
+				r.pcm.close()
+				capDone <- capResult{err: err}
+				return
+			}
+			devices = resolved
+			if matched.ID != "" {
+				r.logf("info", "device override %q matched %s (%s)", r.req.DeviceOverride.Query, matched.Name, matched.ID)
+			} else {
+				r.logf("warning", "device override %q not found; falling back to configured devices", r.req.DeviceOverride.Query)
+			}
+		}
+		params := proto.CaptureParams{Devices: devices, SampleRate: asr.SampleRate, MaxSeconds: cfg.MaxRecording.Seconds()}
 		res, err := cfg.Audio.Record(capCtx, r.id, params, r.onAudio)
+		if fbErr := r.getFallbackErr(); fbErr != nil {
+			err = fbErr
+		}
 		r.pcm.close()
 		capDone <- capResult{res, err}
 	}()

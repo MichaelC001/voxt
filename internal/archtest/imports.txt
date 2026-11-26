@@ -120,3 +120,8 @@ procio core
 omni knobs
 llmrt knobs
 apple knobs
+trigger ctlbridge
+trigger helper/proto
+trigger session
+trigger settings
+trigger store

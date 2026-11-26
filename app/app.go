@@ -79,6 +79,7 @@ type app struct {
 	updateState
 	crashState
 	announceState
+	integrationsState
 }
 
 func newApp(lib *library, h *helperHost) *app {
@@ -126,8 +127,9 @@ func (a *app) toast(msg string) {
 // quit releases what the app holds; it runs in App.OnQuit, before the
 // library closes.
 func (a *app) quit() {
-	a.closeSessions() // session_link.go
-	a.closeOverlay()  // overlay.go
+	a.closeIntegrations() // integrations_link.go
+	a.closeSessions()     // session_link.go
+	a.closeOverlay()      // overlay.go
 	a.closeTray()
 	a.closeMute() // mute_link.go: the output back before the helper goes
 	a.stopHelper()

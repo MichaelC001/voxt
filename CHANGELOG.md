@@ -4,12 +4,22 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.0-beta.9] - 2026-11-26
+
+### Added
+
+- **MCP server & External trigger** (**Settings → Integrations**, off by default): local Unix-socket MCP server (`voxtmini-ctl mcp`) with granular permissions (read, manage dictionary/history/rules, local/remote models, trigger sessions), in-app approval prompts, SQLite audit records, one-click setup for Codex / Claude / Cursor / WorkBuddy and embedded `SKILL.md`; plus external trigger via `voxtmini://trigger/*` URLs or `voxtmini-ctl trigger` with per-session microphone selection.
+
 ### Changed
 
 - Models and Settings → Storage: models other ActNow apps use too say “Shared across ActNow” instead of naming the apps.
 - App framework updated to ActNow's v0.10.0-actnow.4 (based on upstream 0.10.0).
 
 ### 中文
+
+#### 新增
+
+- **MCP 服务与外部触发**（**设置 → 开发与集成**，默认关闭）：提供本机 Unix 套接字 MCP 服务（`voxtmini-ctl mcp`），支持分级权限（只读、管理词典/历史/规则、调用本地/远程模型、触发录音会话）、应用内授权确认弹窗、SQLite 审计记录、Codex / Claude / Cursor / WorkBuddy 一键配置与内置 `SKILL.md`；同时支持通过 `voxtmini://trigger/*` 链接或 `voxtmini-ctl trigger` 外部触发录音并指定本次会话使用的麦克风。
 
 #### 变更
 
