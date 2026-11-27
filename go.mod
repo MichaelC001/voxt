@@ -10,7 +10,7 @@ require (
 	github.com/egoist/mygo v0.10.0
 	github.com/google/jsonschema-go v0.4.3
 	github.com/hehehai/actnowkit v0.22.2
-	github.com/hehehai/actnowkit/feedbackui v0.22.0
+	github.com/hehehai/actnowkit/feedbackui v0.22.1
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	golang.org/x/image v0.46.0
 	golang.org/x/sys v0.48.0
