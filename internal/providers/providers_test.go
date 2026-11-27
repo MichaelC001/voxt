@@ -14,6 +14,7 @@ import (
 	"github.com/hehehai/VoxtMini/internal/asr/aliyun"
 	"github.com/hehehai/VoxtMini/internal/asr/asrtest"
 	"github.com/hehehai/VoxtMini/internal/asr/doubao"
+	"github.com/hehehai/VoxtMini/internal/asr/gemini"
 	"github.com/hehehai/VoxtMini/internal/asr/mimo"
 	"github.com/hehehai/VoxtMini/internal/asr/openai"
 	"github.com/hehehai/VoxtMini/internal/llm"
@@ -162,8 +163,19 @@ func TestCheckEndpoint(t *testing.T) {
 		{ASR, settings.Provider{ID: "openai", Endpoint: "https://api.groq.com/openai/v1"}, true},
 		{ASR, settings.Provider{ID: "openai", Endpoint: "http://203.0.113.5/openai/v1"}, false},
 		{ASR, settings.Provider{ID: "openai", Endpoint: "http://100.88.1.2:3425/v1"}, true},
+		{ASR, settings.Provider{ID: "openai", Endpoint: "wss://api.openai.com/v1/realtime?intent=transcription"}, true},
+		{ASR, settings.Provider{ID: "openai", Endpoint: "https://api.openai.com/v1/realtime"}, true},
+		{ASR, settings.Provider{ID: "openai", Endpoint: "ws://127.0.0.1:8080/v1/realtime"}, true},
+		{ASR, settings.Provider{ID: "openai", Endpoint: "ws://100.88.1.2:8080/v1/realtime"}, true},
+		{ASR, settings.Provider{ID: "openai", Endpoint: "ws://203.0.113.5:8080/v1/realtime"}, false},
 		{ASR, settings.Provider{ID: "doubao", Endpoint: "ws://192.168.1.20:9000/api/v3/sauc/bigmodel_async"}, true},
 		{ASR, settings.Provider{ID: "doubao", Endpoint: "ws://8.8.8.8/api/v3/sauc/bigmodel_async"}, false},
+		{ASR, settings.Provider{ID: "gemini"}, true},
+		{ASR, settings.Provider{ID: "gemini", Endpoint: "wss://relay.example.com/live"}, true},
+		{ASR, settings.Provider{ID: "gemini", Model: "gemini-4-hydrogen", Endpoint: "https://generativelanguage.googleapis.com/v1beta"}, true},
+		{ASR, settings.Provider{ID: "gemini", Model: "gemini-4-hydrogen", Endpoint: "http://100.88.1.2:8080/v1beta"}, true},
+		{ASR, settings.Provider{ID: "gemini", Model: "gemini-4-hydrogen", Endpoint: "http://203.0.113.5/v1beta"}, false},
+		{ASR, settings.Provider{ID: "gemini", Model: "gemini-4-hydrogen", Endpoint: "ws://203.0.113.5/live"}, false},
 		{LLM, settings.Provider{ID: "deepseek"}, true},
 		{LLM, settings.Provider{ID: "custom"}, false},
 		{LLM, settings.Provider{ID: "custom", Endpoint: "http://localhost:8080/v1"}, true},
@@ -179,7 +191,7 @@ func TestCheckEndpoint(t *testing.T) {
 }
 
 func TestNewASR(t *testing.T) {
-	for id, want := range map[string]any{"openai": &openai.Client{}, "doubao": &doubao.Client{}, "aliyun": &aliyun.Client{}} {
+	for id, want := range map[string]any{"openai": &openai.Client{}, "doubao": &doubao.Client{}, "aliyun": &aliyun.Client{}, "gemini": &gemini.Client{}} {
 		c, err := NewASR(settings.Provider{ID: id, Enabled: true, AppID: "a"}, Env{Key: "k"})
 		if err != nil {
 			t.Errorf("%s: %v", id, err)
@@ -189,8 +201,27 @@ func TestNewASR(t *testing.T) {
 			t.Errorf("%s: %s, want %s", id, got, w)
 		}
 	}
+	if c, err := NewASR(settings.Provider{ID: "gemini", Model: "gemini-4-hydrogen", Enabled: true}, Env{Key: "k"}); err != nil {
+		t.Errorf("gemini file: %v", err)
+	} else if _, ok := c.(*gemini.FileClient); !ok {
+		t.Errorf("gemini file: %T, want *gemini.FileClient", c)
+	}
 	if _, err := NewASR(settings.Provider{ID: "openai"}, Env{}); asr.KindOf(err) != asr.KindConfig {
 		t.Errorf("no key: %v", err)
+	}
+	for _, ep := range []string{
+		"wss://api.openai.com/v1/realtime?intent=transcription",
+		"https://api.openai.com/v1/realtime",
+		"ws://127.0.0.1:8080/v1/realtime",
+	} {
+		c, err := NewASR(settings.Provider{ID: "openai", Enabled: true, Endpoint: ep}, Env{Key: "k"})
+		if err != nil {
+			t.Errorf("openai realtime %s: %v", ep, err)
+			continue
+		}
+		if _, ok := c.(*openai.RealtimeClient); !ok {
+			t.Errorf("openai realtime %s: got %T, want *openai.RealtimeClient", ep, c)
+		}
 	}
 	if _, err := NewASR(settings.Provider{ID: "x"}, Env{Key: "k"}); asr.KindOf(err) != asr.KindConfig {
 		t.Errorf("unknown: %v", err)
@@ -217,6 +248,24 @@ func TestTest(t *testing.T) {
 	}
 	if res := Test(context.Background(), ASR, p, Env{Key: "bad"}); asr.KindOf(res.Err) != asr.KindAuth {
 		t.Errorf("asr bad key: %+v", res)
+	}
+
+	gemSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("x-goog-api-key") != "good-gem" {
+			w.WriteHeader(400)
+			w.Write([]byte(`{"error":{"code":400,"message":"API key not valid.","status":"INVALID_ARGUMENT"}}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":""}]},"finishReason":"STOP"}]}`))
+	}))
+	defer gemSrv.Close()
+	gp := settings.Provider{ID: "gemini", Model: "gemini-4-hydrogen", Enabled: true, Endpoint: gemSrv.URL + "/v1beta"}
+	if res := Test(context.Background(), ASR, gp, Env{Key: "good-gem"}); res.Err != nil || res.Latency <= 0 {
+		t.Errorf("gemini file ok: %+v", res)
+	}
+	if res := Test(context.Background(), ASR, gp, Env{Key: "bad-gem"}); asr.KindOf(res.Err) != asr.KindAuth {
+		t.Errorf("gemini file bad key: %+v", res)
 	}
 
 	var body map[string]any

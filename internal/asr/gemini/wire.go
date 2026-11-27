@@ -59,12 +59,16 @@ func setupMessage(model string, req asr.StreamRequest) []byte {
 // other ones (Voxt sends all of the user's languages), deduplicated; none
 // when there is no hint (detect).
 func languageCodes(req asr.StreamRequest) []string {
+	return normalizeLanguages(req.Lang, req.Others)
+}
+
+func normalizeLanguages(lang string, others []string) []string {
 	out := []string{}
-	if strings.TrimSpace(req.Lang) == "" {
+	if strings.TrimSpace(lang) == "" {
 		return out
 	}
 	seen := map[string]bool{}
-	for _, l := range append([]string{req.Lang}, req.Others...) {
+	for _, l := range append([]string{lang}, others...) {
 		l = strings.ToLower(strings.TrimSpace(l))
 		if i := strings.IndexAny(l, "-_"); i >= 0 {
 			l = l[:i]

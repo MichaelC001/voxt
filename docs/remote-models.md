@@ -16,13 +16,13 @@ Voxt's lists (`Voxt/Core/Models/RemoteModelConfiguration.swift`, 1.15.0) against
 
 | Speech (Voxt `RemoteASRProvider`) | VoxtMini | Mode | Code |
 |---|---|---|---|
-| OpenAI Transcribe (gpt-4o-mini-transcribe, gpt-4o-transcribe, whisper-1) | ✅ OpenAI-compatible | upload | `asr/openai` (Auralink) |
+| OpenAI Transcribe (gpt-4o-mini-transcribe, gpt-4o-transcribe, whisper-1) | ✅ OpenAI-compatible (HTTP upload + Realtime WebSocket) | upload / stream | `asr/openai`: HTTP multipart by default; `wss://`/`ws://` or `…/realtime` endpoints auto-route to OpenAI Realtime transcription (16→24 kHz PCM16, live preview, `privnet`-guarded) |
 | Doubao (Volcengine bigmodel ASR 2.0 / 1.0) | ✅ | stream (WebSocket) | `asr/doubao` (Auralink) |
 | Aliyun Bailian (Qwen3-ASR realtime, Fun-ASR, Paraformer) | ✅ | stream | `asr/aliyun` (Auralink) |
 | StepFun | ✅ (OpenAI-compatible upload) | upload | `asr/openai` with StepFun's endpoint |
 | Z.ai GLM-ASR | ✅ (OpenAI-compatible multipart, not streamed) | upload | `asr/openai` with GLM's endpoint |
 | Xiaomi MiMo ASR (chat completions with `input_audio`) | ✅ | upload | `asr/mimo` (new, from Voxt's `xiaomiMiMoASRPayload`) |
-| Google Gemini (Live API, gemini-3.5-transcribe-live) | ✅ (2026-11-14) | stream (WebSocket) | `asr/gemini` (new, from Voxt's `GeminiLive*`): setup → setupComplete → `realtimeInput` audio, `audioStreamEnd`; dictionary as `customVocabulary` |
+| Google Gemini (Live API `gemini-3.5-transcribe-live` and non-Live `generateContent` models such as `gemini-4-hydrogen`, `gemini-4-neon`) | ✅ | stream (Live) / upload (`generateContent`) | `asr/gemini`: auto-routed by model/endpoint; Live WebSocket (`BidiGenerateContent`) for `live` models or `ws(s)://` endpoints, non-streaming `generateContent` (WAV `inlineData`, `x-goog-api-key` header, transcription-only system instruction) for other models |
 
 | Language (Voxt `RemoteLLMProvider`) | VoxtMini preset |
 |---|---|

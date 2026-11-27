@@ -4,6 +4,20 @@ All notable changes to VoxtMini. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.0-beta.10] - 2026-11-27
+
+### Added
+
+- Google Gemini speech recognition now supports non-streaming `generateContent` models (such as `gemini-4-hydrogen` and `gemini-4-neon`) in addition to Gemini Live WebSocket models (`gemini-3.5-transcribe-live`), routing automatically by model name or endpoint.
+- OpenAI Transcribe now supports OpenAI Realtime WebSocket streaming transcription: entering a `wss://`/`ws://` or `…/realtime` endpoint streams live audio (resampled 16→24 kHz PCM16) with live preview deltas and supports custom/local Realtime gateways (`ws://` guarded by `privnet`), while keeping existing HTTP upload transcription unchanged.
+
+### 中文
+
+#### 新增
+
+- Google Gemini 语音识别现已支持非流式 `generateContent` 模型（如 `gemini-4-hydrogen`、`gemini-4-neon`），与 Gemini Live WebSocket 模型（`gemini-3.5-transcribe-live`）并存，根据模型名称或接口地址自动路由。
+- OpenAI Transcribe 现已支持 OpenAI Realtime WebSocket 流式转录：填写 `wss://`/`ws://` 或包含 `/realtime` 的端点时自动切换为实时流式转录（16→24 kHz PCM16 重采样、实时预览增量更新），支持自建/局域网兼容网关（`ws://` 受私有网络规则保护），同时保持原有 HTTP 上传转录完全不变。
+
 ## [0.1.0-beta.9] - 2026-11-26
 
 ### Added

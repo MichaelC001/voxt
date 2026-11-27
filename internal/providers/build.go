@@ -43,7 +43,11 @@ func NewASR(p settings.Provider, env Env) (asr.Provider, error) {
 	)
 	switch pr.ID {
 	case openai.ID:
-		c, err = openai.New(cfg)
+		if openai.IsRealtimeEndpoint(cfg.Endpoint) {
+			c, err = openai.NewRealtime(cfg)
+		} else {
+			c, err = openai.New(cfg)
+		}
 	case StepFunASR, GLMASR:
 		if cfg.Endpoint == "" {
 			cfg.Endpoint = pr.Endpoint
@@ -57,7 +61,7 @@ func NewASR(p settings.Provider, env Env) (asr.Provider, error) {
 	case aliyun.ID:
 		c, err = aliyun.New(cfg)
 	case gemini.ID:
-		c, err = gemini.New(cfg)
+		c, err = gemini.NewProvider(cfg)
 	case mimo.ID:
 		c, err = mimo.New(cfg)
 	default:
@@ -89,7 +93,14 @@ func CheckEndpoint(kind Kind, p settings.Provider) error {
 	}
 	switch {
 	case pr.ID == gemini.ID:
-		_, err := asr.CheckEndpoint(pr.ID, gemini.Endpoint(p.Endpoint), "wss")
+		if gemini.UseLive(p.Model, p.Endpoint) {
+			_, err := asr.CheckEndpoint(pr.ID, gemini.Endpoint(p.Endpoint), "wss")
+			return err
+		}
+		_, err := asr.CheckEndpoint(pr.ID, gemini.FileEndpoint(p.Endpoint, p.Model), "https")
+		return err
+	case pr.ID == openai.ID && openai.IsRealtimeEndpoint(p.Endpoint):
+		_, err := asr.CheckEndpoint(pr.ID, openai.RealtimeEndpoint(p.Endpoint), "wss")
 		return err
 	case pr.Mode == ModeStream:
 		_, err := asr.CheckEndpoint(pr.ID, p.Endpoint, "wss")

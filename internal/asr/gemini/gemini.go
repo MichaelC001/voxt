@@ -1,6 +1,10 @@
-// Package gemini is the streamer of Google's Gemini Live API used as a
-// speech recogniser (the live transcription models): recognition over a
-// WebSocket while the user speaks.
+// Package gemini is Google's Gemini speech recognition: both the Live
+// API WebSocket streamer (for live models such as
+// gemini-3.5-transcribe-live) and non-streaming generateContent audio
+// transcription (for multimodal models such as gemini-4-hydrogen and
+// gemini-4-neon).
+//
+// Live WebSocket (wire.go, stream.go):
 //
 //	→ {"setup":{"model":"models/…","generationConfig":{"responseModalities":["TEXT"]},
 //	   "inputAudioTranscription":{"languageCodes":[…],"mode":"SMART","customVocabulary":[…]}}}
@@ -13,13 +17,13 @@
 //	← turnComplete or goAway, or the socket closes: the final text
 //	← {"error":{"code":…,"message":…,"status":…}} at any point
 //
-// The API key rides in the URL's key query parameter, added at connect
-// time only: Endpoint strips one the user's endpoint carries, and errors
-// never contain it. Proto JSON may arrive in camelCase or snake_case;
-// both are read.
+// Non-streaming generateContent (file.go):
 //
-// Message building and parsing are pure functions (wire.go); stream.go
-// owns the connection.
+//	POST …/v1beta/models/{model}:generateContent (x-goog-api-key header)
+//	WAV audio as inlineData alongside a transcription-only system instruction.
+//
+// NewProvider routes automatically between Live and generateContent based
+// on the model name and endpoint (UseLive).
 //
 // Imports: asr.
 package gemini
@@ -45,7 +49,48 @@ const defaultPath = "/ws/google.ai.generativelanguage.v1beta.GenerativeService.B
 const DefaultModel = "gemini-3.5-transcribe-live"
 
 // Models are the models offered in the model menu (any id may be typed).
-var Models = []string{DefaultModel}
+var Models = []string{
+	DefaultModel,
+	"gemini-4-hydrogen",
+	"gemini-4-neon",
+}
+
+// UseLive reports whether model and endpoint select the Gemini Live
+// WebSocket API rather than non-streaming generateContent:
+//   - an explicit wss://, ws://, or BidiGenerateContent endpoint uses Live;
+//   - an explicit generateContent endpoint (other than BidiGenerateContent)
+//     uses generateContent;
+//   - otherwise, a model containing "live" (case-insensitive; empty
+//     defaults to DefaultModel) uses Live, and any other model uses
+//     generateContent.
+func UseLive(model, endpoint string) bool {
+	ep := strings.ToLower(strings.TrimSpace(endpoint))
+	if ep != "" {
+		if strings.Contains(ep, "bidigeneratecontent") {
+			return true
+		}
+		if strings.Contains(ep, "generatecontent") {
+			return false
+		}
+		if strings.HasPrefix(ep, "wss://") || strings.HasPrefix(ep, "ws://") {
+			return true
+		}
+	}
+	model = strings.TrimSpace(model)
+	if model == "" {
+		model = DefaultModel
+	}
+	return strings.Contains(strings.ToLower(model), "live")
+}
+
+// NewProvider returns a Live streamer (*Client) or a non-streaming
+// generateContent transcriber (*FileClient) according to UseLive.
+func NewProvider(cfg asr.Config) (asr.Provider, error) {
+	if UseLive(cfg.Model, cfg.Endpoint) {
+		return New(cfg)
+	}
+	return NewFile(cfg)
+}
 
 // Endpoint is the WebSocket URL for what the user typed, without the key:
 // "" is DefaultEndpoint; https:// and http:// become wss:// and ws://; an
